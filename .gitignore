@@ -1,0 +1,3 @@
+# nunca subir faturas nem backups com dados pessoais
+*.pdf
+*.json
