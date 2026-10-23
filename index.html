@@ -293,7 +293,7 @@ const num = v => { const n = parseFloat(String(v).replace(/\./g, '').replace(','
 // ---------- estado ----------
 function novoEstado() {
   // regras: o que você marcou para cada estabelecimento nas faturas, para pré-marcar na próxima
-  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [] };
+  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {} };
 }
 // Ajusta dados salvos por versões antigas do app.
 function normalizar(d) {
@@ -627,7 +627,7 @@ function tabelaItens(itens, mostraFixo) {
   if (!itens.length) return '<div class="empty">Nada por aqui ainda.</div>';
   itens = itens.slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() ? ' <span class="tag">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}</td><td>${esc(i.cat)}</td>
+    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() ? ' <span class="tag">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.provisorio ? ' <span class="tag" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}</td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? '' : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
@@ -645,10 +645,12 @@ function telaLanc() {
       <label>Categoria<input name="cat" list="cats" required placeholder="Alimentação"></label>
       <label>Valor (R$)<input name="valor" inputmode="decimal" required placeholder="0,00"></label>
       <label>Cartão<select name="cartao">${opcoesCartao(cartaoSel || SEM_CARTAO)}</select></label>
+      <label>Parcelas<select name="parcelas">${Array.from({ length: 24 }, (_, i) => `<option value="${i + 1}">${i + 1}x</option>`).join('')}</select></label>
+      <label>O valor é<select name="valorDe"><option value="total">Total da compra</option><option value="parcela">De cada parcela</option></select></label>
       <label>Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option></select></label>
       <button class="btn primary">Adicionar</button>
     </form>
-    <p class="hint">Em "Sua parte", informe o valor total da conta: o app lança só a sua fração. Use datas futuras para gastos planejados (IPVA, viagem, presente) — eles entram na projeção.</p>
+    <p class="hint">Comprou no cartão? Escolha o cartão e as parcelas: cada parcela vai para a fatura em que vai cair e entra na projeção já. Quando você importar a fatura, a compra é reconhecida e não duplica. Em "Sua parte", informe o valor total da conta: o app lança só a sua fração. Use datas futuras para gastos planejados (IPVA, viagem, presente) — eles entram na projeção.</p>
   </div>
   ${chipsCartao()}
   <div class="card"><h2>${ico('lista')} Lançamentos de ${nomeMes(mesSel)} ${cartaoSel !== null ? `<span class="sub">· ${esc(nomeCartao(cartaoSel))} · ${fmt.format(totais(doMes).d)}</span>` : ''}</h2>${tabelaItens(doMes)}</div>`;
@@ -967,18 +969,22 @@ function lerFatura(linhas) {
     it.base = `${it.desc}|${it.valor}|${it.data}|${it.parc ? it.parc.N : ''}`;
     it.key = it.sec === 'encargo' ? `${fechamento}|${it.desc}|${it.valor}` : it.base + '|' + (it.parc ? it.parc.n : '');
   });
-  marcarItens(itens);
+  marcarItens(itens, banco);
   return { banco, fechamento, vencimento: iso(venc.a || ano, venc.m, venc.d), itens, soma, totalFatura, ignorados, futuros, revisao: itens.some(i => i.importado) };
 }
 
 // Pré-marca cada item: o que já foi lançado volta como estava (para revisar);
 // o resto segue o que você marcou da última vez para o mesmo estabelecimento.
-function marcarItens(itens) {
+function marcarItens(itens, banco) {
+  const usados = new Set();
   itens.forEach((it, i) => {
     it.id = i;
-    const ja = S.lanc.find(l => l.key === it.key);
+    let ja = S.lanc.find(l => l.key === it.key);
+    // compra lançada à mão antes da fatura fechar: usa a sua marcação e o seu nome/categoria
+    const manual = !ja && banco ? S.lanc.find(l => !usados.has(l.id) && casaComFatura(l, it, banco)) : null;
+    if (manual) { usados.add(manual.id); it.manual = manual.id; ja = manual; }
     const regra = S.regras[it.desc];
-    it.importado = !!(ja && !ja.prevista);
+    it.importado = !!(ja && !ja.prevista && !ja.provisorio);
     it.escolha = ja ? (ja.share === 1 ? 'meu' : ja.share === 0.5 ? 'metade' : 'div')
       : regra ? regra.escolha : null;
     // já tinha sido importada e este item não virou lançamento: foi marcado "não é meu"
@@ -991,7 +997,7 @@ function marcarItens(itens) {
 function reabrirFatura(id) {
   const f = S.faturas.find(f => f.id === id);
   const itens = f.itens.map(x => ({ ...x, parc: x.parc ? { ...x.parc } : null }));
-  marcarItens(itens);
+  marcarItens(itens, f.banco);
   imp = { ...f, itens, revisao: true };
 }
 
@@ -1025,6 +1031,7 @@ function telaFatura() {
     <p class="hint" id="pdf-status"></p>
     <p class="hint">O PDF é lido aqui mesmo no seu navegador e não é enviado para lugar nenhum. Só o leitor de PDF é baixado da internet na primeira vez.</p>
   </div>
+  ${telaFaturasAbertas()}
   ${telaHistoricoFaturas()}`;
 
   const pend = imp.itens.filter(i => !i.escolha).length;
@@ -1041,7 +1048,7 @@ function telaFatura() {
     corpo += `<tr class="sec-title"><td colspan="6">${nomes[sec]} · ${lista.length} itens · ${fmt.format(lista.reduce((a, i) => a + i.valor, 0))}</td></tr>`;
     corpo += lista.map(it => `<tr class="${!it.escolha ? 'pendente' : it.escolha === 'nao' ? 'ignorado' : ''}">
       <td>${it.data.slice(8)}/${it.data.slice(5, 7)}</td>
-      <td>${esc(it.desc)}${it.parc ? ` <span class="tag">${it.parc.n}/${it.parc.N}</span>` : ''}</td>
+      <td>${esc(it.desc)}${it.parc ? ` <span class="tag">${it.parc.n}/${it.parc.N}</span>` : ''}${it.manual ? ` <span class="tag" title="${esc(S.lanc.find(l => l.id === it.manual)?.desc || '')}">✓ lançada à mão</span>` : ''}</td>
       <td class="num">${fmt.format(it.valor)}</td>
       <td><span class="seg">${btn(it, 'meu', 'Meu')}${btn(it, 'metade', 'Metade')}${btn(it, 'div', it.escolha === 'div' ? `${it.k}/${it.n} seu` : 'Dividir…')}${btn(it, 'nao', 'Não é meu')}</span></td>
       <td><input list="cats" data-cat-it="${it.id}" value="${esc(it.cat)}" style="width:130px" ${it.escolha === 'nao' ? 'disabled' : ''}></td>
@@ -1059,6 +1066,14 @@ function telaFatura() {
         : `<span class="neg">▲ soma ${fmt.format(imp.soma)} ≠ fatura ${fmt.format(imp.totalFatura)}</span>`}
         ${imp.futuros ? `<br>${imp.futuros} parcelas de próximas faturas ignoradas` : ''}</div></div>
   </div>
+  ${(() => {
+    const casadas = new Set(imp.itens.map(i => i.manual).filter(Boolean));
+    const ant = addMes(imp.fechamento.slice(0, 7), -1) + imp.fechamento.slice(7);
+    const faltando = S.lanc.filter(l => l.provisorio && l.cartao === imp.banco && !casadas.has(l.id) && l.data > ant && l.data <= imp.fechamento);
+    return faltando.length ? `<div class="card" style="border-color:var(--warn)"><h2>▲ ${faltando.length} ${faltando.length === 1 ? 'compra lançada à mão não apareceu' : 'compras lançadas à mão não apareceram'} nesta fatura</h2>
+      ${faltando.map(l => `<div class="hint" style="margin:2px 0">${l.data.split('-').reverse().join('/')} · ${esc(l.desc)} · ${fmt.format(l.valor)}</div>`).join('')}
+      <p class="hint">Pode ter caído na próxima fatura, ou o valor/data ficou diferente. Se for a mesma compra com outro valor, marque o item da fatura e apague a lançada à mão (lápis ou ✕ em Lançamentos).</p></div>` : '';
+  })()}
   <div class="card">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div><b>${pend ? pend + ' sem marcar' : 'Tudo marcado'}</b> <span class="hint">· marcar os que faltam como:</span></div>
@@ -1096,11 +1111,78 @@ function telaHistoricoFaturas() {
   </div>`;
 }
 
+// Dia de fechamento do cartão: o que você informou, ou o da última fatura importada dele.
+function diaFechamento(c) {
+  if (S.diasFechamento[c]) return S.diasFechamento[c];
+  const f = S.faturas.filter(f => f.banco === c).sort((a, b) => b.fechamento.localeCompare(a.fechamento))[0];
+  return f ? +f.fechamento.slice(8) : null;
+}
+const dataNoMes = (ym, dia) => ym + '-' + String(Math.min(dia, 28)).padStart(2, '0');
+// Data de fechamento da fatura em que cai uma compra feita em `data`
+function fechamentoDaCompra(c, data) {
+  const dia = diaFechamento(c);
+  if (!dia) return null;
+  const ym = data.slice(0, 7);
+  return +data.slice(8) <= dia ? dataNoMes(ym, dia) : dataNoMes(addMes(ym, 1), dia);
+}
+
+// Compra no cartão lançada à mão: cada parcela vai para a fatura em que vai cair.
+// Fica marcada "a conferir" até a fatura ser importada e trocar pela de verdade.
+function lancarCompraCartao(f, valor, share) {
+  const N = Math.max(1, +f.parcelas || 1);
+  const vParc = r2(f.valorDe === 'parcela' ? valor : valor / N);
+  const fech1 = fechamentoDaCompra(f.cartao, f.data);
+  const compra = { id: uid(), data: f.data, N, valor: vParc };
+  for (let k = 1; k <= N; k++) {
+    // à vista fica na data da compra; parcelas, no fechamento de cada fatura (como na importação)
+    const data = N === 1 ? f.data : fech1 ? addMes(fech1.slice(0, 7), k - 1) + fech1.slice(7) : addMes(f.data.slice(0, 7), k - 1) + f.data.slice(7);
+    S.lanc.push({ id: uid(), tipo: 'despesa', data, desc: f.desc.trim() + (N > 1 ? ` (${k}/${N})` : '') + rotuloFracao(share), cat: f.cat.trim(),
+      valor: r2(vParc * share), share, cartao: f.cartao, parcela: N > 1, provisorio: true, compra: { ...compra, n: k } });
+  }
+}
+
+// A compra lançada à mão corresponde a este item da fatura? Mesmo cartão, mesma parcela,
+// valor parecido (até 3% ou R$ 1) e data da compra até 5 dias de diferença.
+function casaComFatura(l, it, banco) {
+  if (!l.provisorio || l.cartao !== banco) return false;
+  const c = l.compra, n = it.parc ? it.parc.n : 1, N = it.parc ? it.parc.N : 1;
+  if (c.n !== n || c.N !== N) return false;
+  if (Math.abs(c.valor - it.valor) > Math.max(1, it.valor * 0.03)) return false;
+  return Math.abs(new Date(c.data) - new Date(it.data)) <= 5 * 864e5;
+}
+
+function telaFaturasAbertas() {
+  const cs = cartoesUsados();
+  if (!cs.length) return '';
+  const hojeIso = hoje();
+  return `<div class="card"><h2>${ico('cartao')} Fatura em andamento</h2>
+    <div class="tbl-wrap"><table><thead><tr><th>Cartão</th><th>Fecha em</th><th class="num">Já previsto (sua parte)</th><th class="num">Lançado à mão</th><th></th></tr></thead><tbody>
+    ${cs.map(c => {
+      const prox = fechamentoDaCompra(c, hojeIso);
+      const ant = prox ? addMes(prox.slice(0, 7), -1) + prox.slice(7) : null;
+      const naFatura = prox ? S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && l.data > ant && l.data <= prox && !(l.origem === 'fatura' && !l.prevista)) : [];
+      const total = naFatura.reduce((a, l) => a + l.valor, 0), manuais = naFatura.filter(l => l.provisorio);
+      return `<tr><td>${tagCartao(c)}</td>
+        <td>${prox ? prox.split('-').reverse().join('/') : '<span class="hint" style="margin:0">informe o dia →</span>'}</td>
+        <td class="num"><b>${prox ? fmt.format(total) : '—'}</b></td>
+        <td class="num">${prox ? `${manuais.length} ${manuais.length === 1 ? 'compra' : 'compras'}` : ''}</td>
+        <td class="num"><label class="hint" style="margin:0;white-space:nowrap">dia <input data-dia-fech="${esc(c)}" inputmode="numeric" value="${diaFechamento(c) || ''}" style="width:52px;padding:5px 8px" placeholder="—"></label></td></tr>`;
+    }).join('')}
+    </tbody></table></div>
+    <p class="hint">"Já previsto" soma as parcelas de faturas anteriores que caem nesta e as compras que você lançou à mão (aba Lançar, com cartão e parcelas). O dia de fechamento vem da última fatura importada; ajuste se precisar.</p>
+  </div>`;
+}
+
 function confirmarImportacao() {
   let novos = 0, futuras = 0;
   for (const it of imp.itens) {
     if (it.escolha) S.regras[it.desc] = { escolha: it.escolha, cat: it.cat, ...(it.escolha === 'div' ? { k: it.k, n: it.n } : {}) };
     if (!it.escolha) continue;   // sem marcação: não mexe no que já existe
+    const manual = it.manual && S.lanc.find(l => l.id === it.manual);
+    if (manual) {
+      const c = manual.compra;
+      S.lanc = S.lanc.filter(l => l !== manual && !(l.provisorio && l.compra.id === c.id && (it.escolha === 'nao' || impFuturas) && l.compra.n > c.n));
+    }
     if (it.escolha === 'nao') {
       // não é seu: tira o lançamento (se já existia) e as parcelas planejadas dele
       S.lanc = S.lanc.filter(l => l.key !== it.key && !(l.prevista && l.key.startsWith(it.base + '|')));
@@ -1184,6 +1266,7 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'f-lanc') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
     const fr = lerFracao(f.parte), share = fr ? fr.k / fr.n : 1;
+    if (f.cartao && f.tipo === 'despesa') { lancarCompraCartao(f, valor, share); mesSel = f.data.slice(0, 7); salvar(); return; }
     S.lanc.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}) });
     mesSel = f.data.slice(0, 7);
   } else if (e.target.id === 'f-fixo') {
@@ -1258,6 +1341,11 @@ document.addEventListener('change', e => {
     st.textContent = 'Lendo a fatura…';
     e.target.files[0].arrayBuffer().then(linhasDoPdf).then(l => { imp = lerFatura(l); render(); })
       .catch(err => { st.innerHTML = `<span class="neg">${esc(err.message)}</span>`; });
+  }
+  if (e.target.dataset && e.target.dataset.diaFech !== undefined) {
+    const d = parseInt(e.target.value, 10);
+    if (d >= 1 && d <= 31) S.diasFechamento[e.target.dataset.diaFech] = d; else delete S.diasFechamento[e.target.dataset.diaFech];
+    salvar();
   }
   if (e.target.id === 'saldo') { S.saldoAtual = num(e.target.value); salvar(); }
   if (e.target.id === 'horiz') { S.horizonte = +e.target.value; salvar(); }
