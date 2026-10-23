@@ -445,9 +445,10 @@ function telaLanc() {
       <label style="flex:2 1 200px">Descrição<input name="desc" required placeholder="Ex.: mercado, uber, freela…"></label>
       <label>Categoria<input name="cat" list="cats" required placeholder="Alimentação"></label>
       <label>Valor (R$)<input name="valor" inputmode="decimal" required placeholder="0,00"></label>
+      <label>Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option></select></label>
       <button class="btn primary">Adicionar</button>
     </form>
-    <p class="hint">Use datas futuras para gastos planejados (IPVA, viagem, presente) — eles entram na projeção.</p>
+    <p class="hint">Em "Sua parte", informe o valor total da conta: o app lança só a sua fração. Use datas futuras para gastos planejados (IPVA, viagem, presente) — eles entram na projeção.</p>
   </div>
   <div class="card"><h2>Lançamentos de ${nomeMes(mesSel)}</h2>${tabelaItens(doMes)}</div>`;
 }
@@ -767,28 +768,41 @@ function lerFatura(linhas) {
     const ja = S.lanc.find(l => l.key === it.key);
     const regra = S.regras[it.desc];
     it.jaImportado = !!(ja && !ja.prevista);
-    it.escolha = it.jaImportado ? 'nao' : ja ? (ja.share === 1 ? 'meu' : 'metade') : regra ? regra.escolha : null;
+    it.escolha = it.jaImportado ? 'nao' : ja ? (ja.share === 1 ? 'meu' : ja.share === 0.5 ? 'metade' : 'div') : regra ? regra.escolha : null;
+    if (it.escolha === 'div') Object.assign(it, ja ? lerFracao(fracaoTxt(ja.share)) : { k: regra.k, n: regra.n });
     it.cat = ja ? ja.cat : regra && regra.cat ? regra.cat : palpiteCat(it.desc);
   });
   return { banco, fechamento, vencimento: iso(venc.a || ano, venc.m, venc.d), itens, soma, totalFatura, ignorados, futuros };
 }
 
 const SHARE = { meu: 1, metade: 0.5, nao: 0 };
+const fracao = it => it.escolha === 'div' ? it.k / it.n : SHARE[it.escolha] || 0;
+const rotuloFracao = share => share === 1 ? '' : share === 0.5 ? ' · metade' : ` · ${fracaoTxt(share)} seu`;
+// 0.6667 → "2/3"
+function fracaoTxt(share) {
+  for (let n = 2; n <= 12; n++) { const k = Math.round(share * n); if (Math.abs(k / n - share) < 0.001) return `${k}/${n}`; }
+  return Math.round(share * 100) + '%';
+}
+function lerFracao(txt) {
+  const m = String(txt || '').trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+  return m && +m[1] >= 1 && +m[1] < +m[2] && +m[2] <= 12 ? { k: +m[1], n: +m[2] } : null;
+}
 const r2 = v => Math.round(v * 100) / 100;
 
 function telaFatura() {
   if (!imp) return `
   <div class="card"><h2>Importar fatura do cartão</h2>
-    <p class="hint" style="margin:0 0 12px">Escolha o PDF da fatura do <b>Itaú, Santander, Bradesco ou Nubank</b>. Depois você marca o que é seu, o que é metade e o que não é seu. Na próxima fatura, os mesmos estabelecimentos já vêm marcados.</p>
+    <p class="hint" style="margin:0 0 12px">Escolha o PDF da fatura do <b>Itaú, Santander, Bradesco ou Nubank</b>. Depois você marca o que é seu, o que é metade, o que é dividido (ex.: 2/3 seu) e o que não é seu. Na próxima fatura, os mesmos estabelecimentos já vêm marcados.</p>
     <label class="btn primary" style="display:inline-block;cursor:pointer">Escolher PDF da fatura<input type="file" id="pdf-fatura" accept="application/pdf,.pdf" hidden></label>
     <p class="hint" id="pdf-status"></p>
     <p class="hint">O PDF é lido aqui mesmo no seu navegador e não é enviado para lugar nenhum. Só o leitor de PDF é baixado da internet na primeira vez.</p>
   </div>`;
 
   const pend = imp.itens.filter(i => !i.escolha).length;
-  const minha = r2(imp.itens.reduce((a, i) => a + i.valor * (SHARE[i.escolha] || 0) * (i.jaImportado ? 0 : 1), 0));
+  const minha = r2(imp.itens.reduce((a, i) => a + i.valor * fracao(i) * (i.jaImportado ? 0 : 1), 0));
   const meuTotal = r2(imp.itens.filter(i => i.escolha === 'meu').reduce((a, i) => a + i.valor, 0));
   const metadeTotal = r2(imp.itens.filter(i => i.escolha === 'metade').reduce((a, i) => a + i.valor, 0));
+  const divididos = imp.itens.filter(i => i.escolha === 'div' && !i.jaImportado);
   const nomes = { despesa: 'Compras do mês', parcela: 'Parcelas', credito: 'Estornos e créditos', encargo: 'Juros e IOF' };
   const btn = (it, v, txt) => `<button class="${it.escolha === v ? 'on ' + v : ''}" data-esc="${v}" data-it="${it.id}">${txt}</button>`;
   let corpo = '';
@@ -800,9 +814,9 @@ function telaFatura() {
       <td>${it.data.slice(8)}/${it.data.slice(5, 7)}</td>
       <td>${esc(it.desc)}${it.parc ? ` <span class="tag">${it.parc.n}/${it.parc.N}</span>` : ''}${it.jaImportado ? ' <span class="tag">já importado</span>' : ''}</td>
       <td class="num">${fmt.format(it.valor)}</td>
-      <td>${it.jaImportado ? '' : `<span class="seg">${btn(it, 'meu', 'Meu')}${btn(it, 'metade', 'Metade')}${btn(it, 'nao', 'Não é meu')}</span>`}</td>
+      <td>${it.jaImportado ? '' : `<span class="seg">${btn(it, 'meu', 'Meu')}${btn(it, 'metade', 'Metade')}${btn(it, 'div', it.escolha === 'div' ? `${it.k}/${it.n} seu` : 'Dividir…')}${btn(it, 'nao', 'Não é meu')}</span>`}</td>
       <td><input list="cats" data-cat-it="${it.id}" value="${esc(it.cat)}" style="width:130px" ${it.escolha === 'nao' ? 'disabled' : ''}></td>
-      <td class="num">${it.escolha && it.escolha !== 'nao' && !it.jaImportado ? fmt.format(r2(it.valor * SHARE[it.escolha])) : ''}</td></tr>`).join('');
+      <td class="num">${it.escolha && it.escolha !== 'nao' && !it.jaImportado ? fmt.format(r2(it.valor * fracao(it))) : ''}</td></tr>`).join('');
   }
   return `
   <div class="tiles">
@@ -832,7 +846,7 @@ function telaFatura() {
   </div>
   <div class="barra-imp">
     <div><div class="hint" style="margin:0">Sua parte desta fatura</div><div class="tot">${fmt.format(minha)}</div></div>
-    <div class="hint" style="margin:0;flex:1">Seus: ${fmt.format(meuTotal)} · Metade: ${fmt.format(metadeTotal)} → ${fmt.format(r2(metadeTotal / 2))}</div>
+    <div class="hint" style="margin:0;flex:1">Seus: ${fmt.format(meuTotal)} · Metade: ${fmt.format(metadeTotal)} → ${fmt.format(r2(metadeTotal / 2))}${divididos.length ? ` · Divididos: ${fmt.format(r2(divididos.reduce((a, i) => a + i.valor, 0)))} → ${fmt.format(r2(divididos.reduce((a, i) => a + i.valor * fracao(i), 0)))}` : ''}</div>
     <button class="btn" id="imp-cancelar">Cancelar</button>
     <button class="btn primary" id="imp-ok" ${pend ? `title="Ainda faltam ${pend} itens; eles não serão importados"` : ''}>Importar</button>
   </div>`;
@@ -841,7 +855,7 @@ function telaFatura() {
 function confirmarImportacao() {
   let novos = 0, futuras = 0;
   for (const it of imp.itens) {
-    if (it.escolha) S.regras[it.desc] = { escolha: it.escolha, cat: it.cat };
+    if (it.escolha) S.regras[it.desc] = { escolha: it.escolha, cat: it.cat, ...(it.escolha === 'div' ? { k: it.k, n: it.n } : {}) };
     if (it.jaImportado) continue;
     const planejadas = S.lanc.filter(l => l.prevista && l.key.startsWith(it.base + '|'));
     if (!it.escolha || it.escolha === 'nao') {
@@ -849,9 +863,9 @@ function confirmarImportacao() {
       if (it.escolha === 'nao') S.lanc = S.lanc.filter(l => !planejadas.includes(l));
       continue;
     }
-    const share = SHARE[it.escolha];
+    const share = fracao(it);
     const data = it.sec === 'despesa' && impModo === 'compra' ? it.data : imp.fechamento;
-    const desc = it.desc + (it.parc ? ` (${it.parc.n}/${it.parc.N})` : '') + (share < 1 ? ' · metade' : '');
+    const desc = it.desc + (it.parc ? ` (${it.parc.n}/${it.parc.N})` : '') + rotuloFracao(share);
     S.lanc = S.lanc.filter(l => l.key !== it.key);
     S.lanc.push({ id: uid(), tipo: 'despesa', data, desc, cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key: it.key, origem: 'fatura', cartao: imp.banco, parcela: !!it.parc });
     novos++;
@@ -859,7 +873,7 @@ function confirmarImportacao() {
       for (let k = it.parc.n + 1; k <= it.parc.N; k++) {
         const key = it.base + '|' + k;
         S.lanc = S.lanc.filter(l => l.key !== key);
-        S.lanc.push({ id: uid(), tipo: 'despesa', data: addMes(imp.fechamento.slice(0, 7), k - it.parc.n) + '-' + imp.fechamento.slice(8), desc: `${it.desc} (${k}/${it.parc.N})` + (share < 1 ? ' · metade' : ''), cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key, origem: 'fatura', cartao: imp.banco, parcela: true, prevista: true });
+        S.lanc.push({ id: uid(), tipo: 'despesa', data: addMes(imp.fechamento.slice(0, 7), k - it.parc.n) + '-' + imp.fechamento.slice(8), desc: `${it.desc} (${k}/${it.parc.N})` + rotuloFracao(share), cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key, origem: 'fatura', cartao: imp.banco, parcela: true, prevista: true });
         futuras++;
       }
     }
@@ -896,7 +910,8 @@ document.addEventListener('submit', e => {
   const f = Object.fromEntries(new FormData(e.target));
   if (e.target.id === 'f-lanc') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
-    S.lanc.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim(), cat: f.cat.trim(), valor });
+    const fr = lerFracao(f.parte), share = fr ? fr.k / fr.n : 1;
+    S.lanc.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share });
     mesSel = f.data.slice(0, 7);
   } else if (e.target.id === 'f-fixo') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
@@ -915,7 +930,13 @@ document.addEventListener('click', e => {
   if (d.delLanc) { S.lanc = S.lanc.filter(l => l.id !== d.delLanc); salvar(); }
   if (d.delFixo && confirm('Excluir este item fixo de todos os meses?')) { S.fixos = S.fixos.filter(f => f.id !== d.delFixo); salvar(); }
   if (d.encerrar) { const f = S.fixos.find(f => f.id === d.encerrar); f.fim = mesAtual(); salvar(); }
-  if (d.esc) { imp.itens[d.it].escolha = d.esc; render(); }
+  if (d.esc === 'div') {
+    const it = imp.itens[d.it];
+    const resp = prompt('Quanto desta compra é seu? Ex.: 2/3 (dividido em 3, duas partes suas), 1/3, 1/4', it.escolha === 'div' ? `${it.k}/${it.n}` : '2/3');
+    const f = lerFracao(resp);
+    if (f) { Object.assign(it, f, { escolha: 'div' }); render(); }
+    else if (resp !== null) alert('Use o formato partes suas/total, por exemplo 2/3.');
+  } else if (d.esc) { imp.itens[d.it].escolha = d.esc; render(); }
   if (d.todos) { imp.itens.forEach(i => { if (!i.escolha && !i.jaImportado) i.escolha = d.todos; }); render(); }
   if (e.target.id === 'imp-cancelar') { imp = null; render(); }
   if (e.target.id === 'imp-ok') {
