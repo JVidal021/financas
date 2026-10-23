@@ -248,10 +248,12 @@ const ABAS = [['visao', 'Visão geral', 'home', 'Início'], ['lanc', 'Lançament
 // Cartões: cada lançamento pode ter um cartão (importados da fatura já vêm com o banco).
 // Sem cartão = Pix, débito ou dinheiro.
 const SEM_CARTAO = '';
+const FIXAS = '#fixas';   // itens fixos sem cartão (aluguel, contas em boleto/débito automático)
 const CORES_CARTAO = { 'Itaú': '#ec7000', 'Santander': '#d93a3a', 'Nubank': '#8a3ffc', 'Bradesco': '#cc2c74' };
 const CORES_EXTRA = ['#2a78d6', '#1baf7a', '#c98500', '#6250d6'];
-const corCartao = c => !c ? '#8a8fa3' : CORES_CARTAO[c] || CORES_EXTRA[[...c].reduce((a, ch) => a + ch.charCodeAt(0), 0) % CORES_EXTRA.length];
-const nomeCartao = c => c || 'Pix / débito';
+const corCartao = c => !c ? '#8a8fa3' : c === FIXAS ? '#1baf7a' : CORES_CARTAO[c] || CORES_EXTRA[[...c].reduce((a, ch) => a + ch.charCodeAt(0), 0) % CORES_EXTRA.length];
+const nomeCartao = c => c === FIXAS ? 'Contas fixas' : c || 'Pix / débito';
+const grupoCartao = i => i.cartao || (i.fixo ? FIXAS : SEM_CARTAO);
 const tagCartao = c => `<span class="tag"><span class="dot" style="background:${corCartao(c)}"></span>${esc(nomeCartao(c))}</span>`;
 let cartaoSel = null;   // null = todos
 function cartoesUsados() {
@@ -259,12 +261,13 @@ function cartoesUsados() {
   S.lanc.concat(S.fixos).forEach(i => { if (i.cartao) set.add(i.cartao); });
   return [...set].sort();
 }
-const filtraCartao = itens => cartaoSel === null ? itens : itens.filter(i => (i.cartao || SEM_CARTAO) === cartaoSel);
+// com um cartão selecionado, só despesas: receita (salário etc.) não é gasto de cartão nenhum
+const filtraCartao = itens => cartaoSel === null ? itens : itens.filter(i => i.tipo === 'despesa' && grupoCartao(i) === cartaoSel);
 function chipsCartao() {
   const cs = cartoesUsados();
   if (!cs.length) return '';
   const chip = (v, txt, cor) => `<button class="chip ${cartaoSel === v ? 'on' : ''}" data-cartao="${v === null ? '*' : esc(v)}">${cor ? `<span class="dot" style="background:${cor}"></span>` : ''}${txt}</button>`;
-  return `<div class="chips">${chip(null, 'Todos')}${cs.map(c => chip(c, esc(c), corCartao(c))).join('')}${chip(SEM_CARTAO, 'Pix / débito', corCartao(SEM_CARTAO))}</div>`;
+  return `<div class="chips">${chip(null, 'Todos')}${cs.map(c => chip(c, esc(c), corCartao(c))).join('')}${S.fixos.some(f => f.tipo === 'despesa' && !f.cartao) ? chip(FIXAS, 'Contas fixas', corCartao(FIXAS)) : ''}${chip(SEM_CARTAO, 'Pix / débito', corCartao(SEM_CARTAO))}</div>`;
 }
 const opcoesCartao = (atual = SEM_CARTAO) => [SEM_CARTAO, ...new Set([...cartoesUsados(), ...Object.keys(LEITORES)])]
   .map(c => `<option value="${esc(c)}" ${c === atual ? 'selected' : ''}>${esc(nomeCartao(c))}</option>`).join('');
@@ -286,8 +289,15 @@ function novoEstado() {
   // regras: o que você marcou para cada estabelecimento nas faturas, para pré-marcar na próxima
   return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {} };
 }
+// Ajusta dados salvos por versões antigas do app.
+function normalizar(d) {
+  const s = Object.assign(novoEstado(), d);
+  // a primeira versão do importador só lia Santander e não gravava o cartão
+  s.lanc.forEach(l => { if (l.origem === 'fatura' && !l.cartao) l.cartao = 'Santander'; });
+  return s;
+}
 function carregar() {
-  try { const r = localStorage.getItem(KEY); if (r) return Object.assign(novoEstado(), JSON.parse(r)); } catch (e) {}
+  try { const r = localStorage.getItem(KEY); if (r) return normalizar(JSON.parse(r)); } catch (e) {}
   return novoEstado();
 }
 let S = carregar();
@@ -344,7 +354,7 @@ async function puxar() {
   try {
     const remoto = await lerNuvem();
     if (remoto && (remoto.atualizado || 0) > (S.atualizado || 0)) {
-      S = Object.assign(novoEstado(), remoto);
+      S = normalizar(remoto);
       gravarLocal(); render();
     } else if (!remoto || (S.atualizado || 0) > (remoto.atualizado || 0)) {
       return enviar();
@@ -384,7 +394,7 @@ async function conectarSync(token, repo) {
       S.atualizado = Date.now();
       await enviar();
     } else if (remoto) {
-      S = Object.assign(novoEstado(), remoto);
+      S = normalizar(remoto);
       gravarLocal();
       statusSync('☁ sincronizado');
     } else {
@@ -561,7 +571,7 @@ function telaVisao() {
   // gastos do mês por cartão (só aparece quando há algum cartão)
   const porCartao = {};
   todos.filter(i => i.tipo === 'despesa').forEach(i => {
-    const c = i.cartao || SEM_CARTAO;
+    const c = grupoCartao(i);
     porCartao[c] = porCartao[c] || { v: 0, n: 0 };
     porCartao[c].v += i.valor; porCartao[c].n++;
   });
@@ -570,7 +580,7 @@ function telaVisao() {
   const cardCartoes = cartoesUsados().length ? `
     <div class="card"><h2>${ico('cartao')} Por cartão <span class="sub">· sua parte em ${nomeMes(mesSel)}</span></h2>
       ${listaCartoes.map(([c, x]) => `<div class="cartao-row" data-cartao="${esc(c)}" style="--c:${corCartao(c)}">
-        <div class="cartao-ico">${ico(c ? 'cartao' : 'pix')}</div>
+        <div class="cartao-ico">${ico(c === FIXAS ? 'repete' : c ? 'cartao' : 'pix')}</div>
         <div><div class="nome">${esc(nomeCartao(c))}</div><div class="mini"><i style="width:${x.v / maxCartao * 100}%"></i></div></div>
         <div class="amt">${fmt.format(x.v)}<small>${x.n} ${x.n === 1 ? 'item' : 'itens'}</small></div></div>`).join('') || '<div class="empty">Nenhuma despesa neste mês.</div>'}
       <p class="hint">Toque num cartão para ver só os gastos dele.</p>
@@ -1167,7 +1177,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'ajuste') { S.ajuste = +e.target.value; salvar(); }
   if (e.target.id === 'importar' && e.target.files[0]) {
     e.target.files[0].text().then(t => {
-      try { const d = JSON.parse(t); if (!Array.isArray(d.lanc)) throw 0; S = Object.assign(novoEstado(), d); salvar(); alert('Dados importados.'); }
+      try { const d = JSON.parse(t); if (!Array.isArray(d.lanc)) throw 0; S = normalizar(d); salvar(); alert('Dados importados.'); }
       catch (err) { alert('Arquivo inválido.'); }
     });
   }
