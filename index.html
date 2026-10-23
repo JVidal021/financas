@@ -428,8 +428,8 @@ function tabelaItens(itens, mostraFixo) {
   if (!itens.length) return '<div class="empty">Nada por aqui ainda.</div>';
   itens = itens.slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() ? ' <span class="tag">planejado</span>' : ''}${i.origem === 'fatura' ? ' <span class="tag">cartão</span>' : ''}</td><td>${esc(i.cat)}</td>
-      <td class="num ${i.tipo === 'receita' ? 'pos' : ''}">${i.tipo === 'receita' ? '+' : '−'} ${fmt.format(i.valor)}</td>
+    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() ? ' <span class="tag">planejado</span>' : ''}${i.origem === 'fatura' ? ` <span class="tag">${esc(i.cartao || 'cartão')}</span>` : ''}</td><td>${esc(i.cat)}</td>
+      <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? '' : `<button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
 }
@@ -558,7 +558,7 @@ function telaDados() {
   <div class="card"><h2>Resumo</h2><p class="hint">${S.lanc.length} lançamentos · ${S.fixos.length} itens fixos · ${Object.keys(S.orc).length} limites de orçamento</p></div>`;
 }
 
-// ---------- importar fatura (PDF Santander) ----------
+// ---------- importar fatura (PDF: Itaú, Santander, Bradesco, Nubank) ----------
 let imp = null;          // fatura carregada, ainda não importada
 let impModo = 'compra';  // 'compra' = data da compra | 'fatura' = data de fechamento
 let impFuturas = true;   // lançar próximas parcelas como planejadas
@@ -568,10 +568,10 @@ const PALPITES = [
   [/DROGARI|FARMA|OTICA|CLINIC|LABORAT/, 'Saúde'],
   [/ACADEMIA|WHITE FIT|TOTALPASS|SMART ?FIT/, 'Academia'],
   [/^TIM\*|VIVO|CLARO/, 'Celular'],
-  [/NETFLIX|SPOTIFY|GOOGLE|AMAZON ?PRIME|AMAZONPRIME|AD FREE|DISCORD|DISNEY|HBO|YOUTUBE/, 'Assinaturas'],
+  [/NETFLIX|SPOTIFY|GOOGLE|MICROSOFT|CLAUDE|AMAZON ?PRIME|AMAZONPRIME|AD FREE|DISCORD|DISNEY|HBO|YOUTUBE/, 'Assinaturas'],
   [/MERCADOLIVRE|MERCADO\*|SHOPEE|MAGALU|CASA E VIDEO|LOJAS|PLAST|IMPORTADOS|COSMETIC|CALCA|AMAZON/, 'Compras'],
-  [/AMIGAO|MERCADO|SUPERMERC|ATACAD|ASSAI|GUANABARA|PREZUNIC/, 'Mercado'],
-  [/LANCH|PAO|ALIMENTOS|PASTA|DOCURA|IFOOD|RESTAUR|PIZZ|BURGER|PADARIA/, 'Alimentação'],
+  [/AMIGAO|ZONA SUL|MERCADO|SUPERMERC|ATACAD|ASSAI|GUANABARA|PREZUNIC/, 'Mercado'],
+  [/LANCH|PAO|ALIMENTOS|PASTA|DOCURA|IFOOD|IFD\*|RESTAUR|PIZZ|BURGER|PADARIA|MC ?DONALD|PIPOCA|ESKIMO/, 'Alimentação'],
   [/PES E PATAS|PET/, 'Pets'],
   [/COLEGIO|ESCOLA|CURSO|FACULD/, 'Educação'],
   [/RIOTGAME|STEAM|SHOW|CINEMA|INGRESSO/, 'Lazer'],
@@ -590,72 +590,176 @@ function carregarPdfjs() {
   });
 }
 
-// Junta os pedaços de texto do PDF em linhas, separando as duas colunas da página.
+// Junta os pedaços de texto do PDF em linhas (página inteira, da esquerda para a direita),
+// guardando a posição horizontal de cada caractere para saber de que coluna cada compra veio.
 async function linhasDoPdf(buf) {
   const lib = await carregarPdfjs();
-  const doc = await lib.getDocument({ data: buf }).promise;
-  const colunas = [], completo = [];
+  let doc;
+  try {
+    doc = await lib.getDocument({ data: buf.slice(0) }).promise;
+  } catch (e) {
+    if (e.name !== 'PasswordException') throw e;
+    // alguns bancos protegem o PDF (costuma ser parte do CPF do titular)
+    const senha = prompt('Esta fatura tem senha. Digite a senha do PDF (geralmente são os primeiros dígitos do CPF do titular):');
+    if (!senha) throw new Error('A fatura tem senha e nenhuma foi informada.');
+    try { doc = await lib.getDocument({ data: buf, password: senha }).promise; }
+    catch (e2) { throw e2.name === 'PasswordException' ? new Error('Senha incorreta.') : e2; }
+  }
+  const linhas = [];
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p), meio = page.getViewport({ scale: 1 }).width / 2;
     const itens = (await page.getTextContent()).items.filter(i => i.str.trim());
-    for (const lado of [0, 1]) {
-      const doLado = itens.filter(i => (i.transform[4] < meio) === (lado === 0));
-      const grupos = [];
-      for (const it of doLado) {
-        const y = it.transform[5];
-        let g = grupos.find(g => Math.abs(g.y - y) < 2.5);
-        if (!g) grupos.push(g = { y, itens: [] });
-        g.itens.push(it);
-      }
-      grupos.sort((a, b) => b.y - a.y);
-      for (const g of grupos) {
-        g.itens.sort((a, b) => a.transform[4] - b.transform[4]);
-        let s = '', fim = null;
-        for (const it of g.itens) {
-          if (fim !== null && it.transform[4] - fim > 1) s += ' ';
-          s += it.str; fim = it.transform[4] + it.width;
-        }
-        colunas.push(s.replace(/\s+/g, ' ').trim());
-      }
+    const grupos = [];
+    for (const it of itens) {
+      const y = it.transform[5];
+      let g = grupos.find(g => Math.abs(g.y - y) < 2.5);
+      if (!g) grupos.push(g = { y, itens: [] });
+      g.itens.push(it);
     }
-    completo.push(itens.map(i => i.str).join(' '));
+    grupos.sort((a, b) => b.y - a.y);
+    for (const g of grupos) {
+      g.itens.sort((a, b) => a.transform[4] - b.transform[4]);
+      let txt = '', xs = [], fim = null;
+      for (const it of g.itens) {
+        const x = it.transform[4];
+        if (fim !== null && x - fim > 1) { txt += ' '; xs.push(x); }
+        const s = it.str.replace(/[−–]/g, '-');
+        txt += s; xs.push(...Array(s.length).fill(x));
+        fim = x + it.width;
+      }
+      linhas.push({ pagina: p, meio, txt, xs });
+    }
   }
-  return { linhas: colunas, texto: completo.join(' ') };
+  return linhas;
 }
 
-function lerFatura({ linhas, texto }) {
-  const fech = texto.match(/realizados\s+at[ée]\s+(\d{2})\/(\d{2})/i);
-  const venc = texto.match(/(\d{2})\/(\d{2})\/(20\d{2})/);
-  if (!fech || !venc) throw new Error('Não reconheci esta fatura. Por enquanto só leio faturas do Santander.');
-  let ano = +venc[3];
-  if (+fech[2] > +venc[2]) ano--;
-  const fechamento = `${ano}-${fech[2]}-${fech[1]}`;
-  const dataCompra = dm => { const [d, m] = dm.split('/'); return `${+m > +fech[2] ? ano - 1 : ano}-${m}-${d}`; };
-  const valorBR = v => num(v);
+const MESES = { jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12 };
 
-  const itens = [];
-  let sec = null, totalInformado = null;
+// "1.234,56" | "R$ -12,00" | "12,00-" | "-R$ 5,00" → número (negativo = crédito)
+function valorDe(s) {
+  s = String(s).replace(/[−–]/g, '-').replace(/R\$|\s/g, '');
+  const neg = /^-|-$/.test(s);
+  const n = parseFloat(s.replace(/-/g, '').replace(/\./g, '').replace(',', '.'));
+  return isFinite(n) ? (neg ? -n : n) : NaN;
+}
+// "05/10", "05/10/2026", "05 OUT", "05 OUT 2026" → {d, m, a?}
+function dataDe(s) {
+  const m = String(s).match(/(\d{2})(?:\/(\d{2})|\s([A-Za-z]{3}))(?:[\/ ](\d{4}))?/);
+  if (!m) return null;
+  const mes = m[2] ? +m[2] : MESES[m[3].toLowerCase()];
+  if (!mes || mes > 12 || +m[1] < 1 || +m[1] > 31) return null;
+  return { d: +m[1], m: mes, a: m[4] ? +m[4] : null };
+}
+const iso = (a, m, d) => `${a}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+// Parcela no fim da descrição: "LOJA 03/10", "LOJA PARC 03/10", "Loja - Parcela 3/10"
+function separarParcela(desc) {
+  const m = desc.match(/\s*[-–]?\s*(?:PARC(?:ELA)?\.?\s*)?(\d{1,2})\s*\/\s*(\d{1,2})$/i);
+  if (m && +m[1] >= 1 && +m[1] <= +m[2] && +m[2] > 1 && +m[2] <= 48) return { desc: desc.slice(0, m.index).trim(), parc: { n: +m[1], N: +m[2] } };
+  return { desc, parc: null };
+}
+
+const VALOR = String.raw`-?\s?(?:R\$\s?)?-?(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}-?`;
+const DATA_NUM = String.raw`\d{2}\/\d{2}(?!\/?\d)`;
+const DATA_MES = String.raw`\d{2} (?:JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\b`;
+
+// Um leitor por banco. "secoes": títulos que mudam o que vem abaixo deles, na mesma coluna:
+//   compra = importa · ignora = pagamentos/créditos · futuro = parcelas de faturas seguintes
+const LEITORES = {
+  Santander: {
+    detecta: /santander/i,
+    data: DATA_NUM, inicio: null,
+    secoes: [[/Pagamento e Demais Cr/i, 'ignora'], [/\bParcelamentos\b/i, 'compra'], [/\bDespesas\b(?!\/)/, 'compra']],
+    encargos: [/\(\+\)\s*(Juros[^0-9]*?|IOF)\s+((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})/i],
+    vencimento: /(\d{2}\/\d{2}\/\d{4})/,
+    fechamento: /realizados[\s\S]{0,80}?at[ée]\s+(\d{2}\/\d{2})/i,
+    total: { re: /VALOR TOTAL ((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})/, inclui: 'compras' },
+  },
+  Itaú: {
+    detecta: /ita[uú] ?unibanco|itaucard|banco ita[uú]/i,
+    data: DATA_NUM, inicio: null,
+    secoes: [[/Pagamentos efetuados/i, 'ignora'], [/Lan[çc]amentos: compras e saques|Lan[çc]amentos internacionais/i, 'compra'], [/pr[óo]ximas faturas/i, 'futuro'], [/Limites de cr[ée]dito/i, 'ignora']],
+    encargos: [/Repasse de (IOF) em R\$\s*((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})/i, /(Juros do rotativo|Juros de mora|Multa por atraso)\s+[\d,]+\s*%[^0-9]*?((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})/i],
+    vencimento: /Vencimento:\s*(\d{2}\/\d{2}\/\d{4})/i,
+    fechamento: /Emiss[ãa]o:\s*(\d{2}\/\d{2}\/\d{4})/i,
+    total: { re: /Total dos lan[çc]amentos atuais\s*((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})/i, inclui: 'tudo' },
+  },
+  Bradesco: {
+    detecta: /bradesco/i,
+    data: DATA_NUM, inicio: 'compra',
+    secoes: [[/pr[óo]ximas faturas|parcelas a vencer|lan[çc]amentos futuros/i, 'futuro'], [/(Lan[çc]amentos|Hist[óo]rico)\b/i, 'compra']],
+    encargos: [],
+    vencimento: /Vencimento[:\s]*(\d{2}\/\d{2}\/\d{4})/i,
+    fechamento: /fechamento[^\d]{0,20}(\d{2}\/\d{2}(?:\/\d{4})?)/i,
+    total: { re: /Total (?:da fatura|desta fatura)[^\d]{0,15}((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})/i, inclui: 'tudo' },
+  },
+  Nubank: {
+    detecta: /nubank|nu pagamentos/i,
+    data: DATA_MES, inicio: 'compra',
+    secoes: [[/Pagamentos e Financiamentos/i, 'ignora'], [/^TRANSA[ÇC][ÕO]ES/i, 'compra']],
+    encargos: [],
+    vencimento: /vencimento[:\s]*(\d{2} [A-Z]{3} \d{4})/i,
+    fechamento: /TRANSA[ÇC][ÕO]ES\s+DE\s+\d{2}\s+[A-Z]{3}\s+A\s+(\d{2}\s+[A-Z]{3})/i,
+    total: { re: /Total de compras de todos os cart[õo]es[^\d]{0,30}((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})/i, inclui: 'compras' },
+  },
+};
+const BANCOS_SUPORTADOS = Object.keys(LEITORES).join(', ').replace(/, (?=[^,]*$)/, ' e ');
+
+function lerFatura(linhas) {
+  const texto = linhas.map(l => l.txt).join('\n');
+  const banco = Object.keys(LEITORES).find(b => LEITORES[b].detecta.test(texto));
+  if (!banco) throw new Error(`Não reconheci o banco desta fatura. O app lê faturas em PDF de: ${BANCOS_SUPORTADOS}.`);
+  const L = LEITORES[banco];
+  const reCompra = new RegExp(`(?<![\\d\\/])(${L.data})\\s*(.+?)\\s+(${VALOR})(?![\\d%,])`, 'gi');
+
+  const brutos = [];
+  let futuros = 0;
+  const estado = [L.inicio, L.inicio];   // [coluna esquerda, coluna direita]
+  const colunaEm = (l, i) => l.xs[i] < l.meio ? 0 : 1;
   for (const l of linhas) {
-    if (/^Pagamento e Demais Cr/i.test(l)) { sec = 'credito'; continue; }
-    if (/^Parcelamentos$/i.test(l)) { sec = 'parcela'; continue; }
-    if (/^Despesas$/i.test(l)) { sec = 'despesa'; continue; }
-    const tot = l.match(/^VALOR TOTAL (-?[\d.]+,\d{2})/);
-    if (tot) { totalInformado = valorBR(tot[1]); sec = 'resumo'; continue; }
-    if (sec === 'resumo') {
-      const enc = l.match(/^\(\+\) (Juros.*|IOF) ([\d.]+,\d{2})$/);
-      if (enc && valorBR(enc[2]) > 0) itens.push({ sec: 'encargo', data: fechamento, desc: enc[1].toUpperCase(), parc: null, valor: valorBR(enc[2]) });
-      continue;
+    // títulos de seção mudam o estado da coluna onde aparecem
+    for (const [re, novo] of L.secoes) {
+      const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+      for (const m of l.txt.matchAll(g)) estado[colunaEm(l, m.index)] = novo;
     }
-    if (sec !== 'parcela' && sec !== 'despesa') continue;
-    // o número solto no começo é um ícone da fatura; ignoramos
-    const m = l.match(/^(?:\d )?(\d{2}\/\d{2}) (.+?)(?: (\d{2})\/(\d{2}))? (-?[\d.]+,\d{2})$/);
-    if (!m) continue;
-    itens.push({
-      sec, data: dataCompra(m[1]), desc: m[2].trim(),
-      parc: m[3] ? { n: +m[3], N: +m[4] } : null, valor: valorBR(m[5]),
-    });
+    for (const re of L.encargos) {
+      const m = l.txt.match(re);
+      if (m && valorDe(m[2]) > 0) brutos.push({ dataObj: null, desc: m[1].trim(), valor: valorDe(m[2]), encargo: true });
+    }
+    for (const m of l.txt.matchAll(reCompra)) {
+      const st = estado[colunaEm(l, m.index)];
+      if (st === 'futuro') { futuros++; continue; }
+      if (st !== 'compra') continue;
+      const d = dataDe(m[1]);
+      if (d) brutos.push({ dataObj: d, desc: m[2].trim(), valor: valorDe(m[3]) });
+    }
   }
-  if (!itens.length) throw new Error('Não encontrei compras nesta fatura.');
+
+  // vencimento e fechamento
+  const achar = re => { const m = texto.match(re); return m ? dataDe(m[1]) : null; };
+  const venc = achar(L.vencimento) || (() => { const [a, m, d] = hoje().split('-').map(Number); return { a, m, d }; })();
+  const fech = achar(L.fechamento) || venc;
+  let ano = fech.a || venc.a;
+  if (!fech.a && fech.m > venc.m) ano--;
+  const fechamento = iso(ano, fech.m, fech.d);
+  const dataISO = o => iso(o.a || (o.m > fech.m ? ano - 1 : ano), o.m, o.d);
+
+  let ignorados = 0;
+  const itens = [];
+  for (const b of brutos) {
+    if (isNaN(b.valor) || b.valor === 0) continue;
+    if (b.valor < 0 && /PAGAMENTO|PAGTO/i.test(b.desc)) { ignorados++; continue; }
+    const { desc, parc } = separarParcela(b.desc.replace(/\s+/g, ' ').trim());
+    const sec = b.encargo || /^(JUROS|IOF|MULTA|ENCARGO|ANUIDADE)/i.test(desc) ? 'encargo' : b.valor < 0 ? 'credito' : parc ? 'parcela' : 'despesa';
+    itens.push({ sec, data: b.dataObj ? dataISO(b.dataObj) : fechamento, desc: desc.toUpperCase(), parc, valor: r2(b.valor) });
+  }
+  if (!itens.length) throw new Error(`Reconheci uma fatura ${banco}, mas não encontrei compras nela.`);
+
+  // conferência com o total impresso na fatura
+  const tot = texto.match(L.total.re);
+  const soma = r2(itens.filter(i => L.total.inclui === 'tudo' || i.sec !== 'encargo').reduce((a, i) => a + i.valor, 0));
+  const totalFatura = tot ? valorDe(tot[1]) : null;
+
   itens.forEach((it, i) => {
     it.id = i;
     it.base = `${it.desc}|${it.valor}|${it.data}|${it.parc ? it.parc.N : ''}`;
@@ -666,9 +770,7 @@ function lerFatura({ linhas, texto }) {
     it.escolha = it.jaImportado ? 'nao' : ja ? (ja.share === 1 ? 'meu' : 'metade') : regra ? regra.escolha : null;
     it.cat = ja ? ja.cat : regra && regra.cat ? regra.cat : palpiteCat(it.desc);
   });
-  return {
-    fechamento, vencimento: `${venc[3]}-${venc[2]}-${venc[1]}`, itens, totalInformado,
-  };
+  return { banco, fechamento, vencimento: iso(venc.a || ano, venc.m, venc.d), itens, soma, totalFatura, ignorados, futuros };
 }
 
 const SHARE = { meu: 1, metade: 0.5, nao: 0 };
@@ -677,21 +779,20 @@ const r2 = v => Math.round(v * 100) / 100;
 function telaFatura() {
   if (!imp) return `
   <div class="card"><h2>Importar fatura do cartão</h2>
-    <p class="hint" style="margin:0 0 12px">Escolha o PDF da fatura. Por enquanto só leio faturas do Santander. Depois você marca o que é seu, o que é metade e o que não é seu. Na próxima fatura, os mesmos estabelecimentos já vêm marcados.</p>
+    <p class="hint" style="margin:0 0 12px">Escolha o PDF da fatura do <b>Itaú, Santander, Bradesco ou Nubank</b>. Depois você marca o que é seu, o que é metade e o que não é seu. Na próxima fatura, os mesmos estabelecimentos já vêm marcados.</p>
     <label class="btn primary" style="display:inline-block;cursor:pointer">Escolher PDF da fatura<input type="file" id="pdf-fatura" accept="application/pdf,.pdf" hidden></label>
     <p class="hint" id="pdf-status"></p>
     <p class="hint">O PDF é lido aqui mesmo no seu navegador e não é enviado para lugar nenhum. Só o leitor de PDF é baixado da internet na primeira vez.</p>
   </div>`;
 
-  const soma = imp.itens.filter(i => i.sec !== 'encargo').reduce((a, i) => a + i.valor, 0);
   const pend = imp.itens.filter(i => !i.escolha).length;
   const minha = r2(imp.itens.reduce((a, i) => a + i.valor * (SHARE[i.escolha] || 0) * (i.jaImportado ? 0 : 1), 0));
   const meuTotal = r2(imp.itens.filter(i => i.escolha === 'meu').reduce((a, i) => a + i.valor, 0));
   const metadeTotal = r2(imp.itens.filter(i => i.escolha === 'metade').reduce((a, i) => a + i.valor, 0));
-  const nomes = { despesa: 'Compras do mês', parcela: 'Parcelas', encargo: 'Juros e IOF' };
+  const nomes = { despesa: 'Compras do mês', parcela: 'Parcelas', credito: 'Estornos e créditos', encargo: 'Juros e IOF' };
   const btn = (it, v, txt) => `<button class="${it.escolha === v ? 'on ' + v : ''}" data-esc="${v}" data-it="${it.id}">${txt}</button>`;
   let corpo = '';
-  for (const sec of ['despesa', 'parcela', 'encargo']) {
+  for (const sec of ['despesa', 'parcela', 'credito', 'encargo']) {
     const lista = imp.itens.filter(i => i.sec === sec);
     if (!lista.length) continue;
     corpo += `<tr class="sec-title"><td colspan="6">${nomes[sec]} · ${lista.length} itens · ${fmt.format(lista.reduce((a, i) => a + i.valor, 0))}</td></tr>`;
@@ -705,10 +806,13 @@ function telaFatura() {
   }
   return `
   <div class="tiles">
-    <div class="tile"><div class="lbl">Gastos na fatura</div><div class="val">${fmt.format(imp.itens.reduce((a, i) => a + i.valor, 0))}</div><div class="hint">compras + juros e IOF</div></div>
+    <div class="tile"><div class="lbl">Fatura ${esc(imp.banco)}</div><div class="val">${fmt.format(imp.itens.reduce((a, i) => a + i.valor, 0))}</div><div class="hint">compras + juros e IOF</div></div>
     <div class="tile"><div class="lbl">Vencimento</div><div class="val">${imp.vencimento.split('-').reverse().join('/')}</div></div>
-    <div class="tile"><div class="lbl">Compras lidas</div><div class="val">${imp.itens.length}</div>
-      <div class="hint">${imp.totalInformado != null && Math.abs(soma - imp.totalInformado) < 0.01 ? '✓ soma confere com a fatura' : `<span class="neg">▲ soma ${fmt.format(soma)} ≠ fatura ${fmt.format(imp.totalInformado || 0)}</span>`}</div></div>
+    <div class="tile"><div class="lbl">Itens lidos</div><div class="val">${imp.itens.length}</div>
+      <div class="hint">${imp.totalFatura == null ? 'Confira se a soma bate com a sua fatura'
+        : Math.abs(imp.soma - imp.totalFatura) < 0.01 ? '✓ soma confere com a fatura'
+        : `<span class="neg">▲ soma ${fmt.format(imp.soma)} ≠ fatura ${fmt.format(imp.totalFatura)}</span>`}
+        ${imp.futuros ? `<br>${imp.futuros} parcelas de próximas faturas ignoradas` : ''}</div></div>
   </div>
   <div class="card">
     <div class="row" style="justify-content:space-between;align-items:center">
@@ -749,13 +853,13 @@ function confirmarImportacao() {
     const data = it.sec === 'despesa' && impModo === 'compra' ? it.data : imp.fechamento;
     const desc = it.desc + (it.parc ? ` (${it.parc.n}/${it.parc.N})` : '') + (share < 1 ? ' · metade' : '');
     S.lanc = S.lanc.filter(l => l.key !== it.key);
-    S.lanc.push({ id: uid(), tipo: 'despesa', data, desc, cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key: it.key, origem: 'fatura', parcela: !!it.parc });
+    S.lanc.push({ id: uid(), tipo: 'despesa', data, desc, cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key: it.key, origem: 'fatura', cartao: imp.banco, parcela: !!it.parc });
     novos++;
     if (it.parc && impFuturas) {
       for (let k = it.parc.n + 1; k <= it.parc.N; k++) {
         const key = it.base + '|' + k;
         S.lanc = S.lanc.filter(l => l.key !== key);
-        S.lanc.push({ id: uid(), tipo: 'despesa', data: addMes(imp.fechamento.slice(0, 7), k - it.parc.n) + '-' + imp.fechamento.slice(8), desc: `${it.desc} (${k}/${it.parc.N})` + (share < 1 ? ' · metade' : ''), cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key, origem: 'fatura', parcela: true, prevista: true });
+        S.lanc.push({ id: uid(), tipo: 'despesa', data: addMes(imp.fechamento.slice(0, 7), k - it.parc.n) + '-' + imp.fechamento.slice(8), desc: `${it.desc} (${k}/${it.parc.N})` + (share < 1 ? ' · metade' : ''), cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key, origem: 'fatura', cartao: imp.banco, parcela: true, prevista: true });
         futuras++;
       }
     }
@@ -845,7 +949,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'pdf-fatura' && e.target.files[0]) {
     const st = document.getElementById('pdf-status');
     st.textContent = 'Lendo a fatura…';
-    e.target.files[0].arrayBuffer().then(linhasDoPdf).then(r => { imp = lerFatura(r); render(); })
+    e.target.files[0].arrayBuffer().then(linhasDoPdf).then(l => { imp = lerFatura(l); render(); })
       .catch(err => { st.innerHTML = `<span class="neg">${esc(err.message)}</span>`; });
   }
   if (e.target.id === 'saldo') { S.saldoAtual = num(e.target.value); salvar(); }
