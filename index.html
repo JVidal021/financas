@@ -450,6 +450,11 @@ function projecao() {
   const fator = 1 + S.ajuste / 100;
   let saldo = S.saldoAtual;
   const linhas = [];
+  // resto do mês atual: só o que ainda tem data para acontecer (o resto já está no saldo atual)
+  const resto = eventos(hoje(), fimDoMes(mesAtual()));
+  const rr = r2(resto.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0)), rd = r2(-resto.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0));
+  saldo += rr - rd;
+  linhas.push({ m: mesAtual(), r: rr, d: rd, liq: rr - rd, saldo, planejado: 0, resto: true });
   for (let i = 1; i <= S.horizonte; i++) {
     const m = addMes(mesAtual(), i);
     const fx = totais(S.fixos.filter(f => fixoAtivo(f, m)));
@@ -592,6 +597,11 @@ function telaVisao() {
       <p class="hint">Toque num cartão para ver só os gastos dele.</p>
     </div>` : '';
 
+  // no mês atual: o que ainda vai entrar/sair daqui até o fim do mês
+  const resto = mesSel === mesAtual() ? eventos(hoje(), fimDoMes(mesSel)) : null;
+  const faltaEntrar = resto ? r2(resto.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0)) : 0;
+  const faltaSair = resto ? r2(-resto.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0)) : 0;
+  const quando = sinal => resto.filter(e => sinal * e.valor > 0).map(e => e.data.slice(8) + '/' + e.data.slice(5, 7)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 3).join(', ');
   const hero = cartaoSel === null ? `
   <div class="hero">
     <div class="lbl">Sobra de ${nomeMes(mesSel)}</div>
@@ -599,6 +609,8 @@ function telaVisao() {
     <div class="stats">
       <div class="stat">${ico('sobe')}<div><small>Receitas</small><b>${fmt.format(t.r)}</b></div></div>
       <div class="stat">${ico('desce')}<div><small>Despesas</small><b>${fmt.format(t.d)}</b></div></div>
+      ${resto ? `<div class="stat">${ico('sobe')}<div><small>Ainda vai entrar${faltaEntrar ? ' · ' + quando(1) : ''}</small><b>${fmt.format(faltaEntrar)}</b></div></div>
+      <div class="stat">${ico('desce')}<div><small>Ainda vai sair${faltaSair ? ' · ' + quando(-1) : ''}</small><b>${fmt.format(faltaSair)}</b></div></div>` : ''}
     </div>
     ${orcTotal ? `<div class="orc">Orçamento: ${fmt.format(gastoOrcado)} de ${fmt.format(orcTotal)} (${Math.round(gastoOrcado / orcTotal * 100)}%)${gastoOrcado > orcTotal ? ' · ▲ acima do limite' : ''}
       <div class="bar"><i style="width:${Math.min(100, gastoOrcado / orcTotal * 100)}%"></i></div></div>` : ''}
@@ -672,12 +684,12 @@ function telaFixos() {
       <label>Categoria<input name="cat" list="cats" required></label>
       <label>Valor (R$)<input name="valor" inputmode="decimal" required placeholder="0,00"></label>
       <label>Cartão<select name="cartao">${opcoesCartao()}</select></label>
-      <label>Dia(s) do mês<input name="dias" placeholder="ex.: 10 · 15, 30 · 5º dia útil"></label>
+      <label>Dia(s) do mês<input name="dias" placeholder="ex.: 10 · 15 (40%), 30 · 5º dia útil"></label>
       <label>Começa em<input type="month" name="inicio" value="${mesAtual()}" required></label>
       <label>Termina em<input type="month" name="fim"></label>
       <button class="btn primary">Adicionar</button>
     </form>
-    <p class="hint">"Dia(s) do mês" é quando o dinheiro entra ou sai: salário quinzenal = "15, 30"; no 5º dia útil = "5º dia útil" (conta segunda a sexta, sem feriados nacionais) (o valor é dividido entre os dias; se as quinzenas forem diferentes, cadastre dois itens). Assinatura no cartão não precisa de dia: ela entra na fatura. Salário, aluguel, assinaturas, parcelas… Deixe "termina em" vazio se não tem fim. Para parcelas, coloque o mês da última.</p>
+    <p class="hint">"Dia(s) do mês" é quando o dinheiro entra ou sai: adiantamento de 40% no dia 15 e o resto no 30 = "15 (40%), 30" (o dia sem percentual fica com o que sobra; sem nenhum percentual, divide igual); no 5º dia útil = "5º dia útil" (segunda a sexta, sem feriados nacionais). Assinatura no cartão não precisa de dia: ela entra na fatura. Salário, aluguel, assinaturas, parcelas… Deixe "termina em" vazio se não tem fim. Para parcelas, coloque o mês da última.</p>
   </div>
   <div class="card"><h2>Itens fixos</h2>
   ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Período</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
@@ -714,11 +726,11 @@ function telaProj() {
   return `
   <div class="card"><h2>Premissas</h2>
     <div class="row">
-      <label>Saldo atual (R$)<input id="saldo" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
+      <label>Saldo na conta hoje (R$)<input id="saldo" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
       <label>Horizonte<select id="horiz">${[6, 12, 24, 36].map(h => `<option value="${h}" ${h == S.horizonte ? 'selected' : ''}>${h} meses</option>`).join('')}</select></label>
       <label style="flex:2 1 240px">Gastos variáveis: <b id="aj-lbl">${S.ajuste > 0 ? '+' : ''}${S.ajuste}%</b><input type="range" id="ajuste" min="-50" max="50" step="5" value="${S.ajuste}"></label>
     </div>
-    <p class="hint">Projeção = itens fixos + média dos gastos/receitas variáveis ${media.meses.length ? `(${media.meses.map(nomeMes).join(', ')}: ${fmt.format(media.d)} de gastos/mês)` : '(sem histórico ainda)'} + lançamentos planejados com data futura. Mova o controle para simular cortar ou aumentar os variáveis.</p>
+    <p class="hint">Começa do saldo de hoje${S.saldoData ? ` (atualizado em ${S.saldoData.split('-').reverse().slice(0, 2).join('/')})` : ''} e soma o que ainda falta no mês atual: salários e contas nos dias configurados, faturas que vencem e Pix planejados. Itens fixos sem dia definido não entram no resto do mês. Nos meses seguintes: itens fixos + média dos gastos/receitas variáveis ${media.meses.length ? `(${media.meses.map(nomeMes).join(', ')}: ${fmt.format(media.d)} de gastos/mês)` : '(sem histórico ainda)'} + lançamentos planejados com data futura. Mova o controle para simular cortar ou aumentar os variáveis.</p>
   </div>
   <div class="tiles">
     ${tile(`Saldo em ${nomeMes(fim.m)}`, `<span class="${fim.saldo < 0 ? 'neg' : ''}">${fmt.format(fim.saldo)}</span>`, 'carteira', 'var(--accent)')}
@@ -727,7 +739,7 @@ function telaProj() {
   </div>
   <div class="card"><h2>Saldo projetado</h2><div class="chart" id="proj"></div></div>
   <div class="card"><h2>Mês a mês</h2><div class="tbl-wrap"><table><thead><tr><th>Mês</th><th class="num">Entra</th><th class="num">Sai</th><th class="num">No mês</th><th class="num">Saldo</th></tr></thead><tbody>
-    ${linhas.map(l => `<tr><td>${nomeMes(l.m)}${l.planejado > 0 ? ' <span class="tag">planejado</span>' : ''}</td><td class="num">${fmt.format(l.r)}</td><td class="num">${fmt.format(l.d)}</td>
+    ${linhas.map(l => `<tr><td>${l.resto ? `resto de ${nomeMes(l.m)} <span class="tag" title="Só o que ainda vai entrar e sair até o fim do mês">até ${fimDoMes(l.m).slice(8)}/${l.m.slice(5)}</span>` : nomeMes(l.m)}${l.planejado > 0 ? ' <span class="tag">planejado</span>' : ''}</td><td class="num">${fmt.format(l.r)}</td><td class="num">${fmt.format(l.d)}</td>
       <td class="num ${l.liq < 0 ? 'neg' : 'pos'}">${fmt.format(l.liq)}</td><td class="num ${l.saldo < 0 ? 'neg' : ''}"><b>${fmt.format(l.saldo)}</b></td></tr>`).join('')}
   </tbody></table></div></div>`;
 }
@@ -1156,13 +1168,34 @@ function casaComFatura(l, it, banco) {
 const lerDias = t => [...new Set(String(t || '').split(/[^\d]+/).map(Number).filter(d => d >= 1 && d <= 31))].sort((a, b) => a - b);
 const textoDias = ds => 'dia ' + ds.join(ds.length === 2 ? ' e ' : ', ');
 // Campo "Dia(s) do mês": dias fixos e/ou "Nº dia útil" ("5º dia útil", "5du").
+// Cada parte pode ter percentual: "15 (40%), 30" = 40% no dia 15 e o resto no 30.
+// pct guarda os percentuais informados: { d15: 40, u5: 60 } (d = dia do mês, u = dia útil).
+const RE_UTIL = /(\d{1,2})\s*[ºo°]?\s*(?:du\b|d\.u\.?|dias?\s+[úu]t(?:il|eis)\b|[úu]t(?:il|eis)\b)/i;
 function lerAgenda(t) {
-  const uteis = [];
-  const resto = String(t || '').replace(/(\d{1,2})\s*[ºo°]?\s*(?:du\b|d\.u\.?|dias?\s+[úu]t(?:il|eis)\b|[úu]t(?:il|eis)\b)/gi, (_, n) => { if (+n >= 1 && +n <= 23) uteis.push(+n); return ' '; });
-  return { dias: lerDias(resto), uteis: [...new Set(uteis)].sort((a, b) => a - b) };
+  const dias = [], uteis = [], pct = {};
+  for (let parte of String(t || '').split(/[,;]|\s+e\s+/i)) {
+    let p = null;
+    parte = parte.replace(/(\d{1,3}(?:\.\d+)?)\s*%/, (_, v) => { p = +v; return ' '; });
+    const u = parte.match(RE_UTIL);
+    const d = !u && parte.match(/\d{1,2}/);
+    const chave = u && +u[1] >= 1 && +u[1] <= 23 ? 'u' + u[1] : d && +d[0] >= 1 && +d[0] <= 31 ? 'd' + +d[0] : null;
+    if (!chave) continue;
+    (chave[0] === 'u' ? uteis : dias).push(+chave.slice(1));
+    if (p !== null && p > 0 && p <= 100) pct[chave] = p;
+  }
+  const ord = a => [...new Set(a)].sort((x, y) => x - y);
+  return { dias: ord(dias), uteis: ord(uteis), pct };
 }
-const textoAgenda = f => [f.uteis && f.uteis.map(n => `${n}º dia útil`).join(', '), f.dias && textoDias(f.dias)].filter(Boolean).join(' · ');
-const campoAgenda = f => [...(f.uteis || []).map(n => `${n}º dia útil`), ...(f.dias || [])].join(', ');
+const rotuloPct = (f, chave) => f.pct && f.pct[chave] ? ` (${String(f.pct[chave]).replace('.', ',')}%)` : '';
+const textoAgenda = f => [...(f.uteis || []).map(n => `${n}º dia útil${rotuloPct(f, 'u' + n)}`), ...(f.dias || []).map(d => `dia ${d}${rotuloPct(f, 'd' + d)}`)].join(', ');
+const campoAgenda = f => [...(f.uteis || []).map(n => `${n}º dia útil${rotuloPct(f, 'u' + n)}`), ...(f.dias || []).map(d => `${d}${rotuloPct(f, 'd' + d)}`)].join(', ');
+// Fração do valor em cada parte: o percentual informado; quem não tem, divide o que sobrou.
+function fracoesAgenda(f) {
+  const chaves = [...(f.uteis || []).map(n => 'u' + n), ...(f.dias || []).map(d => 'd' + d)];
+  const pct = f.pct || {}, usado = chaves.reduce((a, c) => a + (pct[c] || 0), 0);
+  const livres = chaves.filter(c => !pct[c]).length;
+  return Object.fromEntries(chaves.map(c => [c, pct[c] ? pct[c] / 100 : livres ? Math.max(0, 1 - usado / 100) / livres : 0]));
+}
 
 // Feriados nacionais (bancos fechados): datas fixas + Carnaval, Sexta-feira Santa e Corpus Christi.
 function pascoa(ano) {
@@ -1212,18 +1245,22 @@ function valorFatura(c, fech) {
   return r2(lancs + fixos);
 }
 
-// Entradas e saídas dos próximos 30 dias, no dia em que acontecem, com o saldo dia a dia.
-function agenda(dias = 30) {
-  const ini = hoje(), fim = (() => { const d = new Date(); d.setDate(d.getDate() + dias); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const fimDoMes = ym => dataDia(ym, 31);
+// Entradas e saídas com data entre `ini` (exclusive) e `fim`: salários e contas fixas nos dias
+// configurados, faturas no vencimento e lançamentos sem cartão (Pix/débito) planejados.
+// O que já passou (até hoje) está no saldo atual, por isso nunca entra aqui.
+function eventos(ini, fim) {
   const dentro = d => d > ini && d <= fim;
   const ev = [];
   const meses = [-1, 0, 1, 2].map(k => addMes(mesAtual(), k));
   for (const m of meses) {
     for (const f of S.fixos) {
       if (f.cartao || !(f.dias || f.uteis) || !fixoAtivo(f, m)) continue;
-      const datas = [...(f.uteis || []).map(n => diaUtil(m, n)), ...(f.dias || []).map(d => dataDia(m, d))].filter(Boolean).sort();
-      datas.forEach((data, i) => {
-        if (dentro(data)) ev.push({ data, desc: f.desc + (datas.length > 1 ? ` (${i + 1}/${datas.length})` : ''), valor: (f.tipo === 'receita' ? 1 : -1) * r2(f.valor / datas.length), tag: f.tipo === 'receita' ? 'entrada' : 'conta fixa' });
+      const fr = fracoesAgenda(f);
+      const datas = [...(f.uteis || []).map(n => [diaUtil(m, n), fr['u' + n]]), ...(f.dias || []).map(d => [dataDia(m, d), fr['d' + d]])]
+        .filter(([d]) => d).sort((a, b) => a[0].localeCompare(b[0]));
+      datas.forEach(([data, parte]) => {
+        if (dentro(data) && parte > 0) ev.push({ data, desc: f.desc + (datas.length > 1 ? ` (${Math.round(parte * 100)}%)` : ''), valor: (f.tipo === 'receita' ? 1 : -1) * r2(f.valor * parte), tag: f.tipo === 'receita' ? 'entrada' : 'conta fixa' });
       });
     }
     for (const c of cartoesUsados()) {
@@ -1234,20 +1271,34 @@ function agenda(dias = 30) {
     }
   }
   S.lanc.filter(l => !l.cartao && dentro(l.data)).forEach(l => ev.push({ data: l.data, desc: l.desc, valor: (l.tipo === 'receita' ? 1 : -1) * l.valor, tag: 'planejado' }));
-  ev.sort((a, b) => a.data.localeCompare(b.data) || b.valor - a.valor);
+  return ev.sort((a, b) => a.data.localeCompare(b.data) || b.valor - a.valor);
+}
+// Próximos `dias` dias com o saldo dia a dia a partir do saldo atual
+function agenda(dias = 30) {
+  const d = new Date(); d.setDate(d.getDate() + dias);
+  const ev = eventos(hoje(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
   let saldo = S.saldoAtual;
   ev.forEach(e => e.saldo = saldo = r2(saldo + e.valor));
   return ev;
+}
+
+function campoSaldo() {
+  const dias = S.saldoData ? Math.round((new Date(hoje()) - new Date(S.saldoData)) / 864e5) : null;
+  return `<div class="row" style="align-items:center;margin-bottom:12px">
+    <label style="flex:0 1 220px">Saldo na conta hoje (R$)<input id="saldo" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
+    <p class="hint" style="flex:1 1 220px;margin:0">${dias === null ? 'Informe quanto você tem hoje na conta (somando as contas que usa). O que já entrou e já saiu está nele; daqui para frente o app soma só o que ainda falta.'
+      : `Atualizado ${dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias (${S.saldoData.split('-').reverse().slice(0, 2).join('/')})`}.${dias > 3 ? ' <span class="status warn">● Atualize para a agenda e a projeção ficarem certas.</span>' : ''}`}</p>
+  </div>`;
 }
 
 function telaAgenda() {
   const ev = agenda();
   const semDia = S.fixos.filter(f => !f.cartao && !f.dias && !f.uteis && fixoAtivo(f, mesAtual())).length;
   const semVenc = cartoesUsados().filter(c => !diaFechamento(c) || !diaVencimento(c));
-  if (!ev.length && !semDia && !semVenc.length) return '';
   const menor = ev.reduce((m, e) => !m || e.saldo < m.saldo ? e : m, null);
   const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-  return `<div class="card"><h2>${ico('lista')} Próximos 30 dias <span class="sub">· saldo dia a dia a partir de ${fmt.format(S.saldoAtual)}</span></h2>
+  return `<div class="card"><h2>${ico('lista')} Próximos 30 dias <span class="sub">· o que ainda vai entrar e sair</span></h2>
+    ${campoSaldo()}
     ${menor && menor.saldo < 0 ? `<p class="status crit" style="margin:0 0 10px">▲ O saldo fica negativo em ${menor.data.split('-').reverse().slice(0, 2).join('/')} (${fmt.format(menor.saldo)}).</p>` : ''}
     ${ev.length ? `<div class="tbl-wrap"><table><thead><tr><th>Dia</th><th>O quê</th><th class="num">Valor</th><th class="num">Saldo</th></tr></thead><tbody>
       ${ev.map(e => `<tr${e === menor ? ' style="background:color-mix(in srgb, var(--warn) 10%, transparent)"' : ''}>
@@ -1256,7 +1307,6 @@ function telaAgenda() {
         <td class="num ${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</td>
         <td class="num ${e.saldo < 0 ? 'neg' : ''}"><b>${fmt.format(e.saldo)}</b>${e === menor ? ' <span class="hint">▼ menor</span>' : ''}</td></tr>`).join('')}
     </tbody></table></div>` : '<div class="empty">Nada previsto para os próximos 30 dias.</div>'}
-    ${S.saldoAtual ? '' : '<p class="hint">Informe seu saldo atual na aba Projeção para o saldo dia a dia ficar certo.</p>'}
     ${semDia ? `<p class="hint">${semDia} ${semDia === 1 ? 'item fixo está' : 'itens fixos estão'} sem dia definido e não aparece${semDia === 1 ? '' : 'm'} aqui (aba Fixos, campo "Dia(s) do mês").</p>` : ''}
     ${semVenc.length ? `<p class="hint">Sem dia de fechamento/vencimento: ${semVenc.map(esc).join(', ')}. Informe em Importar fatura → Fatura em andamento.</p>` : ''}
   </div>`;
@@ -1394,7 +1444,7 @@ function abrirEdicaoFixo(id) {
       <label>Categoria<input name="cat" list="cats" value="${esc(x.cat)}" required></label>
       <label>Valor por mês (R$)<input name="valor" inputmode="decimal" value="${String(x.valor).replace('.', ',')}" required></label>
       <label>Cartão<select name="cartao">${opcoesCartao(x.cartao || SEM_CARTAO)}</select></label>
-      <label>Dia(s) do mês<input name="dias" value="${campoAgenda(x)}" placeholder="ex.: 10 · 15, 30 · 5º dia útil"></label>
+      <label>Dia(s) do mês<input name="dias" value="${campoAgenda(x)}" placeholder="ex.: 10 · 15 (40%), 30 · 5º dia útil"></label>
       <label>Começa em<input type="month" name="inicio" value="${x.inicio}" required></label>
       <label>Termina em<input type="month" name="fim" value="${x.fim || ''}"></label>
     </div>
@@ -1438,18 +1488,19 @@ document.addEventListener('submit', e => {
     mesSel = f.data.slice(0, 7);
   } else if (e.target.id === 'f-fixo') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
-    const { dias, uteis } = lerAgenda(f.dias);
-    S.fixos.push({ id: uid(), tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null, ...(f.cartao ? { cartao: f.cartao } : {}), ...(dias.length ? { dias } : {}), ...(uteis.length ? { uteis } : {}) });
+    const { dias, uteis, pct } = lerAgenda(f.dias);
+    S.fixos.push({ id: uid(), tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null, ...(f.cartao ? { cartao: f.cartao } : {}), ...(dias.length ? { dias } : {}), ...(uteis.length ? { uteis } : {}), ...(Object.keys(pct).length ? { pct } : {}) });
   } else if (e.target.id === 'f-edit') {
     return salvarEdicao(f, e.submitter.value);
   } else if (e.target.id === 'f-edit-fixo') {
-    const x = S.fixos.find(x => x.id === e.submitter.value), valor = num(f.valor), { dias, uteis } = lerAgenda(f.dias);
+    const x = S.fixos.find(x => x.id === e.submitter.value), valor = num(f.valor), { dias, uteis, pct } = lerAgenda(f.dias);
     if (!(valor > 0)) return alert('Informe um valor maior que zero.');
     if (f.fim && f.fim < f.inicio) return alert('"Termina em" não pode ser antes de "Começa em".');
     Object.assign(x, { tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null });
     if (f.cartao) x.cartao = f.cartao; else delete x.cartao;
     if (dias.length) x.dias = dias; else delete x.dias;
     if (uteis.length) x.uteis = uteis; else delete x.uteis;
+    if (Object.keys(pct).length) x.pct = pct; else delete x.pct;
     document.getElementById('dlg').close();
   } else if (e.target.id === 'f-sync') {
     conectarSync(f.token.trim(), f.repo.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/$/, ''));
@@ -1527,7 +1578,7 @@ document.addEventListener('change', e => {
     if (d >= 1 && d <= 31) S.diasFechamento[e.target.dataset.diaFech] = d; else delete S.diasFechamento[e.target.dataset.diaFech];
     salvar();
   }
-  if (e.target.id === 'saldo') { S.saldoAtual = num(e.target.value); salvar(); }
+  if (e.target.id === 'saldo') { S.saldoAtual = num(e.target.value); S.saldoData = hoje(); salvar(); }
   if (e.target.id === 'horiz') { S.horizonte = +e.target.value; salvar(); }
   if (e.target.id === 'ajuste') { S.ajuste = +e.target.value; salvar(); }
   if (e.target.id === 'importar' && e.target.files[0]) {
