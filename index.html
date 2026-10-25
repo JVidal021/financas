@@ -293,7 +293,7 @@ const num = v => { const n = parseFloat(String(v).replace(/\./g, '').replace(','
 // ---------- estado ----------
 function novoEstado() {
   // regras: o que você marcou para cada estabelecimento nas faturas, para pré-marcar na próxima
-  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {} };
+  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {}, diasVencimento: {} };
 }
 // Ajusta dados salvos por versões antigas do app.
 function normalizar(d) {
@@ -618,7 +618,7 @@ function telaVisao() {
       ${cartaoSel !== null ? '' : Object.keys(S.orc).length ? '<p class="hint">A linha vertical marca o limite do orçamento.</p>' : '<p class="hint">Defina limites na aba Orçamento para acompanhar cada categoria.</p>'}
     </div>`;
   const cardHist = `<div class="card"><h2>${ico('grafico')} Últimos 6 meses ${cartaoSel !== null ? `<span class="sub">· gastos no ${esc(nomeCartao(cartaoSel))}</span>` : ''}</h2><div class="chart" id="hist"></div></div>`;
-  return `${chipsCartao()}${hero}
+  return `${chipsCartao()}${hero}${cartaoSel === null && mesSel === mesAtual() ? telaAgenda() : ''}
   ${cardCartoes ? `<div class="grid2">${cardCartoes}${cardCats}</div>${cardHist}` : `<div class="grid2">${cardCats}${cardHist}</div>`}
   <div class="card"><h2>${ico('lista')} Tudo de ${nomeMes(mesSel)}</h2>${tabelaItens(itens, true)}</div>`;
 }
@@ -672,15 +672,16 @@ function telaFixos() {
       <label>Categoria<input name="cat" list="cats" required></label>
       <label>Valor (R$)<input name="valor" inputmode="decimal" required placeholder="0,00"></label>
       <label>Cartão<select name="cartao">${opcoesCartao()}</select></label>
+      <label>Dia(s) do mês<input name="dias" placeholder="ex.: 10 ou 15, 30"></label>
       <label>Começa em<input type="month" name="inicio" value="${mesAtual()}" required></label>
       <label>Termina em<input type="month" name="fim"></label>
       <button class="btn primary">Adicionar</button>
     </form>
-    <p class="hint">Salário, aluguel, assinaturas, parcelas… Deixe "termina em" vazio se não tem fim. Para parcelas, coloque o mês da última.</p>
+    <p class="hint">"Dia(s) do mês" é quando o dinheiro entra ou sai: salário quinzenal = "15, 30" (o valor é dividido entre os dias; se as quinzenas forem diferentes, cadastre dois itens). Assinatura no cartão não precisa de dia: ela entra na fatura. Salário, aluguel, assinaturas, parcelas… Deixe "termina em" vazio se não tem fim. Para parcelas, coloque o mês da última.</p>
   </div>
   <div class="card"><h2>Itens fixos</h2>
   ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Período</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    lista.map(f => `<tr style="${fixoAtivo(f, mesAtual()) ? '' : 'opacity:.55'}"><td>${esc(f.desc)}${f.cartao ? ' ' + tagCartao(f.cartao) : ''}</td><td>${esc(f.cat)}</td><td>${nomeMes(f.inicio)} → ${f.fim ? nomeMes(f.fim) : 'sem fim'}</td>
+    lista.map(f => `<tr style="${fixoAtivo(f, mesAtual()) ? '' : 'opacity:.55'}"><td>${esc(f.desc)}${f.cartao ? ' ' + tagCartao(f.cartao) : ''}</td><td>${esc(f.cat)}</td><td>${nomeMes(f.inicio)} → ${f.fim ? nomeMes(f.fim) : 'sem fim'}${f.dias ? `<div class="hint" style="margin:0">${textoDias(f.dias)}</div>` : ''}</td>
       <td class="num ${f.tipo === 'receita' ? 'pos' : ''}">${f.tipo === 'receita' ? '+' : '−'} ${fmt.format(f.valor)}</td>
       <td class="num">${!f.fim || f.fim >= mesAtual() ? `<button class="link" data-encerrar="${f.id}" title="Encerrar no mês atual">encerrar</button>` : ''}<button class="link" data-del-fixo="${f.id}" title="Excluir">✕</button></td></tr>`).join('') +
     `</tbody></table></div>` : '<div class="empty">Cadastre seus gastos e receitas recorrentes.</div>'}
@@ -1151,25 +1152,102 @@ function casaComFatura(l, it, banco) {
   return Math.abs(new Date(c.data) - new Date(it.data)) <= 5 * 864e5;
 }
 
+// "15, 30" | "15 e 30" | "5" → [15, 30]
+const lerDias = t => [...new Set(String(t || '').split(/[^\d]+/).map(Number).filter(d => d >= 1 && d <= 31))].sort((a, b) => a - b);
+const textoDias = ds => 'dia ' + ds.join(ds.length === 2 ? ' e ' : ', ');
+// dia 30/31 em mês curto cai no último dia do mês
+const dataDia = (ym, dia) => { const [y, m] = ym.split('-').map(Number); return ym + '-' + String(Math.min(dia, new Date(y, m, 0).getDate())).padStart(2, '0'); };
+
+function diaVencimento(c) {
+  if (S.diasVencimento[c]) return S.diasVencimento[c];
+  const f = S.faturas.filter(f => f.banco === c).sort((a, b) => b.fechamento.localeCompare(a.fechamento))[0];
+  return f ? +f.vencimento.slice(8) : null;
+}
+// vencimento da fatura que fecha em `fech`: no mesmo mês se o dia vem depois do fechamento, senão no seguinte
+function vencimentoDe(c, fech) {
+  const dv = diaVencimento(c);
+  if (!dv) return null;
+  return dataDia(dv > +fech.slice(8) ? fech.slice(0, 7) : addMes(fech.slice(0, 7), 1), dv);
+}
+// Sua parte da fatura do cartão `c` que fecha em `fech`: lançamentos do período + fixos no cartão
+function valorFatura(c, fech) {
+  const ant = addMes(fech.slice(0, 7), -1) + fech.slice(7);
+  const lancs = S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && l.data > ant && l.data <= fech).reduce((a, l) => a + l.valor, 0);
+  const fixos = S.fixos.filter(f => f.cartao === c && f.tipo === 'despesa' && fixoAtivo(f, fech.slice(0, 7))).reduce((a, f) => a + f.valor, 0);
+  return r2(lancs + fixos);
+}
+
+// Entradas e saídas dos próximos 30 dias, no dia em que acontecem, com o saldo dia a dia.
+function agenda(dias = 30) {
+  const ini = hoje(), fim = (() => { const d = new Date(); d.setDate(d.getDate() + dias); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const dentro = d => d > ini && d <= fim;
+  const ev = [];
+  const meses = [-1, 0, 1, 2].map(k => addMes(mesAtual(), k));
+  for (const m of meses) {
+    for (const f of S.fixos) {
+      if (f.cartao || !f.dias || !fixoAtivo(f, m)) continue;
+      for (const d of f.dias) {
+        const data = dataDia(m, d);
+        if (dentro(data)) ev.push({ data, desc: f.desc + (f.dias.length > 1 ? ` (${f.dias.indexOf(d) + 1}/${f.dias.length})` : ''), valor: (f.tipo === 'receita' ? 1 : -1) * r2(f.valor / f.dias.length), tag: f.tipo === 'receita' ? 'entrada' : 'conta fixa' });
+      }
+    }
+    for (const c of cartoesUsados()) {
+      if (!diaFechamento(c)) continue;
+      const fech = dataNoMes(m, diaFechamento(c)), venc = vencimentoDe(c, fech);
+      const v = venc && dentro(venc) ? valorFatura(c, fech) : 0;
+      if (v) ev.push({ data: venc, desc: `Fatura ${c}`, valor: -v, cartao: c, previa: fech >= ini });
+    }
+  }
+  S.lanc.filter(l => !l.cartao && dentro(l.data)).forEach(l => ev.push({ data: l.data, desc: l.desc, valor: (l.tipo === 'receita' ? 1 : -1) * l.valor, tag: 'planejado' }));
+  ev.sort((a, b) => a.data.localeCompare(b.data) || b.valor - a.valor);
+  let saldo = S.saldoAtual;
+  ev.forEach(e => e.saldo = saldo = r2(saldo + e.valor));
+  return ev;
+}
+
+function telaAgenda() {
+  const ev = agenda();
+  const semDia = S.fixos.filter(f => !f.cartao && !f.dias && fixoAtivo(f, mesAtual())).length;
+  const semVenc = cartoesUsados().filter(c => !diaFechamento(c) || !diaVencimento(c));
+  if (!ev.length && !semDia && !semVenc.length) return '';
+  const menor = ev.reduce((m, e) => !m || e.saldo < m.saldo ? e : m, null);
+  const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  return `<div class="card"><h2>${ico('lista')} Próximos 30 dias <span class="sub">· saldo dia a dia a partir de ${fmt.format(S.saldoAtual)}</span></h2>
+    ${menor && menor.saldo < 0 ? `<p class="status crit" style="margin:0 0 10px">▲ O saldo fica negativo em ${menor.data.split('-').reverse().slice(0, 2).join('/')} (${fmt.format(menor.saldo)}).</p>` : ''}
+    ${ev.length ? `<div class="tbl-wrap"><table><thead><tr><th>Dia</th><th>O quê</th><th class="num">Valor</th><th class="num">Saldo</th></tr></thead><tbody>
+      ${ev.map(e => `<tr${e === menor ? ' style="background:color-mix(in srgb, var(--warn) 10%, transparent)"' : ''}>
+        <td style="white-space:nowrap">${e.data.slice(8)}/${e.data.slice(5, 7)} <span class="hint">${DIAS_SEM[new Date(e.data + 'T12:00').getDay()]}</span></td>
+        <td>${esc(e.desc)} ${e.cartao ? tagCartao(e.cartao) + (e.previa ? ' <span class="tag" title="A fatura ainda não fechou: o valor pode crescer">parcial</span>' : '') : `<span class="tag">${e.tag}</span>`}</td>
+        <td class="num ${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</td>
+        <td class="num ${e.saldo < 0 ? 'neg' : ''}"><b>${fmt.format(e.saldo)}</b>${e === menor ? ' <span class="hint">▼ menor</span>' : ''}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="empty">Nada previsto para os próximos 30 dias.</div>'}
+    ${S.saldoAtual ? '' : '<p class="hint">Informe seu saldo atual na aba Projeção para o saldo dia a dia ficar certo.</p>'}
+    ${semDia ? `<p class="hint">${semDia} ${semDia === 1 ? 'item fixo está' : 'itens fixos estão'} sem dia definido e não aparece${semDia === 1 ? '' : 'm'} aqui (aba Fixos, campo "Dia(s) do mês").</p>` : ''}
+    ${semVenc.length ? `<p class="hint">Sem dia de fechamento/vencimento: ${semVenc.map(esc).join(', ')}. Informe em Importar fatura → Fatura em andamento.</p>` : ''}
+  </div>`;
+}
+
 function telaFaturasAbertas() {
   const cs = cartoesUsados();
   if (!cs.length) return '';
   const hojeIso = hoje();
   return `<div class="card"><h2>${ico('cartao')} Fatura em andamento</h2>
-    <div class="tbl-wrap"><table><thead><tr><th>Cartão</th><th>Fecha em</th><th class="num">Já previsto (sua parte)</th><th class="num">Lançado à mão</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap"><table><thead><tr><th>Cartão</th><th>Fecha em</th><th>Vence em</th><th class="num">Já previsto (sua parte)</th><th class="num">Lançado à mão</th><th></th></tr></thead><tbody>
     ${cs.map(c => {
       const prox = fechamentoDaCompra(c, hojeIso);
       const ant = prox ? addMes(prox.slice(0, 7), -1) + prox.slice(7) : null;
       const naFatura = prox ? S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && l.data > ant && l.data <= prox && !(l.origem === 'fatura' && !l.prevista)) : [];
-      const total = naFatura.reduce((a, l) => a + l.valor, 0), manuais = naFatura.filter(l => l.provisorio);
+      const total = prox ? valorFatura(c, prox) : 0, manuais = naFatura.filter(l => l.provisorio), venc = prox && vencimentoDe(c, prox);
       return `<tr><td>${tagCartao(c)}</td>
         <td>${prox ? prox.split('-').reverse().join('/') : '<span class="hint" style="margin:0">informe o dia →</span>'}</td>
+        <td>${venc ? venc.split('-').reverse().join('/') : '<span class="hint" style="margin:0">informe o dia →</span>'}</td>
         <td class="num"><b>${prox ? fmt.format(total) : '—'}</b></td>
         <td class="num">${prox ? `${manuais.length} ${manuais.length === 1 ? 'compra' : 'compras'}` : ''}</td>
-        <td class="num"><label class="hint" style="margin:0;white-space:nowrap">dia <input data-dia-fech="${esc(c)}" inputmode="numeric" value="${diaFechamento(c) || ''}" style="width:52px;padding:5px 8px" placeholder="—"></label></td></tr>`;
+        <td class="num" style="white-space:nowrap"><label class="hint" style="margin:0">fecha <input data-dia-fech="${esc(c)}" inputmode="numeric" value="${diaFechamento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label>
+          <label class="hint" style="margin:0 0 0 6px">vence <input data-dia-venc="${esc(c)}" inputmode="numeric" value="${diaVencimento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label></td></tr>`;
     }).join('')}
     </tbody></table></div>
-    <p class="hint">"Já previsto" soma as parcelas de faturas anteriores que caem nesta e as compras que você lançou à mão (aba Lançar, com cartão e parcelas). O dia de fechamento vem da última fatura importada; ajuste se precisar.</p>
+    <p class="hint">"Já previsto" soma as parcelas de faturas anteriores que caem nesta, os fixos no cartão (assinaturas) e as compras que você lançou à mão. Os dias de fechamento e vencimento vêm da última fatura importada; ajuste se precisar.</p>
   </div>`;
 }
 
@@ -1271,7 +1349,8 @@ document.addEventListener('submit', e => {
     mesSel = f.data.slice(0, 7);
   } else if (e.target.id === 'f-fixo') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
-    S.fixos.push({ id: uid(), tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null, ...(f.cartao ? { cartao: f.cartao } : {}) });
+    const dias = lerDias(f.dias);
+    S.fixos.push({ id: uid(), tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null, ...(f.cartao ? { cartao: f.cartao } : {}), ...(dias.length ? { dias } : {}) });
   } else if (e.target.id === 'f-edit') {
     const l = S.lanc.find(l => l.id === e.submitter.value), valor = num(f.valor);
     if (!(valor > 0) && !(l.valor < 0)) return alert('Informe um valor maior que zero.');
@@ -1342,6 +1421,11 @@ document.addEventListener('change', e => {
     e.target.files[0].arrayBuffer().then(linhasDoPdf).then(l => { imp = lerFatura(l); render(); })
       .catch(err => { st.innerHTML = `<span class="neg">${esc(err.message)}</span>`; });
   }
+  if (e.target.dataset && e.target.dataset.diaVenc !== undefined) {
+    const d = parseInt(e.target.value, 10);
+    if (d >= 1 && d <= 31) S.diasVencimento[e.target.dataset.diaVenc] = d; else delete S.diasVencimento[e.target.dataset.diaVenc];
+    salvar();
+  }
   if (e.target.dataset && e.target.dataset.diaFech !== undefined) {
     const d = parseInt(e.target.value, 10);
     if (d >= 1 && d <= 31) S.diasFechamento[e.target.dataset.diaFech] = d; else delete S.diasFechamento[e.target.dataset.diaFech];
@@ -1368,8 +1452,8 @@ function exemplo() {
   const s = novoEstado(), m0 = mesAtual();
   s.saldoAtual = 4200;
   s.fixos = [
-    { id: uid(), tipo: 'receita', desc: 'Salário', cat: 'Salário', valor: 6500, inicio: addMes(m0, -6), fim: null },
-    { id: uid(), tipo: 'despesa', desc: 'Aluguel', cat: 'Moradia', valor: 1800, inicio: addMes(m0, -6), fim: null },
+    { id: uid(), tipo: 'receita', desc: 'Salário', cat: 'Salário', valor: 6500, inicio: addMes(m0, -6), fim: null, dias: [15, 30] },
+    { id: uid(), tipo: 'despesa', desc: 'Aluguel', cat: 'Moradia', valor: 1800, inicio: addMes(m0, -6), fim: null, dias: [10] },
     { id: uid(), tipo: 'despesa', desc: 'Internet + celular', cat: 'Moradia', valor: 180, inicio: addMes(m0, -6), fim: null },
     { id: uid(), tipo: 'despesa', desc: 'Streaming', cat: 'Assinaturas', valor: 75, inicio: addMes(m0, -6), fim: null },
     { id: uid(), tipo: 'despesa', desc: 'Notebook (parcela)', cat: 'Compras', valor: 420, inicio: addMes(m0, -3), fim: addMes(m0, 6) },
