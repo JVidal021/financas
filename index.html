@@ -683,7 +683,7 @@ function telaFixos() {
   ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Período</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
     lista.map(f => `<tr style="${fixoAtivo(f, mesAtual()) ? '' : 'opacity:.55'}"><td>${esc(f.desc)}${f.cartao ? ' ' + tagCartao(f.cartao) : ''}</td><td>${esc(f.cat)}</td><td>${nomeMes(f.inicio)} → ${f.fim ? nomeMes(f.fim) : 'sem fim'}${f.dias ? `<div class="hint" style="margin:0">${textoDias(f.dias)}</div>` : ''}</td>
       <td class="num ${f.tipo === 'receita' ? 'pos' : ''}">${f.tipo === 'receita' ? '+' : '−'} ${fmt.format(f.valor)}</td>
-      <td class="num">${!f.fim || f.fim >= mesAtual() ? `<button class="link" data-encerrar="${f.id}" title="Encerrar no mês atual">encerrar</button>` : ''}<button class="link" data-del-fixo="${f.id}" title="Excluir">✕</button></td></tr>`).join('') +
+      <td class="num">${!f.fim || f.fim >= mesAtual() ? `<button class="link" data-encerrar="${f.id}" title="Encerrar no mês atual">encerrar</button>` : ''}<button class="link" data-edit-fixo="${f.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-fixo="${f.id}" title="Excluir">✕</button></td></tr>`).join('') +
     `</tbody></table></div>` : '<div class="empty">Cadastre seus gastos e receitas recorrentes.</div>'}
   </div>`;
 }
@@ -1295,23 +1295,77 @@ function confirmarImportacao() {
 }
 
 // ---------- editar lançamento ----------
+// Descrição sem os sufixos que o app acrescenta: " (2/10)" e " · metade" / " · 2/3 seu"
+const descBase = d => d.replace(/ · (metade|\d+\/\d+ seu|\d+% seu)$/, '').replace(/ \(\d+\/\d+\)$/, '');
+const sufixoParcela = d => (d.replace(/ · (metade|\d+\/\d+ seu|\d+% seu)$/, '').match(/ \(\d+\/\d+\)$/) || [''])[0];
+// Outras parcelas da mesma compra (lançada à mão ou vinda da fatura)
+function parcelasIrmas(l) {
+  if (l.provisorio && l.compra && l.compra.N > 1) return S.lanc.filter(x => x.provisorio && x.compra && x.compra.id === l.compra.id);
+  if (l.parcela && l.key) { const base = l.key.slice(0, l.key.lastIndexOf('|') + 1); return S.lanc.filter(x => x.parcela && x.key && x.key.startsWith(base)); }
+  return [l];
+}
+const OPCOES_PARTE = [[1, 'Tudo'], [1 / 2, 'Metade'], [2 / 3, '2/3'], [1 / 3, '1/3'], [3 / 4, '3/4'], [1 / 4, '1/4']];
+
 function abrirEdicao(id) {
   const l = S.lanc.find(l => l.id === id);
+  const share = l.share || 1, irmas = parcelasIrmas(l);
+  const opcoes = OPCOES_PARTE.some(([v]) => Math.abs(v - share) < 0.001) ? OPCOES_PARTE : OPCOES_PARTE.concat([[share, fracaoTxt(share)]]);
   const dlg = document.getElementById('dlg');
   dlg.innerHTML = `<form id="f-edit" method="dialog">
     <h2>${ico('lapis')} Editar lançamento</h2>
     <div class="row">
       <label>Tipo<select name="tipo"><option value="despesa" ${l.tipo === 'despesa' ? 'selected' : ''}>Despesa</option><option value="receita" ${l.tipo === 'receita' ? 'selected' : ''}>Receita</option></select></label>
       <label>Data<input type="date" name="data" value="${l.data}" required></label>
-      <label style="flex-basis:100%">Descrição<input name="desc" value="${esc(l.desc)}" required></label>
+      <label style="flex-basis:100%">Descrição<input name="desc" value="${esc(descBase(l.desc))}" required></label>
       <label>Categoria<input name="cat" list="cats" value="${esc(l.cat)}" required></label>
       <label>Cartão<select name="cartao">${opcoesCartao(l.cartao || SEM_CARTAO)}</select></label>
-      <label>Valor (R$)<input name="valor" inputmode="decimal" value="${String(l.valor).replace('.', ',')}" required></label>
+      <label>Valor total${irmas.length > 1 ? ' da parcela' : ''} (R$)<input name="valor" inputmode="decimal" value="${String(r2(Math.abs(l.valor) / share)).replace('.', ',')}" required></label>
+      <label>Sua parte<select name="parte">${opcoes.map(([v, t]) => `<option value="${v}" ${Math.abs(v - share) < 0.001 ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
     </div>
-    ${l.origem === 'fatura' ? `<p class="hint">Este lançamento veio de uma fatura. Para trocar Meu / Metade / Dividir, prefira <b>Importar fatura → Revisar</b>: lá o valor é recalculado a partir da fatura.</p>` : ''}
+    <p class="hint">Sua parte: <b id="edit-parte">${fmt.format(Math.abs(l.valor))}</b></p>
+    ${irmas.length > 1 ? `<label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" name="todas" checked> Aplicar a todas as ${irmas.length} parcelas desta compra (a data de cada uma não muda)</label>` : ''}
+    ${l.origem === 'fatura' ? `<p class="hint">Veio de uma fatura. Se você revisar a fatura depois, o que for marcado lá substitui esta edição.</p>` : ''}
     <div class="row" style="justify-content:flex-end;margin-top:16px">
       <button type="button" class="btn" id="edit-cancelar">Cancelar</button>
       <button class="btn primary" value="${l.id}">Salvar</button>
+    </div>
+  </form>`;
+  dlg.showModal();
+}
+
+function salvarEdicao(f, id) {
+  const l = S.lanc.find(l => l.id === id), total = num(f.valor), share = +f.parte;
+  if (!(total > 0)) return alert('Informe um valor maior que zero.');
+  const sinal = l.valor < 0 ? -1 : 1, base = f.desc.trim();
+  const alvo = f.todas ? parcelasIrmas(l) : [l];
+  for (const x of alvo) {
+    Object.assign(x, { tipo: f.tipo, cat: f.cat.trim(), share, valor: sinal * r2(total * share), desc: base + sufixoParcela(x.desc) + rotuloFracao(share) });
+    if (f.cartao) x.cartao = f.cartao; else delete x.cartao;
+    if (x.compra) x.compra.valor = total;
+  }
+  l.data = f.data;   // a data só muda no lançamento aberto
+  document.getElementById('dlg').close();
+  salvar();
+}
+
+function abrirEdicaoFixo(id) {
+  const x = S.fixos.find(f => f.id === id);
+  const dlg = document.getElementById('dlg');
+  dlg.innerHTML = `<form id="f-edit-fixo" method="dialog">
+    <h2>${ico('lapis')} Editar item fixo</h2>
+    <div class="row">
+      <label>Tipo<select name="tipo"><option value="despesa" ${x.tipo === 'despesa' ? 'selected' : ''}>Despesa</option><option value="receita" ${x.tipo === 'receita' ? 'selected' : ''}>Receita</option></select></label>
+      <label style="flex:2 1 200px">Descrição<input name="desc" value="${esc(x.desc)}" required></label>
+      <label>Categoria<input name="cat" list="cats" value="${esc(x.cat)}" required></label>
+      <label>Valor por mês (R$)<input name="valor" inputmode="decimal" value="${String(x.valor).replace('.', ',')}" required></label>
+      <label>Cartão<select name="cartao">${opcoesCartao(x.cartao || SEM_CARTAO)}</select></label>
+      <label>Dia(s) do mês<input name="dias" value="${(x.dias || []).join(', ')}" placeholder="ex.: 10 ou 15, 30"></label>
+      <label>Começa em<input type="month" name="inicio" value="${x.inicio}" required></label>
+      <label>Termina em<input type="month" name="fim" value="${x.fim || ''}"></label>
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:16px">
+      <button type="button" class="btn" id="edit-cancelar">Cancelar</button>
+      <button class="btn primary" value="${x.id}">Salvar</button>
     </div>
   </form>`;
   dlg.showModal();
@@ -1352,10 +1406,14 @@ document.addEventListener('submit', e => {
     const dias = lerDias(f.dias);
     S.fixos.push({ id: uid(), tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null, ...(f.cartao ? { cartao: f.cartao } : {}), ...(dias.length ? { dias } : {}) });
   } else if (e.target.id === 'f-edit') {
-    const l = S.lanc.find(l => l.id === e.submitter.value), valor = num(f.valor);
-    if (!(valor > 0) && !(l.valor < 0)) return alert('Informe um valor maior que zero.');
-    Object.assign(l, { tipo: f.tipo, data: f.data, desc: f.desc.trim(), cat: f.cat.trim(), valor: l.valor < 0 ? -Math.abs(valor) : valor });
-    if (f.cartao) l.cartao = f.cartao; else delete l.cartao;
+    return salvarEdicao(f, e.submitter.value);
+  } else if (e.target.id === 'f-edit-fixo') {
+    const x = S.fixos.find(x => x.id === e.submitter.value), valor = num(f.valor), dias = lerDias(f.dias);
+    if (!(valor > 0)) return alert('Informe um valor maior que zero.');
+    if (f.fim && f.fim < f.inicio) return alert('"Termina em" não pode ser antes de "Começa em".');
+    Object.assign(x, { tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null });
+    if (f.cartao) x.cartao = f.cartao; else delete x.cartao;
+    if (dias.length) x.dias = dias; else delete x.dias;
     document.getElementById('dlg').close();
   } else if (e.target.id === 'f-sync') {
     conectarSync(f.token.trim(), f.repo.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/$/, ''));
@@ -1385,6 +1443,8 @@ document.addEventListener('click', e => {
   if (d.desfazer && confirm('Desfazer esta importação? Todos os lançamentos desta fatura (e as parcelas planejadas dela) serão apagados.')) desfazerFatura(d.desfazer);
   const ed = e.target.closest('[data-edit-lanc]');
   if (ed) abrirEdicao(ed.dataset.editLanc);
+  const edf = e.target.closest('[data-edit-fixo]');
+  if (edf) abrirEdicaoFixo(edf.dataset.editFixo);
   if (e.target.id === 'imp-cancelar') { imp = null; render(); }
   if (e.target.id === 'edit-cancelar') document.getElementById('dlg').close();
   if (e.target.id === 'imp-ok') {
@@ -1441,7 +1501,9 @@ document.addEventListener('change', e => {
     });
   }
 });
-document.addEventListener('input', e => { if (e.target.id === 'ajuste') document.getElementById('aj-lbl').textContent = (e.target.value > 0 ? '+' : '') + e.target.value + '%'; });
+document.addEventListener('input', e => {
+  const fe = e.target.form;
+  if (fe && fe.id === 'f-edit') document.getElementById('edit-parte').textContent = fmt.format(r2(num(fe.valor.value) * +fe.parte.value)); if (e.target.id === 'ajuste') document.getElementById('aj-lbl').textContent = (e.target.value > 0 ? '+' : '') + e.target.value + '%'; });
 
 let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 150); });
 // ao voltar para o app (ex.: depois de usar no celular), busca o que mudou
