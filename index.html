@@ -1365,7 +1365,7 @@ function pendencias() {
   }
   for (const f of S.fixos) {
     if (f.fim && f.fim < mesAtual()) continue;
-    if (f.inicio > mesAtual()) p.push({ txt: `"${f.desc}" só conta a partir de ${nomeMes(f.inicio)}; em ${nomeMes(mesAtual())} ele não entra.`, edit: f.id, botao: 'Editar' });
+    if (f.inicio > mesAtual()) { if (!f.inicioOk) p.push({ txt: `"${f.desc}" só conta a partir de ${nomeMes(f.inicio)}; em ${nomeMes(mesAtual())} ele não entra.`, edit: f.id, botao: 'Editar', certo: f.id }); }
     else if (!f.cartao && !f.dias && !f.uteis) p.push({ txt: `"${f.desc}" está sem dia do mês: fica fora da agenda e do que ainda falta.`, edit: f.id, botao: 'Pôr o dia' });
   }
   // meses com gastos e nenhuma receita: a sobra deles aparece negativa só por falta de informação
@@ -1379,7 +1379,7 @@ function telaPendencias() {
   if (!p.length) return '';
   return `<div class="card" style="border-color:var(--warn)"><h2>▲ Informações faltando <span class="sub">· ${p.length} ${p.length === 1 ? 'item' : 'itens'} que deixam as contas incompletas</span></h2>
     ${p.map(x => `<div class="cartao-row" style="grid-template-columns:1fr auto;cursor:default"><div style="font-size:14px">${esc(x.txt)}</div>
-      <div style="display:flex;gap:6px">${x.ignorar ? `<button class="btn" data-ignorar-pend="${x.ignorar}" title="O passado já está pago; não mostrar mais">Já está pago</button>` : ''}<button class="btn" ${x.edit ? `data-edit-fixo="${x.edit}"` : `data-ir="${x.acao}"`}>${x.botao}</button></div></div>`).join('')}
+      <div style="display:flex;gap:6px">${x.ignorar ? `<button class="btn" data-ignorar-pend="${x.ignorar}" title="O passado já está pago; não mostrar mais">Já está pago</button>` : ''}${x.certo ? `<button class="btn" data-inicio-ok="${x.certo}" title="Começa nesse mês mesmo; não mostrar mais">Está certo</button>` : ''}<button class="btn" ${x.edit ? `data-edit-fixo="${x.edit}"` : `data-ir="${x.acao}"`}>${x.botao}</button></div></div>`).join('')}
   </div>`;
 }
 
@@ -1630,6 +1630,7 @@ document.addEventListener('click', e => {
   }
   if (d.conf === 'ignorar') { S.conferencia.resolvida = true; salvar(); }
   if (d.ignorarPend === 'semReceita') { S.semReceitaOk = true; salvar(); }
+  if (d.inicioOk) { S.fixos.find(f => f.id === d.inicioOk).inicioOk = true; salvar(); }
   if (d.ir === 'saldo') { aba = 'visao'; mesSel = mesAtual(); cartaoSel = null; render(); const i = document.getElementById('saldo'); i.scrollIntoView({ block: 'center' }); i.focus(); }
   if (d.ir === 'fatura') { aba = 'fatura'; imp = null; render(); }
   if (d.ir === 'fixos') { aba = 'fixos'; render(); }
