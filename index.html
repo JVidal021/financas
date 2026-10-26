@@ -293,14 +293,24 @@ const num = v => { const n = parseFloat(String(v).replace(/\./g, '').replace(','
 // ---------- estado ----------
 function novoEstado() {
   // regras: o que você marcou para cada estabelecimento nas faturas, para pré-marcar na próxima
-  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {}, diasVencimento: {}, cartaoDiaUtil: {}, infoFatura: {} };
+  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {}, diasVencimento: {}, cartaoDiaUtil: {}, infoFatura: {}, melhorDia: {} };
 }
 // Ajusta dados salvos por versões antigas do app.
 function normalizar(d) {
   const s = Object.assign(novoEstado(), d);
   // a primeira versão do importador só lia Santander e não gravava o cartão
   s.lanc.forEach(l => { if (l.origem === 'fatura' && !l.cartao) l.cartao = 'Santander'; });
+  // parcela prevista que já chegou numa fatura com centavos diferentes: fica só a da fatura
+  const reais = s.lanc.filter(l => l.parcela && !l.prevista && l.key);
+  s.lanc = s.lanc.filter(l => !(l.prevista && l.key && reais.some(r => mesmaParcela(l, r))));
   return s;
+}
+// Mesma parcela da mesma compra: mesmo cartão, descrição, número/total de parcelas e valor até R$ 1 de diferença.
+// A chave é "descrição|valor|data|total|número".
+function mesmaParcela(a, b) {
+  if (a.cartao !== b.cartao) return false;
+  const x = a.key.split('|'), y = b.key.split('|');
+  return x.length === 5 && y.length === 5 && x[0] === y[0] && x[3] === y[3] && x[4] === y[4] && Math.abs(+x[1] - +y[1]) <= 1;
 }
 function carregar() {
   try { const r = localStorage.getItem(KEY); if (r) return normalizar(JSON.parse(r)); } catch (e) {}
@@ -418,9 +428,27 @@ async function conectarSync(token, repo) {
 // ---------- cálculos ----------
 const fixoAtivo = (f, m) => f.inicio <= m && (!f.fim || m <= f.fim);
 
+// Vencimento da fatura em que cai um lançamento no cartão (null se o cartão não tem os dias).
+// Compras de uma fatura importada usam o vencimento que está no PDF; o resto segue a regra do cartão.
+const _venc = new Map();
+let _vencImportado = null;
+function vencDoLanc(l) {
+  if (!l.cartao) return null;
+  if (!_vencImportado) {
+    _vencImportado = new Map();
+    for (const f of S.faturas) for (const it of f.itens) _vencImportado.set(it.key, S.cartaoDiaUtil[f.banco] ? proxDiaUtil(f.vencimento) : f.vencimento);
+  }
+  if (l.key && !l.prevista && _vencImportado.has(l.key)) return _vencImportado.get(l.key);
+  if (!melhorDia(l.cartao) || !diaVencimento(l.cartao)) return null;
+  const k = l.cartao + '|' + l.data;
+  if (!_venc.has(k)) _venc.set(k, vencimentoDe(l.cartao, fechamentoDaCompra(l.cartao, l.data)));
+  return _venc.get(k);
+}
+// Mês em que o lançamento pesa na conta: compra no cartão no mês do vencimento da fatura
+const mesDoLanc = l => (vencDoLanc(l) || l.data).slice(0, 7);
 function itensDoMes(m) {
   const fx = S.fixos.filter(f => fixoAtivo(f, m)).map(f => ({ ...f, fixo: true }));
-  const lc = S.lanc.filter(l => l.data.slice(0, 7) === m);
+  const lc = S.lanc.filter(l => mesDoLanc(l) === m);
   return fx.concat(lc);
 }
 function totais(itens) {
@@ -643,13 +671,13 @@ function telaVisao() {
       : `<div class="stat">${ico('sobe')}<div><small>Entra no mês</small><b>${fmt.format(linhaProj.r)}</b></div></div>
       <div class="stat">${ico('desce')}<div><small>Sai no mês (faturas pelo vencimento)</small><b>${fmt.format(linhaProj.d)}</b></div></div>`}
     </div>
-    <div class="orc" title="Receitas do mês menos os gastos do mês, com as compras no cartão na data da compra (mesmo as que você paga no mês seguinte)">Resultado do mês: receitas ${fmt.format(t.r)} − gastos ${fmt.format(t.d)} = <b>${fmt.format(t.saldo)}</b>
-      <span style="opacity:.8">· compras no cartão contam na data da compra</span></div>`
+    <div class="orc" title="Receitas do mês menos os gastos do mês; compras no cartão contam no mês em que a fatura vence">Resultado do mês: receitas ${fmt.format(t.r)} − gastos ${fmt.format(t.d)} = <b>${fmt.format(t.saldo)}</b>
+      <span style="opacity:.8">· cartão no mês do vencimento</span></div>`
     : `<div class="lbl">Resultado de ${nomeMes(mesSel)}</div>
     <div class="big">${fmt.format(t.saldo)}</div>
     <div class="stats">
       <div class="stat">${ico('sobe')}<div><small>Receitas</small><b>${fmt.format(t.r)}</b></div></div>
-      <div class="stat">${ico('desce')}<div><small>Gastos (cartão na data da compra)</small><b>${fmt.format(t.d)}</b></div></div>
+      <div class="stat">${ico('desce')}<div><small>Gastos (cartão no mês do vencimento)</small><b>${fmt.format(t.d)}</b></div></div>
     </div>`}
     ${orcTotal ? `<div class="orc">Orçamento: ${fmt.format(gastoOrcado)} de ${fmt.format(orcTotal)} (${Math.round(gastoOrcado / orcTotal * 100)}%)${gastoOrcado > orcTotal ? ' · ▲ acima do limite' : ''}
       <div class="bar"><i style="width:${Math.min(100, gastoOrcado / orcTotal * 100)}%"></i></div></div>` : ''}
@@ -678,14 +706,14 @@ function tabelaItens(itens, mostraFixo) {
   if (!itens.length) return '<div class="empty">Nada por aqui ainda.</div>';
   itens = itens.slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() ? ' <span class="tag">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.provisorio ? ' <span class="tag" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</td><td>${esc(i.cat)}</td>
+    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${!i.fixo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${i.data.split('-').reverse().join('/')}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? '' : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
 }
 
 function telaLanc() {
-  const doMes = filtraCartao(S.lanc.filter(l => l.data.slice(0, 7) === mesSel));
+  const doMes = filtraCartao(S.lanc.filter(l => mesDoLanc(l) === mesSel));
   const dataPadrao = mesSel === mesAtual() ? hoje() : mesSel + '-01';
   return `
   <div class="card"><h2>Novo lançamento</h2>
@@ -1170,11 +1198,15 @@ function telaHistoricoFaturas() {
 }
 
 // Dia de fechamento do cartão: o que você informou, ou o da última fatura importada dele.
-function diaFechamento(c) {
-  if (S.diasFechamento[c]) return S.diasFechamento[c];
+// Melhor dia de compra: a partir dele (ou do próximo dia útil, se a regra estiver ligada) a compra
+// vai para a fatura seguinte. A fatura fecha no dia anterior.
+function melhorDia(c) {
+  if (S.melhorDia[c]) return S.melhorDia[c];
+  if (S.diasFechamento[c]) return S.diasFechamento[c] + 1;   // configuração antiga: dia de fechamento
   const f = S.faturas.filter(f => f.banco === c).sort((a, b) => b.fechamento.localeCompare(a.fechamento))[0];
-  return f ? +f.fechamento.slice(8) : null;
+  return f ? +f.fechamento.slice(8) + 1 : null;
 }
+const diaFechamento = c => melhorDia(c) ? melhorDia(c) - 1 || 31 : null;
 const dataNoMes = (ym, dia) => ym + '-' + String(Math.min(dia, 28)).padStart(2, '0');
 // Mesma data se for dia útil; senão, o próximo dia útil (fim de semana ou feriado nacional)
 function proxDiaUtil(iso) {
@@ -1187,9 +1219,11 @@ function proxDiaUtil(iso) {
 }
 // Data de fechamento do cartão no mês `ym` (com a regra do dia útil, se ligada para ele)
 function fechamentoEm(c, ym) {
-  const dia = diaFechamento(c);
-  if (!dia) return null;
-  return S.cartaoDiaUtil[c] ? proxDiaUtil(dataDia(ym, dia)) : dataNoMes(ym, dia);
+  const md = melhorDia(c);
+  if (!md) return null;
+  const inicio = S.cartaoDiaUtil[c] ? proxDiaUtil(dataDia(ym, md)) : dataDia(ym, md);
+  const d = new Date(inicio + 'T12:00'); d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 const fechamentoAnterior = (c, fech) => fechamentoEm(c, addMes(fech.slice(0, 7), -1)) || addMes(fech.slice(0, 7), -1) + fech.slice(7);
 // Data de fechamento da fatura em que cai uma compra feita em `data`
@@ -1307,8 +1341,8 @@ function vencimentoDe(c, fech) {
 }
 // Sua parte da fatura do cartão `c` que fecha em `fech`: lançamentos do período + fixos no cartão
 function valorFatura(c, fech) {
-  const ant = fechamentoAnterior(c, fech);
-  const lancs = S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && l.data > ant && l.data <= fech).reduce((a, l) => a + l.valor, 0);
+  const venc = vencimentoDe(c, fech);
+  const lancs = S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && vencDoLanc(l) === venc).reduce((a, l) => a + l.valor, 0);
   const fixos = S.fixos.filter(f => f.cartao === c && f.tipo === 'despesa' && fixoAtivo(f, fech.slice(0, 7))).reduce((a, f) => a + f.valor, 0);
   return r2(lancs + fixos);
 }
@@ -1400,7 +1434,7 @@ function pendencias() {
   if (dias === null) p.push({ txt: 'Saldo na conta de hoje nunca foi informado: a agenda e a projeção partem dele.', acao: 'saldo', botao: 'Informar' });
   else if (dias > 3) p.push({ txt: `Saldo atualizado há ${dias} dias.`, acao: 'saldo', botao: 'Atualizar' });
   for (const c of cartoesUsados()) {
-    const falta = [!diaFechamento(c) && 'fechamento', !diaVencimento(c) && 'vencimento'].filter(Boolean);
+    const falta = [!melhorDia(c) && 'melhor dia de compra', !diaVencimento(c) && 'vencimento'].filter(Boolean);
     if (falta.length) p.push({ txt: `${c} sem dia de ${falta.join(' e ')}: a fatura não aparece na agenda nem no "ainda vai sair".`, acao: 'fatura', botao: 'Informar' });
   }
   for (const f of S.fixos) {
@@ -1452,8 +1486,7 @@ function telaFaturasAbertas() {
     <div class="tbl-wrap"><table><thead><tr><th>Cartão</th><th>Fecha em</th><th>Vence em</th><th class="num">Já previsto (sua parte)</th><th class="num">Lançado à mão</th><th></th></tr></thead><tbody>
     ${cs.map(c => {
       const prox = fechamentoDaCompra(c, hojeIso);
-      const ant = prox ? fechamentoAnterior(c, prox) : null;
-      const naFatura = prox ? S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && l.data > ant && l.data <= prox && !(l.origem === 'fatura' && !l.prevista)) : [];
+      const naFatura = prox ? S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && vencDoLanc(l) === vencimentoDe(c, prox) && !(l.origem === 'fatura' && !l.prevista)) : [];
       const total = prox ? valorFatura(c, prox) : 0, manuais = naFatura.filter(l => l.provisorio), venc = prox && vencimentoDe(c, prox);
       return `<tr><td>${tagCartao(c)}</td>
         <td>${prox ? prox.split('-').reverse().join('/') : '<span class="hint" style="margin:0">informe o dia →</span>'}</td>
@@ -1461,12 +1494,12 @@ function telaFaturasAbertas() {
         <td class="num"><b>${prox ? fmt.format(total) : '—'}</b>${S.infoFatura[c] ? `<div class="hint" style="margin:0">banco: ${fmt.format(S.infoFatura[c].minha)} em ${ddmm(S.infoFatura[c].data)}</div>` : ''}
           ${prox ? `<div><button class="btn" style="padding:4px 10px;font-size:12px;margin-top:4px" data-info-fatura="${esc(c)}">Informar valor</button></div>` : ''}</td>
         <td class="num">${prox ? `${manuais.length} ${manuais.length === 1 ? 'compra' : 'compras'}` : ''}</td>
-        <td class="num" style="white-space:nowrap"><label class="hint" style="margin:0">fecha <input data-dia-fech="${esc(c)}" inputmode="numeric" value="${diaFechamento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label>
+        <td class="num" style="white-space:nowrap"><label class="hint" style="margin:0" title="Melhor dia de compra: a partir deste dia a compra vai para a fatura seguinte">compras a partir do dia <input data-melhor-dia="${esc(c)}" inputmode="numeric" value="${melhorDia(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label>
           <label class="hint" style="margin:0 0 0 6px">vence <input data-dia-venc="${esc(c)}" inputmode="numeric" value="${diaVencimento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label>
           <label class="hint" style="margin:0 0 0 6px" title="Se cair em fim de semana ou feriado, passa para o próximo dia útil"><input type="checkbox" data-util-cartao="${esc(c)}" ${S.cartaoDiaUtil[c] ? 'checked' : ''}> dia útil</label></td></tr>`;
     }).join('')}
     </tbody></table></div>
-    <p class="hint">"Informar valor": digite quanto a fatura está agora no app do banco. O que o app já conhece (parcelas, assinaturas, compras lançadas) é mantido e só a diferença vira um lançamento do cartão; ao informar de novo, ele é substituído, e some quando você importar o PDF da fatura. "Já previsto" soma as parcelas de faturas anteriores que caem nesta, os fixos no cartão (assinaturas) e as compras que você lançou à mão. Os dias de fechamento e vencimento vêm da última fatura importada; ajuste se precisar. Marque "dia útil" se o banco passa a data para o próximo dia útil quando cai em fim de semana ou feriado.</p>
+    <p class="hint">"Informar valor": digite quanto a fatura está agora no app do banco. O que o app já conhece (parcelas, assinaturas, compras lançadas) é mantido e só a diferença vira um lançamento do cartão; ao informar de novo, ele é substituído, e some quando você importar o PDF da fatura. "Já previsto" soma as parcelas de faturas anteriores que caem nesta, os fixos no cartão (assinaturas) e as compras que você lançou à mão. "Compras a partir do dia" é o melhor dia de compra: desse dia em diante a compra vai para a fatura seguinte (a fatura fecha no dia anterior). Marque "dia útil" se o banco passa o melhor dia e o vencimento para o próximo dia útil quando caem em fim de semana ou feriado.</p>
   </div>`;
 }
 
@@ -1488,7 +1521,7 @@ function confirmarImportacao() {
     const share = fracao(it);
     const data = it.sec === 'despesa' && impModo === 'compra' ? it.data : imp.fechamento;
     const desc = it.desc + (it.parc ? ` (${it.parc.n}/${it.parc.N})` : '') + rotuloFracao(share);
-    S.lanc = S.lanc.filter(l => l.key !== it.key);
+    S.lanc = S.lanc.filter(l => l.key !== it.key && !(l.prevista && l.key && it.parc && mesmaParcela(l, { cartao: imp.banco, key: it.key })));
     S.lanc.push({ id: uid(), tipo: 'despesa', data, desc, cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key: it.key, origem: 'fatura', cartao: imp.banco, parcela: !!it.parc });
     novos++;
     if (it.parc && impFuturas) {
@@ -1634,6 +1667,7 @@ function abrirEdicaoFixo(id) {
 
 // ---------- render ----------
 function render() {
+  _venc.clear(); _vencImportado = null;   // dias do cartão ou faturas importadas podem ter mudado
   const sel = document.getElementById('mes');
   const meses = new Set([mesAtual(), mesSel]);
   for (let i = -12; i <= 12; i++) meses.add(addMes(mesAtual(), i));
@@ -1767,6 +1801,12 @@ document.addEventListener('change', e => {
   if (e.target.dataset && e.target.dataset.diaVenc !== undefined) {
     const d = parseInt(e.target.value, 10);
     if (d >= 1 && d <= 31) S.diasVencimento[e.target.dataset.diaVenc] = d; else delete S.diasVencimento[e.target.dataset.diaVenc];
+    salvar();
+  }
+  if (e.target.dataset && e.target.dataset.melhorDia !== undefined) {
+    const c = e.target.dataset.melhorDia, d = parseInt(e.target.value, 10);
+    delete S.diasFechamento[c];
+    if (d >= 1 && d <= 31) S.melhorDia[c] = d; else delete S.melhorDia[c];
     salvar();
   }
   if (e.target.dataset && e.target.dataset.diaFech !== undefined) {
