@@ -293,7 +293,7 @@ const num = v => { const n = parseFloat(String(v).replace(/\./g, '').replace(','
 // ---------- estado ----------
 function novoEstado() {
   // regras: o que você marcou para cada estabelecimento nas faturas, para pré-marcar na próxima
-  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {}, diasVencimento: {} };
+  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {}, diasVencimento: {}, cartaoDiaUtil: {} };
 }
 // Ajusta dados salvos por versões antigas do app.
 function normalizar(d) {
@@ -1137,12 +1137,27 @@ function diaFechamento(c) {
   return f ? +f.fechamento.slice(8) : null;
 }
 const dataNoMes = (ym, dia) => ym + '-' + String(Math.min(dia, 28)).padStart(2, '0');
-// Data de fechamento da fatura em que cai uma compra feita em `data`
-function fechamentoDaCompra(c, data) {
+// Mesma data se for dia útil; senão, o próximo dia útil (fim de semana ou feriado nacional)
+function proxDiaUtil(iso) {
+  const d = new Date(iso + 'T12:00');
+  for (;;) {
+    const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (d.getDay() !== 0 && d.getDay() !== 6 && !feriados(d.getFullYear()).has(s)) return s;
+    d.setDate(d.getDate() + 1);
+  }
+}
+// Data de fechamento do cartão no mês `ym` (com a regra do dia útil, se ligada para ele)
+function fechamentoEm(c, ym) {
   const dia = diaFechamento(c);
   if (!dia) return null;
-  const ym = data.slice(0, 7);
-  return +data.slice(8) <= dia ? dataNoMes(ym, dia) : dataNoMes(addMes(ym, 1), dia);
+  return S.cartaoDiaUtil[c] ? proxDiaUtil(dataDia(ym, dia)) : dataNoMes(ym, dia);
+}
+const fechamentoAnterior = (c, fech) => fechamentoEm(c, addMes(fech.slice(0, 7), -1)) || addMes(fech.slice(0, 7), -1) + fech.slice(7);
+// Data de fechamento da fatura em que cai uma compra feita em `data`
+function fechamentoDaCompra(c, data) {
+  const f = fechamentoEm(c, data.slice(0, 7));
+  if (!f) return null;
+  return data <= f ? f : fechamentoEm(c, addMes(data.slice(0, 7), 1));
 }
 
 // Compra no cartão lançada à mão: cada parcela vai para a fatura em que vai cair.
@@ -1154,7 +1169,7 @@ function lancarCompraCartao(f, valor, share) {
   const compra = { id: uid(), data: f.data, N, valor: vParc };
   for (let k = 1; k <= N; k++) {
     // à vista fica na data da compra; parcelas, no fechamento de cada fatura (como na importação)
-    const data = N === 1 ? f.data : fech1 ? addMes(fech1.slice(0, 7), k - 1) + fech1.slice(7) : addMes(f.data.slice(0, 7), k - 1) + f.data.slice(7);
+    const data = N === 1 ? f.data : fech1 ? fechamentoEm(f.cartao, addMes(fech1.slice(0, 7), k - 1)) : addMes(f.data.slice(0, 7), k - 1) + f.data.slice(7);
     S.lanc.push({ id: uid(), tipo: 'despesa', data, desc: f.desc.trim() + (N > 1 ? ` (${k}/${N})` : '') + rotuloFracao(share), cat: f.cat.trim(),
       valor: r2(vParc * share), share, cartao: f.cartao, parcela: N > 1, provisorio: true, compra: { ...compra, n: k } });
   }
@@ -1241,11 +1256,12 @@ function diaVencimento(c) {
 function vencimentoDe(c, fech) {
   const dv = diaVencimento(c);
   if (!dv) return null;
-  return dataDia(dv > +fech.slice(8) ? fech.slice(0, 7) : addMes(fech.slice(0, 7), 1), dv);
+  const v = dataDia(dv > +fech.slice(8) ? fech.slice(0, 7) : addMes(fech.slice(0, 7), 1), dv);
+  return S.cartaoDiaUtil[c] ? proxDiaUtil(v) : v;
 }
 // Sua parte da fatura do cartão `c` que fecha em `fech`: lançamentos do período + fixos no cartão
 function valorFatura(c, fech) {
-  const ant = addMes(fech.slice(0, 7), -1) + fech.slice(7);
+  const ant = fechamentoAnterior(c, fech);
   const lancs = S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && l.data > ant && l.data <= fech).reduce((a, l) => a + l.valor, 0);
   const fixos = S.fixos.filter(f => f.cartao === c && f.tipo === 'despesa' && fixoAtivo(f, fech.slice(0, 7))).reduce((a, f) => a + f.valor, 0);
   return r2(lancs + fixos);
@@ -1271,7 +1287,7 @@ function eventos(ini, fim) {
     }
     for (const c of cartoesUsados()) {
       if (!diaFechamento(c)) continue;
-      const fech = dataNoMes(m, diaFechamento(c)), venc = vencimentoDe(c, fech);
+      const fech = fechamentoEm(c, m), venc = vencimentoDe(c, fech);
       const v = venc && dentro(venc) ? valorFatura(c, fech) : 0;
       if (v) ev.push({ data: venc, desc: `Fatura ${c}`, valor: -v, cartao: c, previa: fech >= ini });
     }
@@ -1389,7 +1405,7 @@ function telaFaturasAbertas() {
     <div class="tbl-wrap"><table><thead><tr><th>Cartão</th><th>Fecha em</th><th>Vence em</th><th class="num">Já previsto (sua parte)</th><th class="num">Lançado à mão</th><th></th></tr></thead><tbody>
     ${cs.map(c => {
       const prox = fechamentoDaCompra(c, hojeIso);
-      const ant = prox ? addMes(prox.slice(0, 7), -1) + prox.slice(7) : null;
+      const ant = prox ? fechamentoAnterior(c, prox) : null;
       const naFatura = prox ? S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && l.data > ant && l.data <= prox && !(l.origem === 'fatura' && !l.prevista)) : [];
       const total = prox ? valorFatura(c, prox) : 0, manuais = naFatura.filter(l => l.provisorio), venc = prox && vencimentoDe(c, prox);
       return `<tr><td>${tagCartao(c)}</td>
@@ -1398,10 +1414,11 @@ function telaFaturasAbertas() {
         <td class="num"><b>${prox ? fmt.format(total) : '—'}</b></td>
         <td class="num">${prox ? `${manuais.length} ${manuais.length === 1 ? 'compra' : 'compras'}` : ''}</td>
         <td class="num" style="white-space:nowrap"><label class="hint" style="margin:0">fecha <input data-dia-fech="${esc(c)}" inputmode="numeric" value="${diaFechamento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label>
-          <label class="hint" style="margin:0 0 0 6px">vence <input data-dia-venc="${esc(c)}" inputmode="numeric" value="${diaVencimento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label></td></tr>`;
+          <label class="hint" style="margin:0 0 0 6px">vence <input data-dia-venc="${esc(c)}" inputmode="numeric" value="${diaVencimento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label>
+          <label class="hint" style="margin:0 0 0 6px" title="Se cair em fim de semana ou feriado, passa para o próximo dia útil"><input type="checkbox" data-util-cartao="${esc(c)}" ${S.cartaoDiaUtil[c] ? 'checked' : ''}> dia útil</label></td></tr>`;
     }).join('')}
     </tbody></table></div>
-    <p class="hint">"Já previsto" soma as parcelas de faturas anteriores que caem nesta, os fixos no cartão (assinaturas) e as compras que você lançou à mão. Os dias de fechamento e vencimento vêm da última fatura importada; ajuste se precisar.</p>
+    <p class="hint">"Já previsto" soma as parcelas de faturas anteriores que caem nesta, os fixos no cartão (assinaturas) e as compras que você lançou à mão. Os dias de fechamento e vencimento vêm da última fatura importada; ajuste se precisar. Marque "dia útil" se o banco passa a data para o próximo dia útil quando cai em fim de semana ou feriado.</p>
   </div>`;
 }
 
@@ -1646,6 +1663,10 @@ document.addEventListener('change', e => {
     st.textContent = 'Lendo a fatura…';
     e.target.files[0].arrayBuffer().then(linhasDoPdf).then(l => { imp = lerFatura(l); render(); })
       .catch(err => { st.innerHTML = `<span class="neg">${esc(err.message)}</span>`; });
+  }
+  if (e.target.dataset && e.target.dataset.utilCartao !== undefined) {
+    if (e.target.checked) S.cartaoDiaUtil[e.target.dataset.utilCartao] = true; else delete S.cartaoDiaUtil[e.target.dataset.utilCartao];
+    salvar();
   }
   if (e.target.dataset && e.target.dataset.diaVenc !== undefined) {
     const d = parseInt(e.target.value, 10);
