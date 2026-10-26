@@ -627,16 +627,30 @@ function telaVisao() {
   const faltaEntrar = resto ? r2(resto.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0)) : 0;
   const faltaSair = resto ? r2(-resto.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0)) : 0;
   const quando = sinal => resto.filter(e => sinal * e.valor > 0).map(e => e.data.slice(8) + '/' + e.data.slice(5, 7)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 3).join(', ');
+  // mês atual: dinheiro na conta no fim do mês (saldo de hoje + o que ainda entra − o que ainda sai);
+  // meses seguintes: o saldo previsto pela projeção; meses passados: só o resultado do mês
+  const proj = cartaoSel === null && mesSel >= mesAtual() ? projecao() : null;
+  const linhaProj = proj && proj.linhas.find(l => l.m === mesSel);
+  const contaFim = linhaProj ? linhaProj.saldo : null;
   const hero = cartaoSel === null ? `
   <div class="hero">
-    <div class="lbl">Sobra de ${nomeMes(mesSel)}</div>
+    ${contaFim !== null ? `<div class="lbl">Na conta no fim de ${nomeMes(mesSel)}${mesSel > mesAtual() ? ' (previsto)' : ''}</div>
+    <div class="big">${fmt.format(contaFim)}</div>
+    <div class="stats">
+      ${resto ? `<div class="stat">${ico('carteira')}<div><small>Saldo hoje</small><b>${fmt.format(S.saldoAtual)}</b></div></div>
+      <div class="stat">${ico('sobe')}<div><small>Ainda vai entrar${faltaEntrar ? ' · ' + quando(1) : ''}</small><b>${fmt.format(faltaEntrar)}</b></div></div>
+      <div class="stat">${ico('desce')}<div><small>Ainda vai sair${faltaSair ? ' · ' + quando(-1) : ''}</small><b>${fmt.format(faltaSair)}</b></div></div>`
+      : `<div class="stat">${ico('sobe')}<div><small>Entra no mês</small><b>${fmt.format(linhaProj.r)}</b></div></div>
+      <div class="stat">${ico('desce')}<div><small>Sai no mês (faturas pelo vencimento)</small><b>${fmt.format(linhaProj.d)}</b></div></div>`}
+    </div>
+    <div class="orc" title="Receitas do mês menos os gastos do mês, com as compras no cartão na data da compra (mesmo as que você paga no mês seguinte)">Resultado do mês: receitas ${fmt.format(t.r)} − gastos ${fmt.format(t.d)} = <b>${fmt.format(t.saldo)}</b>
+      <span style="opacity:.8">· compras no cartão contam na data da compra</span></div>`
+    : `<div class="lbl">Resultado de ${nomeMes(mesSel)}</div>
     <div class="big">${fmt.format(t.saldo)}</div>
     <div class="stats">
       <div class="stat">${ico('sobe')}<div><small>Receitas</small><b>${fmt.format(t.r)}</b></div></div>
-      <div class="stat">${ico('desce')}<div><small>Despesas</small><b>${fmt.format(t.d)}</b></div></div>
-      ${resto ? `<div class="stat">${ico('sobe')}<div><small>Ainda vai entrar${faltaEntrar ? ' · ' + quando(1) : ''}</small><b>${fmt.format(faltaEntrar)}</b></div></div>
-      <div class="stat">${ico('desce')}<div><small>Ainda vai sair${faltaSair ? ' · ' + quando(-1) : ''}</small><b>${fmt.format(faltaSair)}</b></div></div>` : ''}
-    </div>
+      <div class="stat">${ico('desce')}<div><small>Gastos (cartão na data da compra)</small><b>${fmt.format(t.d)}</b></div></div>
+    </div>`}
     ${orcTotal ? `<div class="orc">Orçamento: ${fmt.format(gastoOrcado)} de ${fmt.format(orcTotal)} (${Math.round(gastoOrcado / orcTotal * 100)}%)${gastoOrcado > orcTotal ? ' · ▲ acima do limite' : ''}
       <div class="bar"><i style="width:${Math.min(100, gastoOrcado / orcTotal * 100)}%"></i></div></div>` : ''}
   </div>` : `
