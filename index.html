@@ -630,7 +630,7 @@ function telaVisao() {
       ${cartaoSel !== null ? '' : Object.keys(S.orc).length ? '<p class="hint">A linha vertical marca o limite do orçamento.</p>' : '<p class="hint">Defina limites na aba Orçamento para acompanhar cada categoria.</p>'}
     </div>`;
   const cardHist = `<div class="card"><h2>${ico('grafico')} Últimos 6 meses ${cartaoSel !== null ? `<span class="sub">· gastos no ${esc(nomeCartao(cartaoSel))}</span>` : ''}</h2><div class="chart" id="hist"></div></div>`;
-  return `${chipsCartao()}${hero}${cartaoSel === null && mesSel === mesAtual() ? telaAgenda() : ''}
+  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${hero}${cartaoSel === null && mesSel === mesAtual() ? telaAgenda() : ''}
   ${cardCartoes ? `<div class="grid2">${cardCartoes}${cardCats}</div>${cardHist}` : `<div class="grid2">${cardCats}${cardHist}</div>`}
   <div class="card"><h2>${ico('lista')} Tudo de ${nomeMes(mesSel)}</h2>${tabelaItens(itens, true)}</div>`;
 }
@@ -982,14 +982,14 @@ function lerFatura(linhas) {
     it.base = `${it.desc}|${it.valor}|${it.data}|${it.parc ? it.parc.N : ''}`;
     it.key = it.sec === 'encargo' ? `${fechamento}|${it.desc}|${it.valor}` : it.base + '|' + (it.parc ? it.parc.n : '');
   });
-  marcarItens(itens, banco);
+  marcarItens(itens, banco, fechamento);
   return { banco, fechamento, vencimento: iso(venc.a || ano, venc.m, venc.d), itens, soma, totalFatura, ignorados, futuros, revisao: itens.some(i => i.importado) };
 }
 
 // Pré-marca cada item: o que já foi lançado volta como estava (para revisar);
 // o resto segue o que você marcou da última vez para o mesmo estabelecimento.
-function marcarItens(itens, banco) {
-  const usados = new Set();
+function marcarItens(itens, banco, fechamento) {
+  const usados = new Set(), fixosUsados = new Set();
   itens.forEach((it, i) => {
     it.id = i;
     let ja = S.lanc.find(l => l.key === it.key);
@@ -1004,13 +1004,19 @@ function marcarItens(itens, banco) {
     if (!ja && !regra && S.faturas.some(f => f.itens.some(x => x.key === it.key))) it.escolha = 'nao';
     if (it.escolha === 'div') Object.assign(it, ja ? lerFracao(fracaoTxt(ja.share)) : { k: regra.k, n: regra.n });
     it.cat = ja ? ja.cat : regra && regra.cat ? regra.cat : palpiteCat(it.desc);
+    // cobrança que já está em Fixos neste cartão (assinatura): não conta de novo
+    if (!ja && banco && fechamento && it.sec === 'despesa') {
+      const fx = S.fixos.find(f => !fixosUsados.has(f.id) && f.cartao === banco && f.tipo === 'despesa' && fixoAtivo(f, fechamento.slice(0, 7))
+        && Math.abs(f.valor - it.valor) <= Math.max(1, f.valor * 0.05));
+      if (fx) { fixosUsados.add(fx.id); it.fixo = fx.desc; it.escolha = 'nao'; it.cat = fx.cat; }
+    }
   });
 }
 
 function reabrirFatura(id) {
   const f = S.faturas.find(f => f.id === id);
   const itens = f.itens.map(x => ({ ...x, parc: x.parc ? { ...x.parc } : null }));
-  marcarItens(itens, f.banco);
+  marcarItens(itens, f.banco, f.fechamento);
   imp = { ...f, itens, revisao: true };
 }
 
@@ -1061,7 +1067,7 @@ function telaFatura() {
     corpo += `<tr class="sec-title"><td colspan="6">${nomes[sec]} · ${lista.length} itens · ${fmt.format(lista.reduce((a, i) => a + i.valor, 0))}</td></tr>`;
     corpo += lista.map(it => `<tr class="${!it.escolha ? 'pendente' : it.escolha === 'nao' ? 'ignorado' : ''}">
       <td>${it.data.slice(8)}/${it.data.slice(5, 7)}</td>
-      <td>${esc(it.desc)}${it.parc ? ` <span class="tag">${it.parc.n}/${it.parc.N}</span>` : ''}${it.manual ? ` <span class="tag" title="${esc(S.lanc.find(l => l.id === it.manual)?.desc || '')}">✓ lançada à mão</span>` : ''}</td>
+      <td>${esc(it.desc)}${it.parc ? ` <span class="tag">${it.parc.n}/${it.parc.N}</span>` : ''}${it.manual ? ` <span class="tag" title="${esc(S.lanc.find(l => l.id === it.manual)?.desc || '')}">✓ lançada à mão</span>` : ''}${it.fixo ? ` <span class="tag" title="Já conta pelo item fixo; marcado como Não é meu para não contar duas vezes">✓ já está em Fixos: ${esc(it.fixo)}</span>` : ''}</td>
       <td class="num">${fmt.format(it.valor)}</td>
       <td><span class="seg">${btn(it, 'meu', 'Meu')}${btn(it, 'metade', 'Metade')}${btn(it, 'div', it.escolha === 'div' ? `${it.k}/${it.n} seu` : 'Dividir…')}${btn(it, 'nao', 'Não é meu')}</span></td>
       <td><input list="cats" data-cat-it="${it.id}" value="${esc(it.cat)}" style="width:130px" ${it.escolha === 'nao' ? 'disabled' : ''}></td>
@@ -1282,12 +1288,75 @@ function agenda(dias = 30) {
   return ev;
 }
 
+const ddmm = d => d.split('-').reverse().slice(0, 2).join('/');
+
+// Ao informar o saldo de hoje, compara com o esperado: saldo anterior + o que estava previsto
+// entre as duas datas (salários, contas, faturas, Pix planejados). A diferença é o que entrou
+// ou saiu sem estar registrado.
+function informarSaldo(novo) {
+  const c = S.conferencia;
+  // corrigindo no mesmo dia: compara de novo a partir da mesma base
+  const base = c && c.ate === hoje() ? { saldo: c.anterior, data: c.de }
+    : S.saldoData && S.saldoData < hoje() ? { saldo: S.saldoAtual, data: S.saldoData } : null;
+  if (base) {
+    const ev = eventos(base.data, hoje());
+    const entradas = r2(ev.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0));
+    const saidas = r2(-ev.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0));
+    const esperado = r2(base.saldo + entradas - saidas);
+    S.conferencia = { de: base.data, ate: hoje(), anterior: base.saldo, entradas, saidas, esperado, informado: novo, diff: r2(novo - esperado) };
+  }
+  S.saldoAtual = novo; S.saldoData = hoje();
+  salvar();
+}
+
 function campoSaldo() {
   const dias = S.saldoData ? Math.round((new Date(hoje()) - new Date(S.saldoData)) / 864e5) : null;
-  return `<div class="row" style="align-items:center;margin-bottom:12px">
+  const c = S.conferencia;
+  const conf = c && !c.resolvida && Math.abs(c.diff) >= 1 ? `
+    <div class="card" style="box-shadow:none;background:var(--surface-2);margin:0 0 12px;padding:14px 16px;border-color:${c.diff < 0 ? 'var(--warn)' : 'var(--border)'}">
+      <b>${c.diff < 0 ? '▲' : '●'} ${c.diff < 0 ? 'Saiu' : 'Entrou'} ${fmt.format(Math.abs(c.diff))} sem registro entre ${ddmm(c.de)} e ${ddmm(c.ate)}</b>
+      <div class="hint">Esperado: ${fmt.format(c.anterior)} + ${fmt.format(c.entradas)} de entradas − ${fmt.format(c.saidas)} de saídas previstas = ${fmt.format(c.esperado)}. Você informou ${fmt.format(c.informado)}.
+        ${c.diff < 0 ? 'Provavelmente Pix, débito ou boletos que não estão no app.' : 'Pode ser uma entrada que não estava cadastrada.'}</div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" data-conf="registrar">Registrar como ${c.diff < 0 ? 'gasto' : 'entrada'} não identificado</button>
+        <button class="btn" data-conf="ignorar">Ignorar</button>
+      </div>
+    </div>` : '';
+  return `<div class="row" style="align-items:end;margin-bottom:12px">
     <label style="flex:0 1 220px">Saldo na conta hoje (R$)<input id="saldo" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
-    <p class="hint" style="flex:1 1 220px;margin:0">${dias === null ? 'Informe quanto você tem hoje na conta (somando as contas que usa). O que já entrou e já saiu está nele; daqui para frente o app soma só o que ainda falta.'
-      : `Atualizado ${dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias (${S.saldoData.split('-').reverse().slice(0, 2).join('/')})`}.${dias > 3 ? ' <span class="status warn">● Atualize para a agenda e a projeção ficarem certas.</span>' : ''}`}</p>
+    ${dias === null || dias > 0 ? `<button class="btn" data-conf-saldo title="O saldo continua o mesmo: só confirma que é o de hoje">✓ Confirmar</button>` : ''}
+    <p class="hint" style="flex:1 1 220px;margin:0 0 8px">${dias === null ? 'Informe quanto você tem hoje na conta (somando as contas que usa). O que já entrou e já saiu está nele; daqui para frente o app soma só o que ainda falta.'
+      : `Atualizado ${dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias (${ddmm(S.saldoData)})`}.${dias > 3 ? ' <span class="status warn">● Atualize para a agenda e a projeção ficarem certas.</span>' : ''} Ao atualizar, o app compara com o esperado e mostra o que entrou ou saiu sem registro.`}</p>
+  </div>${conf}`;
+}
+
+// ---------- dados faltando ----------
+function pendencias() {
+  const p = [];
+  const dias = S.saldoData ? Math.round((new Date(hoje()) - new Date(S.saldoData)) / 864e5) : null;
+  if (dias === null) p.push({ txt: 'Saldo na conta de hoje nunca foi informado: a agenda e a projeção partem dele.', acao: 'saldo', botao: 'Informar' });
+  else if (dias > 3) p.push({ txt: `Saldo atualizado há ${dias} dias.`, acao: 'saldo', botao: 'Atualizar' });
+  for (const c of cartoesUsados()) {
+    const falta = [!diaFechamento(c) && 'fechamento', !diaVencimento(c) && 'vencimento'].filter(Boolean);
+    if (falta.length) p.push({ txt: `${c} sem dia de ${falta.join(' e ')}: a fatura não aparece na agenda nem no "ainda vai sair".`, acao: 'fatura', botao: 'Informar' });
+  }
+  for (const f of S.fixos) {
+    if (f.fim && f.fim < mesAtual()) continue;
+    if (f.inicio > mesAtual()) p.push({ txt: `"${f.desc}" só conta a partir de ${nomeMes(f.inicio)}; em ${nomeMes(mesAtual())} ele não entra.`, edit: f.id, botao: 'Editar' });
+    else if (!f.cartao && !f.dias && !f.uteis) p.push({ txt: `"${f.desc}" está sem dia do mês: fica fora da agenda e do que ainda falta.`, edit: f.id, botao: 'Pôr o dia' });
+  }
+  // meses com gastos e nenhuma receita: a sobra deles aparece negativa só por falta de informação
+  const meses = [...new Set(S.lanc.map(l => l.data.slice(0, 7)))].filter(m => m <= mesAtual()).sort();
+  const semReceita = meses.filter(m => { const t = totais(itensDoMes(m)); return t.d > 0 && t.r === 0; });
+  if (semReceita.length) p.push({ txt: `${semReceita.map(nomeMes).join(', ')} ${semReceita.length === 1 ? 'tem' : 'têm'} gastos mas nenhuma receita, por isso a sobra aparece negativa. Se o salário já existia, ajuste o "Começa em" dele para ${nomeMes(semReceita[0])}.`, acao: 'fixos', botao: 'Ver fixos' });
+  return p;
+}
+function telaPendencias() {
+  const p = pendencias();
+  if (!p.length) return '';
+  return `<div class="card" style="border-color:var(--warn)"><h2>▲ Informações faltando <span class="sub">· ${p.length} ${p.length === 1 ? 'item' : 'itens'} que deixam as contas incompletas</span></h2>
+    ${p.map(x => `<div class="cartao-row" style="grid-template-columns:1fr auto;cursor:default"><div style="font-size:14px">${esc(x.txt)}</div>
+      <button class="btn" ${x.edit ? `data-edit-fixo="${x.edit}"` : `data-ir="${x.acao}"`}>${x.botao}</button></div>`).join('')}
   </div>`;
 }
 
@@ -1528,6 +1597,16 @@ document.addEventListener('click', e => {
   if (d.todos) { imp.itens.forEach(i => { if (!i.escolha) i.escolha = d.todos; }); render(); }
   if (d.revisar) { reabrirFatura(d.revisar); render(); window.scrollTo(0, 0); }
   if (d.desfazer && confirm('Desfazer esta importação? Todos os lançamentos desta fatura (e as parcelas planejadas dela) serão apagados.')) desfazerFatura(d.desfazer);
+  if (e.target.closest('[data-conf-saldo]')) informarSaldo(num(document.getElementById('saldo').value));
+  if (d.conf === 'registrar') {
+    const c = S.conferencia;
+    S.lanc.push({ id: uid(), tipo: c.diff < 0 ? 'despesa' : 'receita', data: c.ate, desc: `Não registrado (${ddmm(c.de)} a ${ddmm(c.ate)})`, cat: 'Outros', valor: Math.abs(c.diff), naoIdentificado: true });
+    c.resolvida = true; salvar();
+  }
+  if (d.conf === 'ignorar') { S.conferencia.resolvida = true; salvar(); }
+  if (d.ir === 'saldo') { aba = 'visao'; mesSel = mesAtual(); cartaoSel = null; render(); const i = document.getElementById('saldo'); i.scrollIntoView({ block: 'center' }); i.focus(); }
+  if (d.ir === 'fatura') { aba = 'fatura'; imp = null; render(); }
+  if (d.ir === 'fixos') { aba = 'fixos'; render(); }
   const ed = e.target.closest('[data-edit-lanc]');
   if (ed) abrirEdicao(ed.dataset.editLanc);
   const edf = e.target.closest('[data-edit-fixo]');
@@ -1578,7 +1657,7 @@ document.addEventListener('change', e => {
     if (d >= 1 && d <= 31) S.diasFechamento[e.target.dataset.diaFech] = d; else delete S.diasFechamento[e.target.dataset.diaFech];
     salvar();
   }
-  if (e.target.id === 'saldo') { S.saldoAtual = num(e.target.value); S.saldoData = hoje(); salvar(); }
+  if (e.target.id === 'saldo') informarSaldo(num(e.target.value));
   if (e.target.id === 'horiz') { S.horizonte = +e.target.value; salvar(); }
   if (e.target.id === 'ajuste') { S.ajuste = +e.target.value; salvar(); }
   if (e.target.id === 'importar' && e.target.files[0]) {
