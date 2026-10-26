@@ -293,7 +293,7 @@ const num = v => { const n = parseFloat(String(v).replace(/\./g, '').replace(','
 // ---------- estado ----------
 function novoEstado() {
   // regras: o que você marcou para cada estabelecimento nas faturas, para pré-marcar na próxima
-  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {}, diasVencimento: {}, cartaoDiaUtil: {} };
+  return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], diasFechamento: {}, diasVencimento: {}, cartaoDiaUtil: {}, infoFatura: {} };
 }
 // Ajusta dados salvos por versões antigas do app.
 function normalizar(d) {
@@ -639,7 +639,7 @@ function tabelaItens(itens, mostraFixo) {
   if (!itens.length) return '<div class="empty">Nada por aqui ainda.</div>';
   itens = itens.slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() ? ' <span class="tag">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.provisorio ? ' <span class="tag" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}</td><td>${esc(i.cat)}</td>
+    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() ? ' <span class="tag">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.provisorio ? ' <span class="tag" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? '' : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
@@ -1418,14 +1418,15 @@ function telaFaturasAbertas() {
       return `<tr><td>${tagCartao(c)}</td>
         <td>${prox ? prox.split('-').reverse().join('/') : '<span class="hint" style="margin:0">informe o dia →</span>'}</td>
         <td>${venc ? venc.split('-').reverse().join('/') : '<span class="hint" style="margin:0">informe o dia →</span>'}</td>
-        <td class="num"><b>${prox ? fmt.format(total) : '—'}</b></td>
+        <td class="num"><b>${prox ? fmt.format(total) : '—'}</b>${S.infoFatura[c] ? `<div class="hint" style="margin:0">banco: ${fmt.format(S.infoFatura[c].minha)} em ${ddmm(S.infoFatura[c].data)}</div>` : ''}
+          ${prox ? `<div><button class="btn" style="padding:4px 10px;font-size:12px;margin-top:4px" data-info-fatura="${esc(c)}">Informar valor</button></div>` : ''}</td>
         <td class="num">${prox ? `${manuais.length} ${manuais.length === 1 ? 'compra' : 'compras'}` : ''}</td>
         <td class="num" style="white-space:nowrap"><label class="hint" style="margin:0">fecha <input data-dia-fech="${esc(c)}" inputmode="numeric" value="${diaFechamento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label>
           <label class="hint" style="margin:0 0 0 6px">vence <input data-dia-venc="${esc(c)}" inputmode="numeric" value="${diaVencimento(c) || ''}" style="width:48px;padding:5px 8px" placeholder="—"></label>
           <label class="hint" style="margin:0 0 0 6px" title="Se cair em fim de semana ou feriado, passa para o próximo dia útil"><input type="checkbox" data-util-cartao="${esc(c)}" ${S.cartaoDiaUtil[c] ? 'checked' : ''}> dia útil</label></td></tr>`;
     }).join('')}
     </tbody></table></div>
-    <p class="hint">"Já previsto" soma as parcelas de faturas anteriores que caem nesta, os fixos no cartão (assinaturas) e as compras que você lançou à mão. Os dias de fechamento e vencimento vêm da última fatura importada; ajuste se precisar. Marque "dia útil" se o banco passa a data para o próximo dia útil quando cai em fim de semana ou feriado.</p>
+    <p class="hint">"Informar valor": digite quanto a fatura está agora no app do banco. O que o app já conhece (parcelas, assinaturas, compras lançadas) é mantido e só a diferença vira um lançamento do cartão; ao informar de novo, ele é substituído, e some quando você importar o PDF da fatura. "Já previsto" soma as parcelas de faturas anteriores que caem nesta, os fixos no cartão (assinaturas) e as compras que você lançou à mão. Os dias de fechamento e vencimento vêm da última fatura importada; ajuste se precisar. Marque "dia útil" se o banco passa a data para o próximo dia útil quando cai em fim de semana ou feriado.</p>
   </div>`;
 }
 
@@ -1460,6 +1461,10 @@ function confirmarImportacao() {
     }
     if (it.cat && !S.cats.includes(it.cat)) S.cats.push(it.cat);
   }
+  // a diferença informada pelo app do banco dá lugar às compras detalhadas desta fatura
+  const pertoDoFech = d => Math.abs(new Date(d) - new Date(imp.fechamento)) <= 7 * 864e5;
+  S.lanc = S.lanc.filter(l => !(l.agregado && l.cartao === imp.banco && pertoDoFech(l.fech)));
+  if (S.infoFatura[imp.banco] && pertoDoFech(S.infoFatura[imp.banco].fech)) delete S.infoFatura[imp.banco];
   // guarda a fatura para poder revisar depois sem o PDF
   const id = imp.banco + '|' + imp.fechamento;
   S.faturas = S.faturas.filter(f => f.id !== id).concat({
@@ -1526,6 +1531,44 @@ function salvarEdicao(f, id) {
   salvar();
 }
 
+// Valor da fatura informado pelo app do banco: guarda o que o app já conhece e lança só a diferença.
+function abrirInfoFatura(c) {
+  const aberta = fechamentoDaCompra(c, hoje()), fechada = fechamentoAnterior(c, aberta), vencFechada = vencimentoDe(c, fechada);
+  const opcoes = [[aberta, `Aberta: fecha ${ddmm(aberta)}, vence ${ddmm(vencimentoDe(c, aberta))}`]];
+  if (vencFechada && hoje() <= vencFechada) opcoes.unshift([fechada, `Fechada: vence ${ddmm(vencFechada)}`]);
+  const info = S.infoFatura[c];
+  const dlg = document.getElementById('dlg');
+  dlg.innerHTML = `<form id="f-info-fatura" method="dialog">
+    <h2>${ico('cartao')} Valor da fatura · ${esc(c)}</h2>
+    <div class="row">
+      ${opcoes.length > 1 ? `<label style="flex-basis:100%">Qual fatura<select name="fech">${opcoes.map(([v, t]) => `<option value="${v}" ${v === aberta ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : `<input type="hidden" name="fech" value="${aberta}">`}
+      <label>Total no app do banco (R$)<input name="total" inputmode="decimal" required value="${info && info.fech === aberta ? String(info.total).replace('.', ',') : ''}" placeholder="0,00"></label>
+      <label>Quanto disso é seu (R$)<input name="minha" inputmode="decimal" value="${info && info.fech === aberta && info.minha !== info.total ? String(info.minha).replace('.', ',') : ''}" placeholder="tudo"></label>
+    </div>
+    <p class="hint">Deixe "quanto é seu" vazio se a fatura toda é sua. No cartão em que sua mãe também compra, informe só a sua parte.</p>
+    <div class="row" style="justify-content:flex-end;margin-top:16px">
+      <button type="button" class="btn" id="edit-cancelar">Cancelar</button>
+      <button class="btn primary" value="${esc(c)}">Salvar</button>
+    </div>
+  </form>`;
+  dlg.showModal();
+}
+
+function salvarInfoFatura(f, c) {
+  const total = num(f.total), minha = f.minha && f.minha.trim() ? num(f.minha) : total, fech = f.fech;
+  if (!(total >= 0) || !(minha >= 0)) return alert('Informe o valor.');
+  // tira a diferença anterior desta fatura antes de comparar de novo
+  S.lanc = S.lanc.filter(l => !(l.agregado && l.cartao === c && l.fech === fech));
+  const conhecido = valorFatura(c, fech), diff = r2(minha - conhecido);
+  if (diff >= 0.01) S.lanc.push({ id: uid(), tipo: 'despesa', data: hoje() < fech ? hoje() : fech, desc: `Compras no ${c} até ${ddmm(hoje())} (valor do banco)`,
+    cat: 'Outros', valor: diff, cartao: c, agregado: true, fech });
+  S.infoFatura[c] = { fech, total, minha, data: hoje(), conhecido };
+  document.getElementById('dlg').close();
+  salvar();
+  alert(diff >= 0.01 ? `O app já conhecia ${fmt.format(conhecido)} desta fatura. A diferença de ${fmt.format(diff)} foi lançada no ${c}.`
+    : `O app já esperava ${fmt.format(conhecido)}, mais do que os ${fmt.format(minha)} do banco (algo ainda não foi cobrado). Nada foi lançado; vale a estimativa do app.`);
+}
+
 function abrirEdicaoFixo(id) {
   const x = S.fixos.find(f => f.id === id);
   const dlg = document.getElementById('dlg');
@@ -1585,6 +1628,8 @@ document.addEventListener('submit', e => {
     S.fixos.push({ id: uid(), tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null, ...(f.cartao ? { cartao: f.cartao } : {}), ...(dias.length ? { dias } : {}), ...(uteis.length ? { uteis } : {}), ...(Object.keys(pct).length ? { pct } : {}), ...(Object.keys(valores).length ? { valores } : {}) });
   } else if (e.target.id === 'f-edit') {
     return salvarEdicao(f, e.submitter.value);
+  } else if (e.target.id === 'f-info-fatura') {
+    return salvarInfoFatura(f, e.submitter.value);
   } else if (e.target.id === 'f-edit-fixo') {
     const x = S.fixos.find(x => x.id === e.submitter.value), valor = num(f.valor), { dias, uteis, pct, valores } = lerAgenda(f.dias);
     if (!(valor > 0)) return alert('Informe um valor maior que zero.');
@@ -1636,6 +1681,7 @@ document.addEventListener('click', e => {
   if (d.ir === 'fixos') { aba = 'fixos'; render(); }
   const ed = e.target.closest('[data-edit-lanc]');
   if (ed) abrirEdicao(ed.dataset.editLanc);
+  if (d.infoFatura) abrirInfoFatura(d.infoFatura);
   const edf = e.target.closest('[data-edit-fixo]');
   if (edf) abrirEdicaoFixo(edf.dataset.editFixo);
   if (e.target.id === 'imp-cancelar') { imp = null; render(); }
