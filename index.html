@@ -431,17 +431,31 @@ const fixoAtivo = (f, m) => f.inicio <= m && (!f.fim || m <= f.fim);
 // Vencimento da fatura em que cai um lançamento no cartão (null se o cartão não tem os dias).
 // Compras de uma fatura importada usam o vencimento que está no PDF; o resto segue a regra do cartão.
 const _venc = new Map();
-let _vencImportado = null;
+// Fatura importada é fatura fechada: o que não veio no PDF não entra nela. Compra lançada à mão vai
+// para a fatura seguinte; parcela prevista que não veio fica fora de tudo (IGNORADA).
+const IGNORADA = '0000-00-00';
+let _vencImportado = null, _fechadas = null;
 function vencDoLanc(l) {
   if (!l.cartao) return null;
   if (!_vencImportado) {
-    _vencImportado = new Map();
-    for (const f of S.faturas) for (const it of f.itens) _vencImportado.set(it.key, S.cartaoDiaUtil[f.banco] ? proxDiaUtil(f.vencimento) : f.vencimento);
+    _vencImportado = new Map(); _fechadas = new Set();
+    for (const f of S.faturas) {
+      const v = S.cartaoDiaUtil[f.banco] ? proxDiaUtil(f.vencimento) : f.vencimento;
+      _fechadas.add(f.banco + '|' + v);
+      for (const it of f.itens) _vencImportado.set(it.key, v);
+    }
   }
   if (l.key && !l.prevista && _vencImportado.has(l.key)) return _vencImportado.get(l.key);
   if (!melhorDia(l.cartao) || !diaVencimento(l.cartao)) return null;
-  const k = l.cartao + '|' + l.data;
-  if (!_venc.has(k)) _venc.set(k, vencimentoDe(l.cartao, fechamentoDaCompra(l.cartao, l.data)));
+  const k = l.cartao + '|' + l.data + (l.prevista ? '|p' : '');
+  if (!_venc.has(k)) {
+    let fech = fechamentoDaCompra(l.cartao, l.data), v = vencimentoDe(l.cartao, fech);
+    if (_fechadas.has(l.cartao + '|' + v)) {
+      if (l.prevista) v = IGNORADA;
+      else for (let i = 0; i < 3 && _fechadas.has(l.cartao + '|' + v); i++) { fech = fechamentoDaCompra(l.cartao, addDia(fech, 1)); v = vencimentoDe(l.cartao, fech); }
+    }
+    _venc.set(k, v);
+  }
   return _venc.get(k);
 }
 // Mês em que o lançamento pesa na conta: compra no cartão no mês do vencimento da fatura
