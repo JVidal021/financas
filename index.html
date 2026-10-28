@@ -36,6 +36,7 @@
   --s1: #3b6cf6;
   --s2: #f97316;
   --violeta: #8b5cf6;
+  --accent-2: #3b82f6;
   --good: #10a36b;
   --warn: #c98a00;
   --crit: #e5484d;
@@ -139,7 +140,7 @@ header h1 .app-nome { display: none; }
 .ibtn:hover { color: var(--accent); }
 .ibtn .ponto { position: absolute; top: 8px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--crit); box-shadow: 0 0 0 2px var(--surface-solid); }
 .perfil { display: flex; align-items: center; gap: 10px; padding-left: 6px; }
-.perfil .av { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #2563eb, #8b5cf6); color: #fff; display: grid; place-items: center; font-weight: 700; box-shadow: 0 4px 12px rgba(37, 99, 235, .35); }
+.perfil .av { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--violeta)); color: #fff; display: grid; place-items: center; font-weight: 700; box-shadow: 0 4px 12px rgba(37, 99, 235, .35); }
 .perfil b { display: block; font-size: 14px; line-height: 1.2; }
 .perfil small { color: var(--muted); font-size: 12px; }
 
@@ -178,7 +179,14 @@ nav button svg.i { color: var(--text-2); transition: color .15s; }
 nav button:hover { background: color-mix(in srgb, var(--surface-solid) 60%, transparent); color: var(--text); }
 nav button.on { background: var(--menu-on); color: var(--accent); font-weight: 650; box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .10); }
 nav button.on svg.i { color: var(--accent); }
-nav .sec, .lado-card { display: none; }
+nav .sec, .lado-card, .menu-tog { display: none; }
+.ajustes { display: grid; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--grid); }
+.chk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; font-weight: 550; cursor: pointer; }
+.chk input { width: 18px; height: 18px; }
+.faixa { display: grid; gap: 6px; font-size: 14px; font-weight: 550; max-width: 460px; }
+.faixa-l { display: flex; align-items: center; gap: 10px; }
+.faixa-l input { flex: 1; }
+.faixa-l small { color: var(--muted); font-size: 12px; font-weight: 500; }
 nav .badge { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; background: var(--accent); color: #fff; border-radius: 99px; padding: 1px 7px; line-height: 1.5; }
 .marca { display: none; }
 main { padding: 18px 24px 36px; }
@@ -273,7 +281,7 @@ input[type=checkbox] { accent-color: var(--accent); }
 .btn { font: inherit; font-weight: 650; font-size: 14px; border: 1px solid var(--edge); background: var(--surface-solid); color: var(--text); border-radius: 11px; padding: 9px 16px; cursor: pointer; transition: transform .1s, box-shadow .15s, background .15s; }
 .btn:hover { background: var(--surface-2); }
 .btn:active { transform: translateY(1px); }
-.btn.primary { background: linear-gradient(135deg, #2563eb, #3b82f6); border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(37, 99, 235, .32); }
+.btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
 .btn.primary:hover { filter: brightness(1.08); }
 button.link { border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 6px; }
 button.link:hover { color: var(--crit); background: var(--surface-2); }
@@ -364,12 +372,28 @@ td.num button.link svg.i { width: 15px; height: 15px; vertical-align: -3px; }
   nav .marca + .sec { padding-top: 0; }
   nav button { padding: 10px 14px; font-size: 14px; }
   .lado-card { display: block; margin-top: auto; padding: 16px; border-radius: 18px; color: #fff; cursor: pointer; position: relative; overflow: hidden;
-    background: linear-gradient(140deg, #1d4ed8, #3b82f6 55%, #8b5cf6); box-shadow: 0 14px 30px rgba(37, 99, 235, .35); }
+    background: linear-gradient(140deg, var(--accent), var(--accent-2) 55%, var(--violeta)); box-shadow: 0 14px 30px color-mix(in srgb, var(--accent) 38%, transparent); }
   .lado-card::after { content: ""; position: absolute; right: -30px; top: -40px; width: 120px; height: 120px; border-radius: 30px; transform: rotate(25deg); background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .25); }
   .lado-card small { display: block; font-size: 12px; opacity: .85; }
   .lado-card b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
   .lado-card span { font-size: 12px; opacity: .9; }
   .lado-card.aperto { background: linear-gradient(140deg, #b91c1c, #e5484d); }
+  .janela { transition: grid-template-columns .25s ease; }
+  .menu-tog { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--muted) !important; font-size: 13px !important; }
+  .menu-tog svg.i { width: 16px; height: 16px; }
+  /* compacto: só os ícones, cada um numa bolinha */
+  body.menu-compacto .janela { grid-template-columns: 88px minmax(0, 1fr); }
+  body.menu-compacto nav { padding: 22px 0 18px; align-items: center; gap: 10px; }
+  body.menu-compacto .marca { padding: 0 0 14px; }
+  body.menu-compacto .marca > span, body.menu-compacto nav .sec, body.menu-compacto nav .longo, body.menu-compacto .lado-card, body.menu-compacto .menu-tog span { display: none; }
+  body.menu-compacto nav button[data-t] { position: relative; width: 46px; height: 46px; padding: 0; border-radius: 50%; justify-content: center; flex: none;
+    background: var(--lateral); border: 1px solid var(--card-borda); box-shadow: 0 4px 12px rgba(20, 45, 120, .08); }
+  body.menu-compacto nav button[data-t] svg.i { width: 19px; height: 19px; }
+  body.menu-compacto nav button[data-t]:hover { background: var(--menu-on); }
+  body.menu-compacto nav button[data-t].on { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 40%, transparent); }
+  body.menu-compacto nav button[data-t].on svg.i { color: #fff; }
+  body.menu-compacto nav .badge { position: absolute; top: -3px; right: -5px; margin: 0; font-size: 10px; padding: 0 5px; box-shadow: 0 0 0 2px var(--surface-solid); }
+  body.menu-compacto .menu-tog { margin-top: auto; width: 36px; height: 36px; padding: 0; border-radius: 50%; justify-content: center; border: 1px solid var(--card-borda); }
   .topo::before { border-radius: 0 30px 0 0; }
   header { padding: 20px 28px 16px; }
   header .logo { display: none; }
@@ -485,6 +509,8 @@ const ICONES = {
   cartao: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
   pix: '<path d="M12 3 3 12l9 9 9-9z"/><path d="m8 12 4-4 4 4-4 4z"/>',
   sobe: '<path d="M7 17 17 7M9 7h8v8"/>',
+  expandir: '<path d="m13 6 6 6-6 6M5 6l6 6-6 6"/>',
+  recolher: '<path d="m11 6-6 6 6 6M19 6l-6 6 6 6"/>',
   lupa: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   lua: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -864,8 +890,8 @@ function barrasHistorico(el, meses) {
   const y = v => P.t + (H - P.t - P.b) * (1 - v / y1);
   const gw = (W - P.l - P.r) / dados.length, bw = Math.min(22, (gw - 18) / 2);
   let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Receitas e despesas por mês"><defs>
-    <linearGradient id="g-rec" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f8bff"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
-    <linearGradient id="g-desp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>`;
+    <linearGradient id="g-rec" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent-2)"/><stop offset="1" stop-color="var(--accent)"/></linearGradient>
+    <linearGradient id="g-desp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--violeta)" stop-opacity=".55"/><stop offset="1" stop-color="var(--violeta)"/></linearGradient></defs>`;
   s += gradeY(ticks, y, P.l, W - P.r);
   const bar = (bx, v, cor) => {
     const top = y(v), h = y(0) - top; if (h <= 0) return '';
@@ -880,7 +906,7 @@ function barrasHistorico(el, meses) {
   });
   s += `</svg><div class="tip"></div>`;
   el.style.setProperty('--cartao', corCartao(cartaoSel));
-  el.innerHTML = (soGastos ? '' : `<div class="legend"><span><i style="background:linear-gradient(#4f8bff,#2563eb)"></i>Receitas</span><span><i style="background:linear-gradient(#c4b5fd,#8b5cf6)"></i>Despesas</span></div>`) + s;
+  el.innerHTML = (soGastos ? '' : `<div class="legend"><span><i style="background:linear-gradient(var(--accent-2),var(--accent))"></i>Receitas</span><span><i style="background:var(--violeta)"></i>Despesas</span></div>`) + s;
   const svg = el.querySelector('svg'), tip = el.querySelector('.tip');
   svg.addEventListener('pointermove', ev => {
     const i = ev.target.dataset && ev.target.dataset.i; if (i == null) return;
@@ -1805,7 +1831,8 @@ function graficoSaldoDia(el, ev) {
 }
 
 // Rosca de gastos por categoria: as 5 maiores + o resto
-const CORES_CAT = ['#2563eb', '#5b8cff', '#7c5cf6', '#a78bfa', '#38bdf8', '#cbd5f5'];
+const CORES_CAT_PADRAO = ['#2563eb', '#5b8cff', '#7c5cf6', '#a78bfa', '#38bdf8', '#cbd5f5'];
+let CORES_CAT = CORES_CAT_PADRAO;   // trocadas quando as cores seguem o fundo
 function rosca(cats) {
   const total = cats.reduce((a, [, v]) => a + v, 0);
   if (!(total > 0)) return '';
@@ -2160,10 +2187,11 @@ function render() {
   const npend = pendencias().length;
   const contador = { lanc: S.lanc.filter(l => l.provisorio).length, visao: npend };
   const lvLado = livreParaGastar();
-  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div><span>Minhas Finanças<small>controle pessoal</small></span></div><div class="sec">Menu</div>` + ABAS.map(([id, nome, icone, curto]) => `${id === 'fatura' ? '<div class="sec">Ferramentas</div>' : ''}<button data-t="${id}" class="${id === aba ? 'on' : ''}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('')
+  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div><span>Minhas Finanças<small>controle pessoal</small></span></div><div class="sec">Menu</div>` + ABAS.map(([id, nome, icone, curto]) => `${id === 'fatura' ? '<div class="sec">Ferramentas</div>' : ''}<button data-t="${id}" class="${id === aba ? 'on' : ''}" title="${nome}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('')
     + `<div class="lado-card ${lvLado.valor < 0 ? 'aperto' : ''}" data-t="visao" role="button" title="Menor saldo previsto nos próximos 45 dias">
         <small>${lvLado.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</small><b>${fmt.format(Math.abs(lvLado.valor))}</b>
-        <span>${lvLado.valor < 0 ? `em ${ddmm(lvLado.ate)}` : `≈ ${fmt.format(lvLado.porDia)}/dia até ${ddmm(lvLado.ate)}`}</span></div>`;
+        <span>${lvLado.valor < 0 ? `em ${ddmm(lvLado.ate)}` : `≈ ${fmt.format(lvLado.porDia)}/dia até ${ddmm(lvLado.ate)}`}</span></div>`
+    + `<button class="menu-tog" data-menu-tog title="${menuAberto() ? 'Recolher menu' : 'Expandir menu'}">${ico(menuAberto() ? 'recolher' : 'expandir')}<span>Recolher</span></button>`;
   document.getElementById('sino').innerHTML = ico('sino') + (npend ? '<span class="ponto"></span>' : '');
   document.getElementById('sino').title = npend ? `${npend} ${npend === 1 ? 'pendência' : 'pendências'}` : 'Nenhuma pendência';
   document.getElementById('tema').innerHTML = ico(document.documentElement.dataset.theme === 'dark' ? 'sol' : 'lua');
@@ -2292,6 +2320,14 @@ function escolherBusca(alvo) {
   });
 }
 
+// ---------- menu lateral: compacto (só os ícones em bolinhas) ou expandido ----------
+const menuAberto = () => { try { return localStorage.getItem('financas.menu') === 'aberto'; } catch (e) { return false; } };
+function alternarMenu(aberto) {
+  try { localStorage.setItem('financas.menu', aberto ? 'aberto' : 'compacto'); } catch (e) {}
+  document.body.classList.toggle('menu-compacto', !aberto);
+  render();
+}
+
 // ---------- fundo (escolhido em cada aparelho, fica só neste navegador) ----------
 const FUNDO_KEY = 'financas.fundo';
 function lerFundo() { try { return JSON.parse(localStorage.getItem(FUNDO_KEY)) || { tipo: 'azul' }; } catch (e) { return { tipo: 'azul' }; } }
@@ -2327,10 +2363,54 @@ function svgGlicinias() {
   }
   return (_glicinias = 'data:image/svg+xml,' + encodeURIComponent(s + '</svg>'));
 }
+// Matiz (0–360) mais marcante de uma imagem: agrupa as cores vivas por tom e fica com o grupo mais forte
+function matizDaImagem(fonte) {
+  const c = document.createElement('canvas'); c.width = 48; c.height = 30;
+  const g = c.getContext('2d'); g.drawImage(fonte, 0, 0, 48, 30);
+  const d = g.getImageData(0, 0, 48, 30).data, peso = new Array(36).fill(0);
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255, max = Math.max(r, gg, b), min = Math.min(r, gg, b), l = (max + min) / 2, dd = max - min;
+    if (!dd) continue;
+    const sat = dd / (1 - Math.abs(2 * l - 1));
+    if (sat < .25 || l < .12 || l > .9) continue;
+    let h = max === r ? ((gg - b) / dd) % 6 : max === gg ? (b - r) / dd + 2 : (r - gg) / dd + 4;
+    h = (h * 60 + 360) % 360;
+    peso[Math.floor(h / 10)] += sat * (1 - Math.abs(l - .5));
+  }
+  let melhor = 0, matiz = null;
+  for (let i = 0; i < 36; i++) { const v = peso[i] + .5 * (peso[(i + 35) % 36] + peso[(i + 1) % 36]); if (v > melhor) { melhor = v; matiz = i * 10 + 5; } }
+  return matiz;
+}
+const MATIZ_GLICINIAS = 268;
+// Transparência do vidro: 0 = mais sólido, 1 = mais transparente (0,5 = padrão)
+function coresVidro(t, escuro) {
+  const f = 1.6 - 1.2 * t, a = v => Math.min(.97, +(v * f).toFixed(3));
+  return escuro
+    ? { '--janela': `rgba(6, 14, 44, ${a(.40)})`, '--lateral': `rgba(8, 16, 50, ${a(.25)})`, '--surface': `rgba(24, 38, 92, ${a(.55)})`,
+        '--card': `linear-gradient(150deg, rgba(44, 66, 140, ${a(.55)}) 0%, rgba(16, 26, 70, ${a(.42)}) 100%)` }
+    : { '--janela': `rgba(255, 255, 255, ${a(.32)})`, '--lateral': `rgba(255, 255, 255, ${a(.45)})`, '--surface': `rgba(255, 255, 255, ${a(.6)})`,
+        '--card': `linear-gradient(150deg, rgba(255, 255, 255, ${a(.8)}) 0%, rgba(255, 255, 255, ${a(.52)}) 100%)` };
+}
 function aplicarFundo() {
   const f = lerFundo(), url = f.tipo === 'glicinias' ? svgGlicinias() : f.tipo === 'imagem' && f.img ? f.img : null;
+  const raiz = document.documentElement.style;
   document.body.classList.toggle('fundo-img', !!url);
   if (url) document.body.style.setProperty('--fundo-img', `url("${url}")`); else document.body.style.removeProperty('--fundo-img');
+  // cores do app no tom do fundo
+  const h = f.corAuto === false ? null : f.tipo === 'glicinias' ? MATIZ_GLICINIAS : f.tipo === 'imagem' ? f.matiz : null;
+  const vars = ['--accent', '--accent-2', '--s1', '--violeta', '--accent-soft', '--hero'];
+  if (h == null) { vars.forEach(v => raiz.removeProperty(v)); CORES_CAT = CORES_CAT_PADRAO; }
+  else {
+    const hsl = (hh, ss, ll, aa = 1) => `hsl(${(hh + 360) % 360} ${ss}% ${ll}% / ${aa})`;
+    raiz.setProperty('--accent', hsl(h, 72, 54)); raiz.setProperty('--s1', hsl(h, 75, 56));
+    raiz.setProperty('--accent-2', hsl(h + 14, 82, 64)); raiz.setProperty('--violeta', hsl(h + 38, 72, 64));
+    raiz.setProperty('--accent-soft', hsl(h, 72, 54, .13));
+    raiz.setProperty('--hero', `linear-gradient(135deg, ${hsl(h, 70, 40)} 0%, ${hsl(h, 75, 55)} 55%, ${hsl(h + 30, 82, 66)} 100%)`);
+    CORES_CAT = [hsl(h, 72, 50), hsl(h, 80, 66), hsl(h + 35, 68, 58), hsl(h + 60, 62, 70), hsl(h - 25, 68, 62), hsl(h, 30, 84)];
+  }
+  // transparência
+  const t = f.transp ?? .5, cv = coresVidro(t, document.documentElement.dataset.theme === 'dark');
+  for (const [k, v] of Object.entries(cv)) { if (t === .5) raiz.removeProperty(k); else raiz.setProperty(k, v); }
 }
 function salvarFundo(f) {
   try { localStorage.setItem(FUNDO_KEY, JSON.stringify(f)); }
@@ -2345,7 +2425,7 @@ function lerImagemFundo(arquivo) {
     c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
     URL.revokeObjectURL(url);
-    salvarFundo({ tipo: 'imagem', img: c.toDataURL('image/jpeg', .85) });
+    salvarFundo({ ...lerFundo(), tipo: 'imagem', img: c.toDataURL('image/jpeg', .85), matiz: matizDaImagem(c) });
   };
   img.onerror = () => { URL.revokeObjectURL(url); alert('Não consegui abrir essa imagem.'); };
   img.src = url;
@@ -2360,6 +2440,12 @@ function cardAparencia() {
       ${op('imagem', f.img ? 'Sua imagem' : 'Usar uma imagem sua', f.img ? `background-image:url(&quot;${f.img}&quot;)` : 'background:var(--surface-2);color:var(--accent)', f.img ? '' : '+')}
     </div>
     <div class="row" style="margin-top:12px"><label class="btn" style="flex:0 0 auto;flex-direction:row;cursor:pointer">${f.img ? 'Trocar imagem' : 'Escolher imagem'}<input type="file" id="fundo-arq" accept="image/*" hidden></label></div>
+    <div class="ajustes">
+      <label class="chk"><input type="checkbox" id="cor-auto" ${f.corAuto === false ? '' : 'checked'}> Cores do app acompanham o fundo <span class="hint" style="margin:0">(botões, gráficos e destaques no tom da imagem)</span></label>
+      <label class="faixa">Transparência do vidro
+        <span class="faixa-l"><small>sólido</small><input type="range" id="transp" min="0" max="1" step="0.05" value="${f.transp ?? .5}"><small>transparente</small></span></label>
+      <label class="chk"><input type="checkbox" id="menu-aberto" ${menuAberto() ? 'checked' : ''}> Menu lateral expandido (com os nomes) <span class="hint" style="margin:0">no computador</span></label>
+    </div>
     <p class="hint">A imagem fica guardada só neste navegador (não vai para o GitHub nem para o outro aparelho). Use uma foto ou wallpaper que você tenha; ela é reduzida automaticamente.</p>
   </div>`;
 }
@@ -2367,14 +2453,15 @@ function cardAparencia() {
 // ---------- eventos ----------
 document.getElementById('logo').innerHTML = ico('carteira');
 aplicarFundo();
+document.body.classList.toggle('menu-compacto', !menuAberto());
 document.getElementById('tema').addEventListener('click', () => {
   const escuro = document.documentElement.dataset.theme !== 'dark';
   if (escuro) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
   try { localStorage.setItem('financas.tema', escuro ? 'dark' : 'light'); } catch (e) {}
-  render();
+  aplicarFundo(); render();
 });
 document.getElementById('sino').addEventListener('click', () => { aba = 'visao'; cartaoSel = null; render(); rolarTopo(); });
-document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b) { aba = b.dataset.t; render(); rolarTopo(); } });
+document.getElementById('tabs').addEventListener('click', e => { if (e.target.closest('[data-menu-tog]')) return alternarMenu(!menuAberto()); const b = e.target.closest('[data-t]'); if (b) { aba = b.dataset.t; render(); rolarTopo(); } });
 document.getElementById('mes').addEventListener('change', e => { mesSel = e.target.value; render(); });
 
 document.addEventListener('submit', e => {
@@ -2490,6 +2577,9 @@ document.addEventListener('click', e => {
 
 document.addEventListener('change', e => {
   if (e.target.id === 'fundo-arq' && e.target.files[0]) return lerImagemFundo(e.target.files[0]);
+  if (e.target.id === 'cor-auto') return salvarFundo({ ...lerFundo(), corAuto: e.target.checked });
+  if (e.target.id === 'transp') return salvarFundo({ ...lerFundo(), transp: +e.target.value });
+  if (e.target.id === 'menu-aberto') return alternarMenu(e.target.checked);
   if (e.target.dataset && e.target.dataset.orc !== undefined) {
     const v = num(e.target.value);
     if (v > 0) S.orc[e.target.dataset.orc] = v; else delete S.orc[e.target.dataset.orc];
@@ -2535,6 +2625,7 @@ document.addEventListener('change', e => {
   }
 });
 document.addEventListener('input', e => {
+  if (e.target.id === 'transp') { try { localStorage.setItem(FUNDO_KEY, JSON.stringify({ ...lerFundo(), transp: +e.target.value })); } catch (err) {} aplicarFundo(); return; }
   const fe = e.target.form;
   if (fe && fe.id === 'f-edit') document.getElementById('edit-parte').textContent = fmt.format(r2(num(fe.valor.value) * +fe.parte.value)); if (e.target.id === 'ajuste') document.getElementById('aj-lbl').textContent = (e.target.value > 0 ? '+' : '') + e.target.value + '%'; });
 
