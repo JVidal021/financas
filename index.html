@@ -108,30 +108,61 @@ header h1 .app-nome { display: none; }
 .perfil b { display: block; font-size: 14px; line-height: 1.2; }
 .perfil small { color: var(--muted); font-size: 12px; }
 
+/* busca */
+.busca { position: relative; flex: 0 1 380px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); color: var(--muted); transition: box-shadow .15s, border-color .15s; }
+.busca:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow); }
+.busca input { flex: 1; border: 0; background: none; padding: 0; height: 100%; box-shadow: none !important; font-size: 14px; }
+.busca input::-webkit-search-cancel-button { display: none; }
+.busca kbd, .br kbd { font: 600 11px "Inter", system-ui, sans-serif; color: var(--muted); background: var(--surface-2); border: 1px solid var(--edge); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.busca-res { position: absolute; left: 0; right: 0; top: calc(100% + 8px); min-width: 380px; max-height: min(70vh, 560px); overflow-y: auto; background: var(--surface-solid); border: 1px solid var(--edge); border-radius: 18px; box-shadow: 0 24px 60px rgba(10, 30, 110, .22); padding: 8px; z-index: 30; color: var(--text); }
+.bg + .bg { border-top: 1px solid var(--grid); margin-top: 6px; padding-top: 6px; }
+.bg-t { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 10px 4px; }
+.bg-t span { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.br { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; text-align: left; border: 0; background: none; color: inherit; font: inherit; padding: 7px 10px; border-radius: 12px; cursor: pointer; }
+.br:hover, .br.sel { background: var(--accent-soft); }
+.br-t b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-t small { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-v { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.br .av-cat svg.i { width: 15px; height: 15px; }
+.br-todos { display: flex; justify-content: space-between; margin-top: 6px; border-top: 1px solid var(--grid); border-radius: 0 0 12px 12px; color: var(--accent); font-weight: 650; font-size: 13.5px; padding: 11px 12px; }
+.busca-vazia { padding: 18px; text-align: center; color: var(--muted); font-size: 14px; }
+mark { background: color-mix(in srgb, var(--accent) 18%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.so-cel { display: none; }
+header { position: relative; }
+.mes-pill { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px 0 14px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); color: var(--muted); cursor: pointer; }
+.mes-pill #mes { border: 0; background: none; box-shadow: none; padding: 0 8px 0 0; height: 100%; font-weight: 600; font-size: 14px; cursor: pointer; }
+.leg-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--edge); border-radius: 99px; padding: 3px 10px; }
+.leg-pill i { width: 18px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--s1), var(--violeta)); }
+
 /* menu */
 nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 12px 18px 0; }
 nav::-webkit-scrollbar { display: none; }
 nav .curto { display: none; }
-nav button { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 9px 14px; border-radius: 12px; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 550; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
-nav button:hover { background: var(--accent-soft); color: var(--text); }
-nav button.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+nav button { display: flex; align-items: center; gap: 11px; background: none; border: 0; padding: 9px 14px; border-radius: 12px; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
+nav button svg.i { color: var(--muted); transition: color .15s; }
+nav button:hover { background: color-mix(in srgb, var(--surface-solid) 60%, transparent); color: var(--text); }
+nav button.on { background: linear-gradient(90deg, rgba(37, 99, 235, .13), rgba(37, 99, 235, .06)); color: var(--accent); font-weight: 650; box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .10); }
+nav button.on svg.i { color: var(--accent); }
+nav .sec, .lado-card { display: none; }
 nav .badge { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; background: var(--accent); color: #fff; border-radius: 99px; padding: 1px 7px; line-height: 1.5; }
 .marca { display: none; }
 main { padding: 18px 24px 36px; }
 
 /* cartões de conteúdo */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
-.card h2 { font-size: 15px; font-weight: 700; margin: 0 0 14px; letter-spacing: -.005em; display: flex; align-items: center; gap: 8px; }
+.card h2 { font-size: 15px; font-weight: 650; margin: 0 0 16px; letter-spacing: -.005em; display: flex; align-items: center; gap: 8px; }
 .card h2 .sub { font-weight: 500; color: var(--muted); font-size: 13px; }
-.card h2 .acao { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--accent); }
+.card h2 .acao { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.card h2 .leg-pill + .acao { margin-left: 8px; }
+.card h2 > svg.i { width: 30px; height: 30px; padding: 7px; border-radius: 9px; color: var(--accent); background: var(--accent-soft); }
 .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); display: flex; gap: 12px; align-items: flex-start; }
 .tile > div:last-child { flex: 1; min-width: 0; }
-.tile .ico { order: 2; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; color: var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 13%, transparent); flex: none; }
+.tile .ico { order: 2; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 13%, transparent); flex: none; }
 .tile .ico svg.i { width: 20px; height: 20px; }
 .tile .lbl { color: var(--text-2); font-size: 13px; font-weight: 550; }
-.tile .val { font-size: 24px; font-weight: 750; margin-top: 4px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.tile .val { font-size: 25px; font-weight: 750; margin-top: 4px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .tile .sub2 { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .delta { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; margin-top: 6px; }
 .delta span { font-weight: 500; color: var(--muted); }
@@ -180,7 +211,8 @@ main { padding: 18px 24px 36px; }
 .rosca svg { width: 150px; height: 150px; flex: none; }
 .rosca .leg { flex: 1 1 160px; display: grid; gap: 7px; font-size: 13px; }
 .rosca .leg div { display: flex; align-items: center; gap: 8px; }
-.rosca .leg b { margin-left: auto; font-weight: 650; font-variant-numeric: tabular-nums; }
+.rosca .leg b { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; }
+.rosca .leg .v { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .rosca .leg span.n { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* atividade (próximos dias) */
@@ -262,11 +294,11 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 /* gráficos */
 .chart { position: relative; }
 .chart svg { display: block; width: 100%; overflow: visible; }
-.chart text { fill: var(--muted); font-size: 11px; }
+.chart text { fill: var(--muted); font-size: 11px; font-weight: 500; }
 .tip { position: absolute; pointer-events: none; background: var(--surface-solid); border: 1px solid var(--edge); border-radius: 12px; padding: 9px 12px; font-size: 13px; box-shadow: 0 10px 30px rgba(20, 45, 120, .16); white-space: nowrap; display: none; z-index: 2; }
 .tip b { display: block; margin-bottom: 2px; }
 .legend { display: flex; gap: 16px; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
-.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
 .empty { color: var(--muted); text-align: center; padding: 28px 0; }
 
 /* importação de fatura */
@@ -289,16 +321,27 @@ td.num button.link svg.i { width: 15px; height: 15px; vertical-align: -3px; }
 /* tela larga: menu lateral dentro da janela */
 @media (min-width: 1100px) {
   .janela { grid-template-columns: 250px minmax(0, 1fr); }
-  nav { position: sticky; top: 0; align-self: start; height: calc(100vh - 88px); flex-direction: column; gap: 4px; padding: 22px 16px; overflow-y: auto;
+  nav { position: sticky; top: 0; align-self: start; height: calc(100vh - 88px); flex-direction: column; gap: 2px; padding: 24px 16px 18px; overflow-y: auto;
     background: var(--lateral); border-right: 1px solid var(--janela-borda); border-radius: 30px 0 0 30px; }
-  nav button { padding: 11px 14px; font-size: 14.5px; }
-  .marca { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; letter-spacing: -.01em; padding: 0 6px 22px; }
+  .marca { display: flex; align-items: center; gap: 11px; font-weight: 800; font-size: 16px; letter-spacing: -.015em; padding: 0 6px 24px; line-height: 1.2; }
+  .marca small { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  nav .sec { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 14px 14px 6px; }
+  nav .marca + .sec { padding-top: 0; }
+  nav button { padding: 10px 14px; font-size: 14px; }
+  .lado-card { display: block; margin-top: auto; padding: 16px; border-radius: 18px; color: #fff; cursor: pointer; position: relative; overflow: hidden;
+    background: linear-gradient(140deg, #1d4ed8, #3b82f6 55%, #8b5cf6); box-shadow: 0 14px 30px rgba(37, 99, 235, .35); }
+  .lado-card::after { content: ""; position: absolute; right: -30px; top: -40px; width: 120px; height: 120px; border-radius: 30px; transform: rotate(25deg); background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .25); }
+  .lado-card small { display: block; font-size: 12px; opacity: .85; }
+  .lado-card b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+  .lado-card span { font-size: 12px; opacity: .9; }
+  .lado-card.aperto { background: linear-gradient(140deg, #b91c1c, #e5484d); }
   .topo::before { border-radius: 0 30px 0 0; }
   header { padding: 20px 28px 16px; }
   header .logo { display: none; }
   main { padding: 20px 28px 36px; }
 }
 @media (min-width: 721px) and (max-width: 1099px) {
+  .busca kbd { display: none; }
   .janela { width: calc(100% - 48px); margin: 24px auto; }
   .perfil .pn, #sync-st { display: none; }
   nav { border-bottom: 1px solid var(--edge); padding-bottom: 10px; }
@@ -310,7 +353,14 @@ td.num button.link svg.i { width: 15px; height: 15px; vertical-align: -3px; }
   .topo::before { border-radius: 0; }
   header { padding: 12px 16px; gap: 8px; }
   header h1 { font-size: 18px; }
-  .saud, .perfil, #sync-st { display: none; }
+  .saud, .perfil, #sync-st, .busca { display: none; }
+  .so-cel { display: grid; }
+  .leg-pill, .card h2 .sub { display: none; }
+  .mes-pill { padding-left: 10px; height: 36px; }
+  .mes-pill svg.i { display: none; }
+  header.buscando .busca { display: flex; position: absolute; left: 12px; right: 12px; top: 10px; z-index: 5; flex: none; }
+  header.buscando .busca kbd { display: none; }
+  .busca-res { min-width: 0; position: fixed; left: 8px; right: 8px; top: 62px; max-height: calc(100vh - 150px); }
   .tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
   .tile { padding: 14px; flex-direction: column; gap: 8px; }
   .tile .ico { order: 0; width: 34px; height: 34px; border-radius: 10px; }
@@ -356,8 +406,15 @@ td.num button.link svg.i { width: 15px; height: 15px; vertical-align: -3px; }
       <header>
         <div class="logo" id="logo"></div>
         <div class="titulo"><h1>Minhas Finanças</h1><div class="saud" id="saud"></div></div>
+        <div class="busca" id="busca" role="search">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" placeholder="Buscar lançamentos, categorias, cartões…" autocomplete="off" spellcheck="false" aria-label="Buscar" aria-controls="busca-res">
+          <kbd>Ctrl K</kbd>
+          <div class="busca-res" id="busca-res" hidden></div>
+        </div>
         <span id="sync-st"></span>
-        <select id="mes" aria-label="Mês"></select>
+        <button class="ibtn so-cel" id="abrir-busca" title="Buscar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+        <label class="mes-pill" id="mes-pill"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><select id="mes" aria-label="Mês"></select></label>
         <button class="ibtn" id="tema" title="Tema claro / escuro"></button>
         <button class="ibtn" id="sino" title="Pendências"></button>
         <div class="perfil"><span class="av">J</span><span class="pn"><b>Jimmy</b><small>Pessoal</small></span></div>
@@ -387,6 +444,7 @@ const ICONES = {
   cartao: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
   pix: '<path d="M12 3 3 12l9 9 9-9z"/><path d="m8 12 4-4 4 4-4 4z"/>',
   sobe: '<path d="M7 17 17 7M9 7h8v8"/>',
+  lupa: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   lua: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   sino: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
@@ -692,6 +750,31 @@ function niceTicks(min, max, n = 4) {
   return t;
 }
 
+// Curva suave que passa por todos os pontos sem criar picos ou vales que não existem
+// (interpolação monotônica de Fritsch–Carlson). `ps` = [[x, y], ...] em ordem de x.
+function curva(ps) {
+  const n = ps.length;
+  if (n < 2) return n ? `M${ps[0][0]},${ps[0][1]}` : '';
+  const dx = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = ps[i + 1][0] - ps[i][0]; m[i] = dx[i] ? (ps[i + 1][1] - ps[i][1]) / dx[i] : 0; }
+  t[0] = m[0]; t[n - 1] = m[n - 2];
+  for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (!m[i]) { t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b;
+    if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+  }
+  let d = `M${ps[0][0]},${ps[0][1]}`;
+  for (let i = 0; i < n - 1; i++) d += `C${ps[i][0] + dx[i] / 3},${ps[i][1] + t[i] * dx[i] / 3} ${ps[i + 1][0] - dx[i] / 3},${ps[i + 1][1] - t[i + 1] * dx[i] / 3} ${ps[i + 1][0]},${ps[i + 1][1]}`;
+  return d;
+}
+// Degradês e brilho usados pelas linhas de saldo
+const defsLinha = id => `<defs><linearGradient id="${id}-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--violeta)" stop-opacity=".26"/><stop offset=".6" stop-color="var(--s1)" stop-opacity=".08"/><stop offset="1" stop-color="var(--s1)" stop-opacity="0"/></linearGradient>
+  <linearGradient id="${id}-l" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--s1)"/><stop offset="1" stop-color="var(--violeta)"/></linearGradient>
+  <filter id="${id}-f" x="-5%" y="-30%" width="110%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#4f6bff" flood-opacity=".28"/></filter></defs>`;
+const gradeY = (ticks, y, x0, x1) => ticks.map(t => `<line x1="${x0}" x2="${x1}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1" stroke-dasharray="${t === 0 ? '0' : '4 5'}"${t === 0 ? ' style="stroke:var(--muted);opacity:.45"' : ''}/><text x="${x0 - 10}" y="${y(t) + 4}" text-anchor="end">${fmtCurto(t)}</text>`).join('');
+const pontoHover = `<circle class="halo" r="11" fill="var(--s1)" opacity=".16" style="display:none"/><circle class="dot" r="5.5" fill="var(--surface-solid)" stroke="var(--s1)" stroke-width="3" style="display:none"/>`;
+
 function linhaSaldo(el, linhas) {
   const W = el.clientWidth || 600, H = 260, P = { l: 64, r: 16, t: 12, b: 28 };
   const vals = linhas.map(l => l.saldo).concat([S.saldoAtual]);
@@ -701,26 +784,24 @@ function linhaSaldo(el, linhas) {
   const x = i => P.l + (W - P.l - P.r) * (i / Math.max(1, pts.length - 1));
   const y = v => P.t + (H - P.t - P.b) * (1 - (v - y0) / (y1 - y0));
   let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Saldo projetado por mês">`;
-  for (const t of ticks) s += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--${t === 0 ? 'text-2' : 'grid'})" stroke-width="1"/><text x="${P.l - 8}" y="${y(t) + 4}" text-anchor="end">${fmtCurto(t)}</text>`;
+  s += gradeY(ticks, y, P.l, W - P.r);
   const every = Math.ceil(pts.length / Math.max(2, Math.floor((W - P.l) / 60)));
   pts.forEach((p, i) => { if (i % every === 0) s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${p.atual ? 'hoje' : nomeMes(p.m)}</text>`; });
-  const trilha = pts.map((p, i) => (i ? 'L' : 'M') + x(i) + ',' + y(p.saldo)).join('');
-  s += `<defs><linearGradient id="g-proj" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--violeta)" stop-opacity=".28"/><stop offset="1" stop-color="var(--s1)" stop-opacity="0"/></linearGradient></defs>`;
-  s += `<path d="${trilha}V${y(Math.max(0, y0))}H${x(0)}Z" fill="url(#g-proj)"/>`;
-  s += `<path d="${trilha}" fill="none" stroke="var(--s1)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`;
-  s += pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.saldo)}" r="3.5" fill="var(--surface-solid)" stroke="var(--s1)" stroke-width="2"/>`).join('');
-  const last = pts[pts.length - 1];
-  s += `<circle cx="${x(pts.length - 1)}" cy="${y(last.saldo)}" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`;
-  s += `<line class="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" style="display:none"/><circle class="dot" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" style="display:none"/>`;
+  const trilha = curva(pts.map((p, i) => [x(i), y(p.saldo)]));
+  s += defsLinha('g-proj');
+  s += `<path d="${trilha}L${x(pts.length - 1)},${y(Math.max(0, y0))}L${x(0)},${y(Math.max(0, y0))}Z" fill="url(#g-proj-a)"/>`;
+  s += `<path d="${trilha}" fill="none" stroke="url(#g-proj-l)" stroke-width="3" stroke-linecap="round" filter="url(#g-proj-f)"/>`;
+  s += pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.saldo)}" r="3.2" fill="var(--surface-solid)" stroke="var(--s1)" stroke-width="2"/>`).join('');
+  s += `<line class="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--s1)" stroke-opacity=".35" stroke-width="1" stroke-dasharray="3 4" style="display:none"/>${pontoHover}`;
   s += `<rect x="${P.l}" y="0" width="${W - P.l - P.r}" height="${H}" fill="transparent" class="hit"/></svg><div class="tip"></div>`;
   el.innerHTML = s;
-  const svg = el.querySelector('svg'), tip = el.querySelector('.tip'), xh = svg.querySelector('.xh'), dot = svg.querySelector('.dot');
+  const svg = el.querySelector('svg'), tip = el.querySelector('.tip'), xh = svg.querySelector('.xh'), dot = svg.querySelector('.dot'), halo = svg.querySelector('.halo');
   const mover = ev => {
     const r = svg.getBoundingClientRect(), mx = (ev.clientX - r.left) * (W / r.width);
     const i = Math.max(0, Math.min(pts.length - 1, Math.round((mx - P.l) / ((W - P.l - P.r) / Math.max(1, pts.length - 1)))));
     const p = pts[i];
     xh.setAttribute('x1', x(i)); xh.setAttribute('x2', x(i)); xh.style.display = '';
-    dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(p.saldo)); dot.style.display = '';
+    for (const c of [dot, halo]) { c.setAttribute('cx', x(i)); c.setAttribute('cy', y(p.saldo)); c.style.display = ''; }
     tip.innerHTML = `<b>${p.atual ? 'Hoje' : nomeMes(p.m)}</b>Saldo: ${fmt.format(p.saldo)}` + (p.atual ? '' : `<br><span style="color:var(--text-2)">No mês: <span class="${p.liq < 0 ? 'neg' : 'pos'}">${fmt.format(p.liq)}</span></span>`);
     tip.style.display = 'block';
     const px = x(i) * (r.width / W);
@@ -728,7 +809,7 @@ function linhaSaldo(el, linhas) {
     tip.style.top = Math.max(0, y(p.saldo) * (r.height / H) - tip.offsetHeight - 10) + 'px';
   };
   svg.addEventListener('pointermove', mover);
-  svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; xh.style.display = 'none'; dot.style.display = 'none'; });
+  svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; xh.style.display = 'none'; dot.style.display = 'none'; halo.style.display = 'none'; });
 }
 
 function barrasHistorico(el, meses) {
@@ -740,23 +821,25 @@ function barrasHistorico(el, meses) {
   const ticks = niceTicks(0, Math.max(1, ...dados.flatMap(d => [d.r, d.d])));
   const y1 = ticks[ticks.length - 1];
   const y = v => P.t + (H - P.t - P.b) * (1 - v / y1);
-  const gw = (W - P.l - P.r) / dados.length, bw = Math.min(28, (gw - 14) / 2);
-  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Receitas e despesas por mês">`;
-  for (const t of ticks) s += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--${t === 0 ? 'text-2' : 'grid'})"/><text x="${P.l - 8}" y="${y(t) + 4}" text-anchor="end">${fmtCurto(t)}</text>`;
+  const gw = (W - P.l - P.r) / dados.length, bw = Math.min(22, (gw - 18) / 2);
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Receitas e despesas por mês"><defs>
+    <linearGradient id="g-rec" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f8bff"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+    <linearGradient id="g-desp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>`;
+  s += gradeY(ticks, y, P.l, W - P.r);
   const bar = (bx, v, cor) => {
     const top = y(v), h = y(0) - top; if (h <= 0) return '';
-    const r = Math.min(4, h, bw / 2);
-    return `<path d="M${bx},${y(0)}V${top + r}Q${bx},${top} ${bx + r},${top}H${bx + bw - r}Q${bx + bw},${top} ${bx + bw},${top + r}V${y(0)}Z" fill="var(${cor})"/>`;
+    const r = Math.min(7, h, bw / 2);
+    return `<path d="M${bx},${y(0)}V${top + r}Q${bx},${top} ${bx + r},${top}H${bx + bw - r}Q${bx + bw},${top} ${bx + bw},${top + r}V${y(0)}Z" fill="${cor.startsWith('--') ? `var(${cor})` : cor}"/>`;
   };
   dados.forEach((d, i) => {
     const cx = P.l + gw * i + gw / 2;
-    s += soGastos ? bar(cx - bw / 2, d.d, '--cartao') : bar(cx - bw - 1, d.r, '--s1') + bar(cx + 1, d.d, '--s2');
+    s += soGastos ? bar(cx - bw / 2, d.d, '--cartao') : bar(cx - bw - 2, d.r, 'url(#g-rec)') + bar(cx + 2, d.d, 'url(#g-desp)');
     s += `<text x="${cx}" y="${H - 8}" text-anchor="middle">${nomeMes(d.m)}</text>`;
     s += `<rect x="${P.l + gw * i}" y="0" width="${gw}" height="${H}" fill="transparent" data-i="${i}"/>`;
   });
   s += `</svg><div class="tip"></div>`;
   el.style.setProperty('--cartao', corCartao(cartaoSel));
-  el.innerHTML = (soGastos ? '' : `<div class="legend"><span><i style="background:var(--s1)"></i>Receitas</span><span><i style="background:var(--s2)"></i>Despesas</span></div>`) + s;
+  el.innerHTML = (soGastos ? '' : `<div class="legend"><span><i style="background:linear-gradient(#4f8bff,#2563eb)"></i>Receitas</span><span><i style="background:linear-gradient(#c4b5fd,#8b5cf6)"></i>Despesas</span></div>`) + s;
   const svg = el.querySelector('svg'), tip = el.querySelector('.tip');
   svg.addEventListener('pointermove', ev => {
     const i = ev.target.dataset && ev.target.dataset.i; if (i == null) return;
@@ -914,10 +997,25 @@ function tabelaItens(itens, mostraFixo) {
     `</tbody></table></div>`;
 }
 
+function telaBusca() {
+  if (!filtroBusca) return '';
+  const ls = lancsDoFiltro(filtroBusca), desp = somaDesp(ls), rec = r2(ls.reduce((a, l) => a + (l.tipo === 'receita' ? l.valor : 0), 0));
+  const meses = [...new Set(ls.map(l => mesDoLanc(l)))];
+  return `<div class="card busca-card"><h2>${ico('lupa')} Resultados: ${esc(filtroBusca.rotulo)} <span class="sub">· ${ls.length} ${ls.length === 1 ? 'lançamento' : 'lançamentos'}</span><button class="link acao" data-limpar-busca>Limpar busca ✕</button></h2>
+    <div class="tiles" style="margin-bottom:12px">
+      ${tile('Gastos encontrados', fmt.format(desp), 'desce', 'var(--violeta)')}
+      ${rec ? tile('Receitas encontradas', fmt.format(rec), 'sobe', 'var(--good)') : ''}
+      ${meses.length > 1 ? tile('Média por mês', fmt.format(r2(desp / meses.length)), 'grafico', 'var(--accent)', `<div class="sub2">${meses.length} meses</div>`) : ''}
+    </div>
+    ${tabelaItens(ls.slice(0, 300))}${ls.length > 300 ? '<p class="hint">Mostrando os 300 mais recentes.</p>' : ''}
+  </div>`;
+}
+
 function telaLanc() {
   const doMes = filtraCartao(S.lanc.filter(l => mesDoLanc(l) === mesSel));
   const dataPadrao = mesSel === mesAtual() ? hoje() : mesSel + '-01';
   return `
+  ${telaBusca()}
   <div class="card"><h2>Novo lançamento</h2>
     <form id="f-lanc" class="row">
       <label>Tipo<select name="tipo"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></label>
@@ -1622,7 +1720,7 @@ function delta(atual, antes, subirEhRuim, rotulo) {
 // Saldo da conta dia a dia (degraus), com área preenchida e o dia mais apertado marcado
 function graficoSaldoDia(el, ev) {
   if (!el) return;
-  const W = el.clientWidth || 600, H = 230, P = { l: 58, r: 14, t: 18, b: 26 };
+  const W = el.clientWidth || 600, H = 250, P = { l: 62, r: 16, t: 22, b: 28 };
   const pts = [{ data: hoje(), saldo: S.saldoAtual, desc: 'Hoje' }].concat(ev);
   const fimDia = pts.filter((p, i) => !pts[i + 1] || pts[i + 1].data !== p.data);   // saldo no fim de cada dia
   const fim = addDia(hoje(), 45);
@@ -1631,53 +1729,58 @@ function graficoSaldoDia(el, ev) {
   const ticks = niceTicks(Math.min(0, ...pts.map(p => p.saldo)), Math.max(1, ...pts.map(p => p.saldo)));
   const y0 = ticks[0], y1 = ticks[ticks.length - 1];
   const y = v => P.t + (H - P.t - P.b) * (1 - (v - y0) / (y1 - y0));
-  // linha ligando o saldo no fim de cada dia com movimento
-  const nos = fimDia[0].data === hoje() ? fimDia : [pts[0]].concat(fimDia);
-  let linha = nos.map((p, i) => (i ? 'L' : 'M') + x(p.data) + ',' + y(p.saldo)).join('') + `L${x(fim)},${y(nos[nos.length - 1].saldo)}`;
+  // um ponto por dia com movimento (saldo no fim do dia), ligados por uma curva suave
+  const nos = fimDia[0].data === hoje() ? fimDia.slice() : [pts[0]].concat(fimDia);
+  const ultimo = nos[nos.length - 1];
+  const linha = curva(nos.map(p => [x(p.data), y(p.saldo)]).concat(ultimo.data < fim ? [[x(fim), y(ultimo.saldo)]] : []));
+  const base = y(Math.max(0, y0));
   const menor = fimDia.reduce((m, p) => p.saldo < m.saldo ? p : m, fimDia[0]);
-  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Saldo da conta dia a dia"><defs><linearGradient id="g-saldo-dia" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--violeta)" stop-opacity=".28"/><stop offset=".55" stop-color="var(--s1)" stop-opacity=".12"/><stop offset="1" stop-color="var(--s1)" stop-opacity="0"/></linearGradient><linearGradient id="g-linha-dia" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--s1)"/><stop offset="1" stop-color="var(--violeta)"/></linearGradient></defs>`;
-  for (const t of ticks) s += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--${t === 0 ? 'text-2' : 'grid'})" stroke-width="1"${t === 0 ? ' stroke-dasharray="4 3"' : ''}/><text x="${P.l - 8}" y="${y(t) + 4}" text-anchor="end">${fmtCurto(t)}</text>`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Saldo da conta dia a dia">${defsLinha('g-dia')}`;
+  s += gradeY(ticks, y, P.l, W - P.r);
   for (let k = 0; k <= 45; k += 7) { const d = addDia(hoje(), k); s += `<text x="${x(d)}" y="${H - 8}" text-anchor="middle">${k ? ddmm(d) : 'hoje'}</text>`; }
-  s += `<path d="${linha}V${y(Math.max(0, y0))}H${x(hoje())}Z" fill="url(#g-saldo-dia)"/>`;
-  s += `<path d="${linha}" fill="none" stroke="url(#g-linha-dia)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`;
-  s += nos.map(p => `<circle cx="${x(p.data)}" cy="${y(p.saldo)}" r="3.5" fill="var(--surface-solid)" stroke="var(--s1)" stroke-width="2"/>`).join('');
-  s += `<circle cx="${x(menor.data)}" cy="${y(menor.saldo)}" r="5" fill="${menor.saldo < 0 ? 'var(--crit)' : 'var(--warn)'}" stroke="var(--surface-solid)" stroke-width="2"/>`;
-  s += `<text x="${Math.min(W - P.r - 4, Math.max(P.l + 4, x(menor.data)))}" y="${Math.max(P.t + 10, y(menor.saldo) - 11)}" text-anchor="middle" style="font-weight:700;fill:var(--text-2);paint-order:stroke;stroke:var(--surface-solid);stroke-width:5px;stroke-linejoin:round">${fmtCurto(menor.saldo)} em ${ddmm(menor.data)}</text>`;
-  s += `<line class="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--muted)" stroke-dasharray="3 3" style="display:none"/></svg><div class="tip"></div>`;
+  s += `<path d="${linha}L${x(fim)},${base}L${x(hoje())},${base}Z" fill="url(#g-dia-a)"/>`;
+  s += `<path d="${linha}" fill="none" stroke="url(#g-dia-l)" stroke-width="3" stroke-linecap="round" filter="url(#g-dia-f)"/>`;
+  s += nos.map(p => `<circle cx="${x(p.data)}" cy="${y(p.saldo)}" r="3.2" fill="var(--surface-solid)" stroke="var(--s1)" stroke-width="2"/>`).join('');
+  const cm = menor.saldo < 0 ? 'var(--crit)' : 'var(--warn)';
+  s += `<circle cx="${x(menor.data)}" cy="${y(menor.saldo)}" r="10" fill="${cm}" opacity=".18"/><circle cx="${x(menor.data)}" cy="${y(menor.saldo)}" r="5" fill="${cm}" stroke="var(--surface-solid)" stroke-width="2"/>`;
+  const lx = Math.min(W - P.r - 60, Math.max(P.l + 60, x(menor.data))), ly = Math.max(P.t + 2, y(menor.saldo) - 34);
+  s += `<g transform="translate(${lx},${ly})"><rect x="-58" y="0" width="116" height="22" rx="11" fill="var(--surface-solid)" stroke="var(--edge)"/><text x="0" y="15" text-anchor="middle" style="font-weight:700;fill:var(--text-2)">${fmtCurto(menor.saldo)} em ${ddmm(menor.data)}</text></g>`;
+  s += `<line class="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--s1)" stroke-opacity=".35" stroke-dasharray="3 4" style="display:none"/>${pontoHover}</svg><div class="tip"></div>`;
   el.innerHTML = s;
-  const svg = el.querySelector('svg'), tip = el.querySelector('.tip'), xh = svg.querySelector('.xh');
+  const svg = el.querySelector('svg'), tip = el.querySelector('.tip'), xh = svg.querySelector('.xh'), dot = svg.querySelector('.dot'), halo = svg.querySelector('.halo');
   svg.addEventListener('pointermove', evt => {
     const r = svg.getBoundingClientRect(), mx = (evt.clientX - r.left) * (W / r.width);
     const dia = addDia(hoje(), Math.max(0, Math.min(45, Math.round((mx - P.l) / (W - P.l - P.r) * 45))));
     const ant = fimDia.filter(p => p.data <= dia), atual = ant[ant.length - 1], doDia = pts.filter(p => p.data === dia && p !== pts[0]);
     xh.setAttribute('x1', x(dia)); xh.setAttribute('x2', x(dia)); xh.style.display = '';
+    for (const c of [dot, halo]) { c.setAttribute('cx', x(dia)); c.setAttribute('cy', y(atual.saldo)); c.style.display = doDia.length || dia === hoje() ? '' : 'none'; }
     tip.innerHTML = `<b>${ddmm(dia)}</b>Saldo: <span class="${atual.saldo < 0 ? 'neg' : ''}">${fmt.format(atual.saldo)}</span>` + doDia.map(e => `<br><span style="color:var(--text-2)">${esc(e.desc)}: <span class="${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</span></span>`).join('');
     tip.style.display = 'block';
     const px = x(dia) * (r.width / W);
-    tip.style.left = Math.max(0, Math.min(px + 12, r.width - tip.offsetWidth)) + 'px';
+    tip.style.left = Math.max(0, Math.min(px + 14, r.width - tip.offsetWidth)) + 'px';
     tip.style.top = '0px';
   });
-  svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; xh.style.display = 'none'; });
+  svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; xh.style.display = 'none'; dot.style.display = 'none'; halo.style.display = 'none'; });
 }
 
 // Rosca de gastos por categoria: as 5 maiores + o resto
-const CORES_CAT = ['#2563eb', '#4f8bff', '#7c5cf6', '#a78bfa', '#38bdf8', '#c3cdf0'];
+const CORES_CAT = ['#2563eb', '#5b8cff', '#7c5cf6', '#a78bfa', '#38bdf8', '#cbd5f5'];
 function rosca(cats) {
   const total = cats.reduce((a, [, v]) => a + v, 0);
   if (!(total > 0)) return '';
   const fatias = cats.slice(0, 5).filter(([, v]) => v > 0);
   const resto = total - fatias.reduce((a, [, v]) => a + v, 0);
   if (resto > 0.005) fatias.push(['Outras', resto]);
-  const R = 60, C = 2 * Math.PI * R;
+  const R = 58, C = 2 * Math.PI * R, VAO = fatias.length > 1 ? 7 : 0;
   let acc = 0, arcos = '';
-  fatias.forEach(([, v], i) => {
+  fatias.forEach(([c, v], i) => {
     const len = v / total * C;
-    arcos += `<circle r="${R}" cx="75" cy="75" fill="none" stroke="${CORES_CAT[i]}" stroke-width="18" stroke-dasharray="${Math.max(0, len - 2)} ${C}" stroke-dashoffset="${-acc}" transform="rotate(-90 75 75)"/>`;
+    arcos += `<circle r="${R}" cx="75" cy="75" fill="none" stroke="${CORES_CAT[i]}" stroke-width="15" stroke-linecap="round" stroke-dasharray="${Math.max(0.1, len - VAO)} ${C}" stroke-dashoffset="${-acc - VAO / 2}" transform="rotate(-90 75 75)"><title>${esc(c)}: ${fmt.format(v)}</title></circle>`;
     acc += len;
   });
-  return `<div class="rosca"><svg viewBox="0 0 150 150" role="img" aria-label="Gastos por categoria"><circle r="${R}" cx="75" cy="75" fill="none" stroke="var(--grid)" stroke-width="18"/>${arcos}
-    <text x="75" y="72" text-anchor="middle" style="font-size:16px;font-weight:750;fill:var(--text)">${fmtCurto(total)}</text><text x="75" y="90" text-anchor="middle" style="font-size:11px;fill:var(--muted)">no mês</text></svg>
-    <div class="leg">${fatias.map(([c, v], i) => `<div><span class="dot" style="background:${CORES_CAT[i]}"></span><span class="n">${esc(c)}</span><b>${Math.round(v / total * 100)}%</b></div>`).join('')}</div></div>`;
+  return `<div class="rosca"><svg viewBox="0 0 150 150" role="img" aria-label="Gastos por categoria"><circle r="${R}" cx="75" cy="75" fill="none" stroke="var(--grid)" stroke-width="15"/>${arcos}
+    <text x="75" y="71" text-anchor="middle" style="font-size:17px;font-weight:800;fill:var(--text)">${fmtCurto(total)}</text><text x="75" y="89" text-anchor="middle" style="font-size:11px;fill:var(--muted)">total no mês</text></svg>
+    <div class="leg">${fatias.map(([c, v], i) => `<div><span class="dot" style="background:${CORES_CAT[i]}"></span><span class="n">${esc(c)}</span><span class="v">${fmt.format(v)}</span><b>${Math.round(v / total * 100)}%</b></div>`).join('')}</div></div>`;
 }
 
 // Próximos `dias` dias com o saldo dia a dia a partir do saldo atual
@@ -1766,7 +1869,7 @@ function cardSaldoDia() {
   const semDia = S.fixos.filter(f => !f.cartao && !f.dias && !f.uteis && fixoAtivo(f, mesAtual())).length;
   const semVenc = cartoesUsados().filter(c => !diaFechamento(c) || !diaVencimento(c));
   const menor = ev.reduce((m, e) => !m || e.saldo < m.saldo ? e : m, null);
-  return `<div class="card"><h2>${ico('grafico')} Saldo na conta <span class="sub">· próximos 45 dias</span></h2>
+  return `<div class="card"><h2>${ico('grafico')} Saldo na conta <span class="sub">· próximos 45 dias</span><span class="leg-pill"><i></i>saldo previsto</span></h2>
     ${campoSaldo()}
     ${menor && menor.saldo < 0 ? `<p class="status crit" style="margin:0 0 10px">▲ O saldo fica negativo em ${ddmm(menor.data)} (${fmt.format(menor.saldo)}).</p>` : ''}
     ${ev.length ? '<div class="chart" id="saldo-dia" style="margin-top:10px"></div>' : '<div class="empty">Nada previsto para os próximos dias.</div>'}
@@ -1780,7 +1883,7 @@ function cardAtividade() {
   const menor = ev.reduce((m, e) => !m || e.saldo < m.saldo ? e : m, null);
   const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   const visual = e => e.cartao ? ['cartao', corCartao(e.cartao)] : e.tag === 'entrada' ? ['sobe', 'var(--good)'] : e.tag === 'planejado' ? ['lista', 'var(--accent)'] : ['repete', 'var(--warn)'];
-  return `<div class="card"><h2>${ico('lista')} Próximos 30 dias <span class="sub">· entra e sai</span></h2>
+  return `<div class="card"><h2>${ico('lista')} Próximos 30 dias<button class="link acao" data-t="proj">Ver projeção</button></h2>
     ${ev.length ? `<div class="feed">${ev.map(e => { const [ic, cor] = visual(e); return `<div class="ev${e === menor ? ' menor' : ''}">
       <span class="ev-ico" style="--c:${cor}">${ico(ic)}</span>
       <div class="ev-txt"><b title="${esc(e.desc)}">${esc(e.desc)}</b><small>${ddmm(e.data)} ${DIAS_SEM[new Date(e.data + 'T12:00').getDay()]}
@@ -1999,13 +2102,13 @@ function abrirEdicaoFixo(id) {
 
 // ---------- render ----------
 function render() {
-  _venc.clear(); _vencImportado = null;   // dias do cartão ou faturas importadas podem ter mudado
+  _venc.clear(); _vencImportado = null; _indice = null;   // dias do cartão ou faturas importadas podem ter mudado
   const sel = document.getElementById('mes');
   const meses = new Set([mesAtual(), mesSel]);
   for (let i = -12; i <= 12; i++) meses.add(addMes(mesAtual(), i));
   S.lanc.forEach(l => meses.add(l.data.slice(0, 7)));
   sel.innerHTML = [...meses].sort().reverse().map(m => `<option value="${m}" ${m === mesSel ? 'selected' : ''}>${nomeMes(m)}${m === mesAtual() ? ' (atual)' : ''}</option>`).join('');
-  sel.style.visibility = ['proj', 'dados', 'fixos', 'fatura'].includes(aba) ? 'hidden' : '';
+  document.getElementById('mes-pill').style.visibility = ['proj', 'dados', 'fixos', 'fatura'].includes(aba) ? 'hidden' : '';
   document.getElementById('cats').innerHTML = catsUsadas().map(c => `<option value="${esc(c)}">`).join('');
   const abaAtual = ABAS.find(a => a[0] === aba);
   document.querySelector('header h1').innerHTML = `<span class="app-nome">Minhas Finanças</span><span class="aba-nome">${abaAtual[1]}</span>`;
@@ -2015,7 +2118,11 @@ function render() {
   // contadores no menu: compras lançadas à mão esperando a fatura, pendências na visão geral
   const npend = pendencias().length;
   const contador = { lanc: S.lanc.filter(l => l.provisorio).length, visao: npend };
-  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div>Minhas Finanças</div>` + ABAS.map(([id, nome, icone, curto]) => `<button data-t="${id}" class="${id === aba ? 'on' : ''}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('');
+  const lvLado = livreParaGastar();
+  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div><span>Minhas Finanças<small>controle pessoal</small></span></div><div class="sec">Menu</div>` + ABAS.map(([id, nome, icone, curto]) => `${id === 'fatura' ? '<div class="sec">Ferramentas</div>' : ''}<button data-t="${id}" class="${id === aba ? 'on' : ''}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('')
+    + `<div class="lado-card ${lvLado.valor < 0 ? 'aperto' : ''}" data-t="visao" role="button" title="Menor saldo previsto nos próximos 45 dias">
+        <small>${lvLado.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</small><b>${fmt.format(Math.abs(lvLado.valor))}</b>
+        <span>${lvLado.valor < 0 ? `em ${ddmm(lvLado.ate)}` : `≈ ${fmt.format(lvLado.porDia)}/dia até ${ddmm(lvLado.ate)}`}</span></div>`;
   document.getElementById('sino').innerHTML = ico('sino') + (npend ? '<span class="ponto"></span>' : '');
   document.getElementById('sino').title = npend ? `${npend} ${npend === 1 ? 'pendência' : 'pendências'}` : 'Nenhuma pendência';
   document.getElementById('tema').innerHTML = ico(document.documentElement.dataset.theme === 'dark' ? 'sol' : 'lua');
@@ -2026,6 +2133,117 @@ function render() {
     if (document.getElementById('saldo-dia')) graficoSaldoDia(document.getElementById('saldo-dia'), agenda(45));
   }
   if (aba === 'proj') linhaSaldo(document.getElementById('proj'), projecao().linhas);
+}
+
+// ---------- busca ----------
+// Procura em todos os lançamentos (descrição, categoria, cartão, data e valor), nos itens fixos,
+// nas categorias, nos cartões e nas telas do app. Todas as palavras precisam aparecer (sem acento,
+// sem diferenciar maiúsculas). O índice é refeito a cada render, quando os dados podem ter mudado.
+const semAcento = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+let _indice = null;
+function indiceBusca() {
+  if (!_indice) _indice = S.lanc.map(l => ({ l, t: semAcento([l.desc, l.cat, l.cartao || 'pix debito', l.data.split('-').reverse().join('/'), fmt.format(l.valor), l.tipo].join(' ')) }));
+  return _indice;
+}
+const ATALHOS = [['Novo lançamento', 'lanc', 'lista', 'adicionar despesa receita compra'], ['Importar fatura', 'fatura', 'envia', 'pdf cartao'],
+  ['Informar saldo de hoje', 'saldo', 'carteira', 'conta conferir'], ['Projeção dos próximos meses', 'proj', 'grafico', 'futuro previsao'],
+  ['Orçamento e limites', 'orc', 'alvo', 'limite categoria'], ['Itens fixos', 'fixos', 'repete', 'salario conta assinatura'], ['Dados e sincronização', 'dados', 'dados', 'backup github exportar']];
+function buscar(q) {
+  const tokens = semAcento(q).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return null;
+  const casa = t => tokens.every(k => t.includes(k));
+  const lanc = indiceBusca().filter(x => casa(x.t)).map(x => x.l).sort((a, b) => b.data.localeCompare(a.data));
+  const fixos = S.fixos.filter(f => casa(semAcento([f.desc, f.cat, f.cartao || '', fmt.format(f.valor)].join(' '))));
+  const cats = catsUsadas().filter(c => casa(semAcento(c)));
+  const cartoes = cartoesUsados().filter(c => casa(semAcento(c)));
+  const atalhos = ATALHOS.filter(a => casa(semAcento(a[0] + ' ' + a[3])));
+  return { tokens, lanc, fixos, cats, cartoes, atalhos };
+}
+// Destaca as palavras buscadas no texto (o texto sem acento tem as mesmas posições do original)
+function marcar(txt, tokens) {
+  const base = semAcento(txt);
+  if (base.length !== txt.length) return esc(txt);
+  const on = new Array(txt.length).fill(false);
+  for (const k of tokens) { let i = base.indexOf(k); while (i >= 0) { for (let j = i; j < i + k.length; j++) on[j] = true; i = base.indexOf(k, i + 1); } }
+  let out = '', aberto = false;
+  for (let i = 0; i < txt.length; i++) {
+    if (on[i] !== aberto) { out += on[i] ? '<mark>' : '</mark>'; aberto = on[i]; }
+    out += esc(txt[i]);
+  }
+  return out + (aberto ? '</mark>' : '');
+}
+const somaDesp = ls => r2(ls.reduce((a, l) => a + (l.tipo === 'despesa' ? l.valor : 0), 0));
+function mostrarBusca(q) {
+  const box = document.getElementById('busca-res'), r = buscar(q);
+  if (!r) { box.hidden = true; box.innerHTML = ''; return; }
+  const grupo = (titulo, extra, itens) => itens ? `<div class="bg"><div class="bg-t">${titulo}${extra ? `<span>${extra}</span>` : ''}</div>${itens}</div>` : '';
+  const linha = (alvo, av, titulo, sub, valor) => `<button type="button" class="br" data-br="${esc(alvo)}">${av}<span class="br-t"><b>${titulo}</b><small>${sub}</small></span>${valor ? `<span class="br-v">${valor}</span>` : ''}</button>`;
+  const avCat = c => `<span class="av-cat" style="--c:${corCategoria(c)}">${esc((c || '?').charAt(0).toUpperCase())}</span>`;
+  const avIco = (icone, cor) => `<span class="av-cat" style="--c:${cor}">${ico(icone)}</span>`;
+  const html =
+    grupo('Lançamentos', r.lanc.length ? `${r.lanc.length} · ${fmt.format(somaDesp(r.lanc))} em gastos` : '', r.lanc.slice(0, 6).map(l => linha('lanc:' + l.id, avCat(l.cat), marcar(l.desc, r.tokens),
+      `${l.data.split('-').reverse().join('/')} · ${marcar(l.cat, r.tokens)} · ${esc(nomeCartao(l.cartao || SEM_CARTAO))}`, `<span class="${l.tipo === 'receita' ? 'pos' : ''}">${l.tipo === 'receita' ? '+' : '−'} ${fmt.format(l.valor)}</span>`)).join(''))
+    + grupo('Categorias', '', r.cats.slice(0, 4).map(c => { const ls = S.lanc.filter(l => l.cat === c); return linha('cat:' + c, avCat(c), marcar(c, r.tokens), `${ls.length} lançamentos`, fmt.format(somaDesp(ls))); }).join(''))
+    + grupo('Cartões', '', r.cartoes.slice(0, 4).map(c => { const ls = S.lanc.filter(l => l.cartao === c); return linha('cartao:' + c, avIco('cartao', corCartao(c)), marcar(c, r.tokens), `${ls.length} lançamentos`, fmt.format(somaDesp(ls))); }).join(''))
+    + grupo('Fixos', '', r.fixos.slice(0, 4).map(f => linha('fixo:' + f.id, avIco('repete', f.tipo === 'receita' ? 'var(--good)' : 'var(--warn)'), marcar(f.desc, r.tokens), `${esc(f.cat)} · ${f.tipo === 'receita' ? 'receita' : 'despesa'} fixa`, fmt.format(f.valor))).join(''))
+    + grupo('Ir para', '', r.atalhos.slice(0, 4).map(a => linha('ir:' + a[1], avIco(a[2], 'var(--accent)'), marcar(a[0], r.tokens), 'atalho', '')).join(''));
+  box.innerHTML = (html || `<div class="busca-vazia">Nada encontrado para “${esc(q)}”.</div>`)
+    + (r.lanc.length > 6 || r.lanc.length && (r.cats.length || r.cartoes.length) ? `<button type="button" class="br br-todos" data-br="todos">Ver os ${r.lanc.length} lançamentos encontrados <kbd>Enter</kbd></button>` : '');
+  box.hidden = false;
+  const prim = box.querySelector('.br'); if (prim) prim.classList.add('sel');
+}
+// Filtro aplicado na aba Lançamentos: texto livre, uma categoria ou um cartão
+let filtroBusca = null;
+function lancsDoFiltro(f) {
+  if (f.tipo === 'cat') return S.lanc.filter(l => l.cat === f.valor);
+  if (f.tipo === 'cartao') return S.lanc.filter(l => l.cartao === f.valor);
+  const r = buscar(f.valor); return r ? r.lanc : [];
+}
+function fecharBusca() {
+  const box = document.getElementById('busca-res'); box.hidden = true;
+  document.querySelector('header').classList.remove('buscando');
+}
+function escolherBusca(alvo) {
+  const q = document.getElementById('q');
+  const [tipo, ...resto] = alvo.split(':'), valor = resto.join(':');
+  fecharBusca(); q.blur();
+  if (tipo === 'lanc') return abrirEdicao(valor);
+  if (tipo === 'fixo') return abrirEdicaoFixo(valor);
+  if (tipo === 'ir') {
+    if (valor === 'saldo') { aba = 'visao'; mesSel = mesAtual(); cartaoSel = null; render(); const i = document.getElementById('saldo'); if (i) { i.scrollIntoView({ block: 'center' }); i.focus(); } return; }
+    aba = valor; render(); window.scrollTo(0, 0); return;
+  }
+  filtroBusca = tipo === 'todos' ? { tipo: 'texto', valor: q.value.trim(), rotulo: `“${q.value.trim()}”` } : { tipo, valor, rotulo: tipo === 'cat' ? `categoria ${valor}` : `cartão ${valor}` };
+  q.value = ''; aba = 'lanc'; cartaoSel = null; render(); window.scrollTo(0, 0);
+}
+{
+  const q = document.getElementById('q'), box = document.getElementById('busca-res');
+  let timer = null;
+  q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => mostrarBusca(q.value), 90); });
+  q.addEventListener('focus', () => { if (q.value.trim()) mostrarBusca(q.value); });
+  q.addEventListener('keydown', e => {
+    const itens = [...box.querySelectorAll('.br')], at = itens.findIndex(b => b.classList.contains('sel'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); if (!itens.length) return;
+      const n = (at + (e.key === 'ArrowDown' ? 1 : -1) + itens.length) % itens.length;
+      itens.forEach((b, i) => b.classList.toggle('sel', i === n)); itens[n].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!q.value.trim()) return;
+      const sel = itens[at];
+      escolherBusca(sel && at > 0 ? sel.dataset.br : box.querySelector('[data-br="todos"]') ? 'todos' : sel ? sel.dataset.br : 'todos');
+    } else if (e.key === 'Escape') { q.value = ''; fecharBusca(); q.blur(); }
+  });
+  box.addEventListener('mousedown', e => e.preventDefault());   // não perde o foco antes do clique
+  box.addEventListener('click', e => { const b = e.target.closest('[data-br]'); if (b) escolherBusca(b.dataset.br); });
+  document.addEventListener('click', e => { if (!e.target.closest('#busca') && !e.target.closest('#abrir-busca')) fecharBusca(); });
+  document.getElementById('abrir-busca').addEventListener('click', () => { document.querySelector('header').classList.add('buscando'); q.focus(); });
+  document.addEventListener('keydown', e => {
+    const digitando = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.querySelector('dialog[open]');
+    if ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === '/' && !digitando)) {
+      e.preventDefault(); document.querySelector('header').classList.add('buscando'); q.focus(); q.select();
+    }
+  });
 }
 
 // ---------- eventos ----------
@@ -2079,6 +2297,9 @@ document.addEventListener('submit', e => {
 
 document.addEventListener('click', e => {
   const d = e.target.dataset || {};
+  if (e.target.closest('[data-limpar-busca]')) { filtroBusca = null; render(); return; }
+  const irAba = e.target.closest('#app [data-t]');
+  if (irAba) { aba = irAba.dataset.t; render(); window.scrollTo(0, 0); return; }
   if (d.delLanc) { S.lanc = S.lanc.filter(l => l.id !== d.delLanc); salvar(); }
   if (d.delFixo && confirm('Excluir este item fixo de todos os meses?')) { S.fixos = S.fixos.filter(f => f.id !== d.delFixo); salvar(); }
   if (d.encerrar) { const f = S.fixos.find(f => f.id === d.encerrar); f.fim = mesAtual(); salvar(); }
