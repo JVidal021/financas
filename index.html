@@ -13,7 +13,7 @@
   color-scheme: light;
   --fundo: linear-gradient(160deg, #0a2cc0 0%, #1748ec 32%, #2f68ff 62%, #6f9bff 88%, #a8c4ff 100%);
   --brilho: radial-gradient(1000px 560px at 50% 45%, rgba(255, 255, 255, .28), transparent 70%);
-  --janela: rgba(244, 248, 255, .58);
+  --janela: rgba(240, 245, 255, .84);
   --janela-borda: rgba(255, 255, 255, .85);
   --lateral: rgba(255, 255, 255, .5);
   --surface: rgba(255, 255, 255, .86);
@@ -36,14 +36,14 @@
   --crit: #e5484d;
   --radius: 18px;
   --shadow: 0 1px 2px rgba(20, 45, 120, .05), 0 8px 24px rgba(20, 45, 120, .07);
-  --header-bg: rgba(248, 250, 255, .7);
+  --header-bg: rgba(246, 249, 255, .86);
   --cubo-a: rgba(255, 255, 255, .78); --cubo-b: rgba(170, 200, 255, .38); --cubo-c: rgba(30, 90, 240, .5);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --fundo: linear-gradient(162deg, #030820 0%, #08196b 34%, #12339f 62%, #1c47c4 100%);
   --brilho: radial-gradient(900px 600px at 50% 38%, rgba(80, 130, 255, .22), transparent 70%);
-  --janela: rgba(10, 18, 46, .55);
+  --janela: rgba(10, 18, 46, .86);
   --janela-borda: rgba(255, 255, 255, .12);
   --lateral: rgba(14, 24, 60, .55);
   --surface: rgba(19, 30, 66, .82); --surface-2: rgba(28, 42, 88, .85); --surface-solid: #111c44;
@@ -53,7 +53,7 @@
   --s1: #6b9bff; --s2: #fb8a3c; --violeta: #a78bfa;
   --good: #3fd193; --warn: #eab308; --crit: #f87171;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px rgba(0, 0, 0, .3);
-  --header-bg: rgba(12, 20, 50, .7);
+  --header-bg: rgba(12, 20, 50, .88);
   --cubo-a: rgba(160, 190, 255, .35); --cubo-b: rgba(70, 110, 230, .25); --cubo-c: rgba(10, 30, 120, .55);
 }
 * { box-sizing: border-box; }
@@ -65,7 +65,7 @@ body {
 svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
 /* fundo: degradê azul com blocos de vidro flutuando */
-#fundo { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--brilho), var(--fundo); pointer-events: none; }
+#fundo { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--brilho), var(--fundo); pointer-events: none; transform: translateZ(0); contain: strict; }
 .cubo { position: absolute; aspect-ratio: 1; border-radius: 24%;
   background: linear-gradient(145deg, var(--cubo-a) 0%, var(--cubo-b) 42%, var(--cubo-c) 100%);
   border: 1.5px solid rgba(255, 255, 255, .75);
@@ -73,25 +73,24 @@ svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-widt
   display: grid; place-items: center; }
 .cubo::before { content: ""; position: absolute; left: 9%; right: 9%; top: 7%; height: 38%; border-radius: 40% 40% 50% 50% / 60% 60% 40% 40%;
   background: linear-gradient(180deg, rgba(255, 255, 255, .75), rgba(255, 255, 255, 0)); }
-.cubo::after { content: ""; position: absolute; inset: -1.5px; border-radius: inherit; background: linear-gradient(135deg, rgba(255, 255, 255, .55), transparent 35%, transparent 70%, rgba(120, 170, 255, .45)); mix-blend-mode: screen; }
+.cubo::after { content: ""; position: absolute; inset: -1.5px; border-radius: inherit; background: linear-gradient(135deg, rgba(255, 255, 255, .4), transparent 35%, transparent 70%, rgba(120, 170, 255, .3)); }
 .cubo svg { width: 46%; height: 46%; fill: none; stroke: #1f5bff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 4px 8px rgba(30, 90, 255, .5)); position: relative; z-index: 1; }
-.c1 { width: 260px; left: -70px; top: -60px; transform: rotate(-18deg); filter: blur(1px); }
+.c1 { width: 260px; left: -70px; top: -60px; transform: rotate(-18deg); }
 .c2 { width: 190px; right: -50px; top: 7%; transform: rotate(22deg); }
 .c3 { width: 210px; left: 2%; bottom: -50px; transform: rotate(-10deg); }
-.c4 { width: 150px; right: 7%; bottom: 3%; transform: rotate(14deg); filter: blur(3px); }
-.c5 { width: 80px; right: 26%; top: 44%; transform: rotate(32deg); filter: blur(6px); opacity: .8; }
-.c6 { width: 64px; left: 30%; top: 4%; transform: rotate(-26deg); filter: blur(5px); opacity: .7; }
+.c4 { width: 150px; right: 7%; bottom: 3%; transform: rotate(14deg); opacity: .8; }
+.c5 { width: 80px; right: 26%; top: 44%; transform: rotate(32deg); opacity: .5; }
+.c6 { width: 64px; left: 30%; top: 4%; transform: rotate(-26deg); opacity: .5; }
 
 /* janela de vidro que envolve o app */
 .janela { position: relative; isolation: isolate; width: min(1320px, calc(100% - 112px)); margin: 44px auto; border-radius: 30px; display: grid; grid-template-columns: 1fr; min-height: calc(100vh - 88px); }
 .janela::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--janela); border: 1px solid var(--janela-borda);
-  backdrop-filter: blur(30px) saturate(1.5); -webkit-backdrop-filter: blur(30px) saturate(1.5);
   box-shadow: 0 40px 110px rgba(6, 28, 120, .38), inset 0 1px 0 rgba(255, 255, 255, .9); }
 .conteudo { min-width: 0; }
 
 /* topo */
 .topo { position: sticky; top: 0; z-index: 10; }
-.topo::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--header-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-bottom: 1px solid var(--edge); border-radius: 30px 30px 0 0; }
+.topo::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--header-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--edge); border-radius: 30px 30px 0 0; }
 header { padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
 .logo { width: 38px; height: 38px; border-radius: 12px; background: var(--hero); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 16px rgba(37, 99, 235, .4); flex: none; }
 .titulo { flex: 1; min-width: 0; }
@@ -156,6 +155,7 @@ main { padding: 18px 24px 36px; }
 .card h2 .leg-pill + .acao { margin-left: 8px; }
 .card h2 > svg.i { width: 30px; height: 30px; padding: 7px; border-radius: 9px; color: var(--accent); background: var(--accent-soft); }
 .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+.adiado { content-visibility: auto; contain-intrinsic-size: auto 900px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); display: flex; gap: 12px; align-items: flex-start; }
 .tile > div:last-child { flex: 1; min-width: 0; }
@@ -381,8 +381,9 @@ td.num button.link svg.i { width: 15px; height: 15px; vertical-align: -3px; }
   .hero .hero-ico { width: 40px; height: 40px; right: 16px; top: 16px; }
   #mes { max-width: 118px; }
   .card { padding: 16px; }
-  .cubo { opacity: .55; }
-  nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--header-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-top: 1px solid var(--edge); justify-content: space-between; gap: 0; }
+  .cubo { display: none; }
+  :root { --shadow: 0 1px 2px rgba(20, 45, 120, .05), 0 4px 12px rgba(20, 45, 120, .06); }
+  nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--header-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--edge); justify-content: space-between; gap: 0; }
   nav button { flex: 1; flex-direction: column; gap: 3px; padding: 6px 2px; font-size: 10px; border-radius: 12px; min-width: 0; position: relative; }
   nav button span { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   nav .longo { display: none; }
@@ -981,7 +982,7 @@ function telaVisao() {
     : cardCartoes ? `<div class="grid2">${cardCartoes}${cardCats}</div>${cardHist}` : `<div class="grid2">${cardCats}${cardHist}</div>`;
   return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${cardLivre ? `<div class="destaque">${hero}${cardLivre}</div>` : hero}${kpis}
   ${blocos}
-  <div class="card"><h2>${ico('lista')} Tudo de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</span></h2>${tabelaItens(itens, true)}</div>`;
+  <div class="card adiado"><h2>${ico('lista')} Tudo de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</span></h2>${tabelaItens(itens, true)}</div>`;
 }
 
 // Cor fixa por categoria (para o círculo com a inicial)
@@ -2128,6 +2129,9 @@ function render() {
   document.getElementById('tema').innerHTML = ico(document.documentElement.dataset.theme === 'dark' ? 'sol' : 'lua');
   const app = document.getElementById('app');
   app.innerHTML = { visao: telaVisao, lanc: telaLanc, fixos: telaFixos, orc: telaOrc, proj: telaProj, dados: telaDados, fatura: telaFatura }[aba]();
+  desenharGraficos();
+}
+function desenharGraficos() {
   if (aba === 'visao') {
     const h = []; for (let i = 5; i >= 0; i--) h.push(addMes(mesSel, -i)); barrasHistorico(document.getElementById('hist'), h);
     if (document.getElementById('saldo-dia')) graficoSaldoDia(document.getElementById('saldo-dia'), agenda(45));
@@ -2411,7 +2415,11 @@ document.addEventListener('input', e => {
   const fe = e.target.form;
   if (fe && fe.id === 'f-edit') document.getElementById('edit-parte').textContent = fmt.format(r2(num(fe.valor.value) * +fe.parte.value)); if (e.target.id === 'ajuste') document.getElementById('aj-lbl').textContent = (e.target.value > 0 ? '+' : '') + e.target.value + '%'; });
 
-let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 150); });
+let rz, larguraAnt = innerWidth;
+window.addEventListener('resize', () => {
+  if (innerWidth === larguraAnt) return;
+  larguraAnt = innerWidth; clearTimeout(rz); rz = setTimeout(desenharGraficos, 150);
+});
 // ao voltar para o app (ex.: depois de usar no celular), busca o que mudou
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) puxar(); });
 window.addEventListener('beforeunload', e => { if (timerEnvio) { enviar(); e.preventDefault(); } });
