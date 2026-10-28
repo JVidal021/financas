@@ -7,179 +7,233 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>try { if (localStorage.getItem('financas.tema') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
 <style>
 :root {
   color-scheme: light;
-  --bg: #e8eefb;
-  --blob1: rgba(59, 130, 246, .38); --blob2: rgba(56, 189, 248, .30); --blob3: rgba(99, 102, 241, .22);
-  --surface: rgba(255, 255, 255, .62);
-  --surface-2: rgba(241, 245, 253, .78);
-  --surface-solid: #f7f9fe;
-  --border: rgba(255, 255, 255, .75);
-  --edge: rgba(30, 58, 138, .08);
-  --grid: rgba(30, 58, 138, .08);
-  --text: #0f172a;
-  --text-2: #42506b;
-  --muted: #7a87a0;
+  --fundo: linear-gradient(160deg, #0a2cc0 0%, #1748ec 32%, #2f68ff 62%, #6f9bff 88%, #a8c4ff 100%);
+  --brilho: radial-gradient(1000px 560px at 50% 45%, rgba(255, 255, 255, .28), transparent 70%);
+  --janela: rgba(244, 248, 255, .58);
+  --janela-borda: rgba(255, 255, 255, .85);
+  --lateral: rgba(255, 255, 255, .5);
+  --surface: rgba(255, 255, 255, .86);
+  --surface-2: rgba(239, 244, 255, .9);
+  --surface-solid: #ffffff;
+  --border: rgba(255, 255, 255, .95);
+  --edge: rgba(23, 50, 130, .09);
+  --grid: rgba(23, 50, 130, .08);
+  --text: #0e1a3d;
+  --text-2: #475575;
+  --muted: #8892ab;
   --accent: #2563eb;
-  --accent-soft: rgba(37, 99, 235, .11);
+  --accent-soft: rgba(37, 99, 235, .10);
   --hero: linear-gradient(135deg, #1d4ed8 0%, #2f74f5 55%, #38bdf8 100%);
-  --s1: #2563eb;
+  --s1: #3b6cf6;
   --s2: #f97316;
-  --good: #0f8a5f;
-  --warn: #b77a00;
-  --crit: #dc3a3a;
+  --violeta: #8b5cf6;
+  --good: #10a36b;
+  --warn: #c98a00;
+  --crit: #e5484d;
   --radius: 18px;
-  --shadow: 0 1px 1px rgba(30, 58, 138, .04), 0 10px 30px rgba(30, 58, 138, .08);
-  --header-bg: rgba(232, 238, 251, .62);
-  --glass: blur(18px) saturate(1.5);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --bg: #070b17;
-    --blob1: rgba(37, 99, 235, .30); --blob2: rgba(14, 165, 233, .18); --blob3: rgba(99, 102, 241, .20);
-    --surface: rgba(20, 28, 50, .58); --surface-2: rgba(30, 40, 68, .62); --surface-solid: #131a2e;
-    --border: rgba(255, 255, 255, .09); --edge: rgba(255, 255, 255, .05); --grid: rgba(255, 255, 255, .07);
-    --text: #eef2fb; --text-2: #b4bfd6; --muted: #7c89a5;
-    --accent: #5b8cff; --accent-soft: rgba(91, 140, 255, .16);
-    --hero: linear-gradient(135deg, #1e40af 0%, #2563eb 55%, #0ea5e9 100%);
-    --s1: #5b8cff; --s2: #fb8a3c;
-    --good: #3fcf8e; --warn: #e8b030; --crit: #f47272;
-    --shadow: 0 1px 1px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .35);
-    --header-bg: rgba(7, 11, 23, .55);
-  }
+  --shadow: 0 1px 2px rgba(20, 45, 120, .05), 0 8px 24px rgba(20, 45, 120, .07);
+  --header-bg: rgba(248, 250, 255, .7);
+  --cubo-a: rgba(255, 255, 255, .78); --cubo-b: rgba(170, 200, 255, .38); --cubo-c: rgba(30, 90, 240, .5);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #070b17;
-  --blob1: rgba(37, 99, 235, .30); --blob2: rgba(14, 165, 233, .18); --blob3: rgba(99, 102, 241, .20);
-  --surface: rgba(20, 28, 50, .58); --surface-2: rgba(30, 40, 68, .62); --surface-solid: #131a2e;
-  --border: rgba(255, 255, 255, .09); --edge: rgba(255, 255, 255, .05); --grid: rgba(255, 255, 255, .07);
-  --text: #eef2fb; --text-2: #b4bfd6; --muted: #7c89a5;
-  --accent: #5b8cff; --accent-soft: rgba(91, 140, 255, .16);
-  --hero: linear-gradient(135deg, #1e40af 0%, #2563eb 55%, #0ea5e9 100%);
-  --s1: #5b8cff; --s2: #fb8a3c;
-  --good: #3fcf8e; --warn: #e8b030; --crit: #f47272;
-  --shadow: 0 1px 1px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .35);
-  --header-bg: rgba(7, 11, 23, .55);
+  --fundo: linear-gradient(162deg, #030820 0%, #08196b 34%, #12339f 62%, #1c47c4 100%);
+  --brilho: radial-gradient(900px 600px at 50% 38%, rgba(80, 130, 255, .22), transparent 70%);
+  --janela: rgba(10, 18, 46, .55);
+  --janela-borda: rgba(255, 255, 255, .12);
+  --lateral: rgba(14, 24, 60, .55);
+  --surface: rgba(19, 30, 66, .82); --surface-2: rgba(28, 42, 88, .85); --surface-solid: #111c44;
+  --border: rgba(255, 255, 255, .08); --edge: rgba(255, 255, 255, .08); --grid: rgba(255, 255, 255, .08);
+  --text: #eef2ff; --text-2: #b6c2e2; --muted: #7f8db3;
+  --accent: #6b9bff; --accent-soft: rgba(107, 155, 255, .16);
+  --s1: #6b9bff; --s2: #fb8a3c; --violeta: #a78bfa;
+  --good: #3fd193; --warn: #eab308; --crit: #f87171;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px rgba(0, 0, 0, .3);
+  --header-bg: rgba(12, 20, 50, .7);
+  --cubo-a: rgba(160, 190, 255, .35); --cubo-b: rgba(70, 110, 230, .25); --cubo-c: rgba(10, 30, 120, .55);
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; background: var(--bg); color: var(--text);
+  margin: 0; background: #1f57f5; color: var(--text);
   font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-/* fundo com manchas de cor por trás do vidro */
-body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(640px circle at 8% -5%, var(--blob1), transparent 62%),
-    radial-gradient(560px circle at 96% 18%, var(--blob2), transparent 60%),
-    radial-gradient(760px circle at 45% 110%, var(--blob3), transparent 62%); }
 svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
+/* fundo: degradê azul com blocos de vidro flutuando */
+#fundo { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--brilho), var(--fundo); pointer-events: none; }
+.cubo { position: absolute; aspect-ratio: 1; border-radius: 24%;
+  background: linear-gradient(145deg, var(--cubo-a) 0%, var(--cubo-b) 42%, var(--cubo-c) 100%);
+  border: 1.5px solid rgba(255, 255, 255, .75);
+  box-shadow: inset 8px 8px 18px rgba(255, 255, 255, .75), inset -14px -20px 34px rgba(18, 60, 200, .45), 30px 46px 80px rgba(8, 30, 140, .38);
+  display: grid; place-items: center; }
+.cubo::before { content: ""; position: absolute; left: 9%; right: 9%; top: 7%; height: 38%; border-radius: 40% 40% 50% 50% / 60% 60% 40% 40%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .75), rgba(255, 255, 255, 0)); }
+.cubo::after { content: ""; position: absolute; inset: -1.5px; border-radius: inherit; background: linear-gradient(135deg, rgba(255, 255, 255, .55), transparent 35%, transparent 70%, rgba(120, 170, 255, .45)); mix-blend-mode: screen; }
+.cubo svg { width: 46%; height: 46%; fill: none; stroke: #1f5bff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 4px 8px rgba(30, 90, 255, .5)); position: relative; z-index: 1; }
+.c1 { width: 260px; left: -70px; top: -60px; transform: rotate(-18deg); filter: blur(1px); }
+.c2 { width: 190px; right: -50px; top: 7%; transform: rotate(22deg); }
+.c3 { width: 210px; left: 2%; bottom: -50px; transform: rotate(-10deg); }
+.c4 { width: 150px; right: 7%; bottom: 3%; transform: rotate(14deg); filter: blur(3px); }
+.c5 { width: 80px; right: 26%; top: 44%; transform: rotate(32deg); filter: blur(6px); opacity: .8; }
+.c6 { width: 64px; left: 30%; top: 4%; transform: rotate(-26deg); filter: blur(5px); opacity: .7; }
+
+/* janela de vidro que envolve o app */
+.janela { position: relative; isolation: isolate; width: min(1320px, calc(100% - 112px)); margin: 44px auto; border-radius: 30px; display: grid; grid-template-columns: 1fr; min-height: calc(100vh - 88px); }
+.janela::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--janela); border: 1px solid var(--janela-borda);
+  backdrop-filter: blur(30px) saturate(1.5); -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  box-shadow: 0 40px 110px rgba(6, 28, 120, .38), inset 0 1px 0 rgba(255, 255, 255, .9); }
+.conteudo { min-width: 0; }
+
 /* topo */
-.topo { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--edge); }
-.topo::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--header-bg); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
-header h1 .aba-nome, .marca { display: none; }
-header { max-width: 1080px; margin: 0 auto; padding: 14px 16px 10px; display: flex; align-items: center; gap: 12px; }
-.logo { width: 36px; height: 36px; border-radius: 11px; background: var(--hero); color: #fff; display: grid; place-items: center; box-shadow: 0 4px 14px rgba(37, 99, 235, .4); flex: none; }
-header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.01em; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-nav .curto { display: none; }
-#sync-st { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
-#mes { border-radius: 99px; padding: 7px 14px; font-weight: 600; background: var(--surface); border-color: var(--border); }
-nav { max-width: 1080px; margin: 0 auto; padding: 0 12px 10px; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.topo { position: sticky; top: 0; z-index: 10; }
+.topo::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--header-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-bottom: 1px solid var(--edge); border-radius: 30px 30px 0 0; }
+header { padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+.logo { width: 38px; height: 38px; border-radius: 12px; background: var(--hero); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 16px rgba(37, 99, 235, .4); flex: none; }
+.titulo { flex: 1; min-width: 0; }
+header h1 { font-size: 22px; font-weight: 750; letter-spacing: -.02em; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+header h1 .app-nome { display: none; }
+.saud { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sync-st { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22vw; }
+#mes { border-radius: 99px; padding: 8px 14px; font-weight: 600; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.ibtn { position: relative; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow); flex: none; }
+.ibtn:hover { color: var(--accent); }
+.ibtn .ponto { position: absolute; top: 8px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--crit); box-shadow: 0 0 0 2px var(--surface-solid); }
+.perfil { display: flex; align-items: center; gap: 10px; padding-left: 6px; }
+.perfil .av { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #2563eb, #8b5cf6); color: #fff; display: grid; place-items: center; font-weight: 700; box-shadow: 0 4px 12px rgba(37, 99, 235, .35); }
+.perfil b { display: block; font-size: 14px; line-height: 1.2; }
+.perfil small { color: var(--muted); font-size: 12px; }
+
+/* menu */
+nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 12px 18px 0; }
 nav::-webkit-scrollbar { display: none; }
-nav button { display: flex; align-items: center; gap: 7px; background: none; border: 0; padding: 8px 14px; border-radius: 99px; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
-nav button:hover { background: var(--surface-2); color: var(--text); }
-nav button.on { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
-main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 40px; }
+nav .curto { display: none; }
+nav button { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 9px 14px; border-radius: 12px; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 550; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
+nav button:hover { background: var(--accent-soft); color: var(--text); }
+nav button.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+nav .badge { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; background: var(--accent); color: #fff; border-radius: 99px; padding: 1px 7px; line-height: 1.5; }
+.marca { display: none; }
+main { padding: 18px 24px 36px; }
 
 /* cartões de conteúdo */
-.card, .tile, .chip, .barra-imp, .tip, dialog#dlg { backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
-.card h2 { font-size: 15px; font-weight: 650; margin: 0 0 14px; letter-spacing: -.005em; display: flex; align-items: center; gap: 8px; }
+.card h2 { font-size: 15px; font-weight: 700; margin: 0 0 14px; letter-spacing: -.005em; display: flex; align-items: center; gap: 8px; }
 .card h2 .sub { font-weight: 500; color: var(--muted); font-size: 13px; }
+.card h2 .acao { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--accent); }
 .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); display: flex; gap: 12px; align-items: flex-start; }
-.tile .ico { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 13%, transparent); flex: none; }
-.tile .lbl { color: var(--text-2); font-size: 13px; font-weight: 500; }
-.tile .val { font-size: 22px; font-weight: 700; margin-top: 1px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.tile .sub2 { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 650; border-radius: 99px; padding: 1px 8px; margin-top: 4px; }
-.delta span { font-weight: 500; opacity: .75; }
-.delta.bom { color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
-.delta.ruim { color: var(--crit); background: color-mix(in srgb, var(--crit) 11%, transparent); }
-.cat-row .dl { font-size: 11px; font-weight: 650; margin-left: 4px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); display: flex; gap: 12px; align-items: flex-start; }
+.tile > div:last-child { flex: 1; min-width: 0; }
+.tile .ico { order: 2; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; color: var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 13%, transparent); flex: none; }
+.tile .ico svg.i { width: 20px; height: 20px; }
+.tile .lbl { color: var(--text-2); font-size: 13px; font-weight: 550; }
+.tile .val { font-size: 24px; font-weight: 750; margin-top: 4px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.tile .sub2 { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.delta { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; margin-top: 6px; }
+.delta span { font-weight: 500; color: var(--muted); }
+.delta.bom { color: var(--good); }
+.delta.ruim { color: var(--crit); }
+.cat-row .dl { font-size: 11px; font-weight: 700; margin-left: 4px; }
 .cat-row .dl.bom { color: var(--good); } .cat-row .dl.ruim { color: var(--crit); }
 
-/* destaque do mês */
-.hero { background: var(--hero); color: #fff; border-radius: 22px; padding: 24px; margin-bottom: 16px; box-shadow: 0 14px 36px rgba(37, 99, 235, .32); position: relative; overflow: hidden; border: 1px solid rgba(255, 255, 255, .22); }
-.hero::after { content: ""; position: absolute; right: -60px; top: -70px; width: 240px; height: 240px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, .22), rgba(255, 255, 255, .04) 70%); }
-.hero::before { content: ""; position: absolute; left: -40px; bottom: -90px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255, 255, 255, .06); }
-.hero .lbl { font-size: 14px; opacity: .85; font-weight: 500; }
-.hero .big { font-size: 38px; font-weight: 750; letter-spacing: -.03em; margin: 2px 0 16px; font-variant-numeric: tabular-nums; }
-.hero .stats { display: flex; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1; }
-.hero .stat { background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .16); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 12px; padding: 10px 14px; min-width: 150px; display: flex; gap: 10px; align-items: center; }
-.hero .stat small { display: block; font-size: 12px; opacity: .8; }
+/* destaque do mês (cartão branco, cor só nos ícones) */
+.hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin-bottom: 16px; box-shadow: var(--shadow); position: relative; }
+.hero .hero-ico { position: absolute; right: 20px; top: 20px; width: 48px; height: 48px; border-radius: 14px; background: var(--hero); color: #fff; display: grid; place-items: center; box-shadow: 0 8px 18px rgba(37, 99, 235, .35); }
+.hero .lbl { font-size: 14px; color: var(--text-2); font-weight: 550; }
+.hero .big { font-size: 38px; font-weight: 800; letter-spacing: -.03em; margin: 2px 0 16px; font-variant-numeric: tabular-nums; }
+.hero .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.hero .stat { background: var(--surface-2); border: 1px solid var(--edge); border-radius: 14px; padding: 10px 14px; min-width: 150px; flex: 1 1 150px; display: flex; gap: 10px; align-items: center; }
+.hero .stat > svg.i { width: 34px; height: 34px; padding: 8px; border-radius: 10px; color: var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 13%, transparent); }
+.hero .stat small { display: block; font-size: 12px; color: var(--muted); }
 .hero .stat b { font-size: 16px; font-variant-numeric: tabular-nums; }
-.hero .orc { margin-top: 16px; position: relative; z-index: 1; font-size: 13px; }
-.hero .orc .bar { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .22); margin-top: 6px; overflow: hidden; }
-.hero .orc .bar i { display: block; height: 100%; border-radius: 99px; background: #fff; }
+.hero .orc { margin-top: 14px; font-size: 13px; color: var(--text-2); }
+.hero .orc .bar { height: 7px; border-radius: 99px; background: var(--grid); margin-top: 6px; overflow: hidden; }
+.hero .orc .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--violeta)); }
+/* destaque de um cartão (mantém a cor do cartão) */
+.hero.cor { color: #fff; border-color: rgba(255, 255, 255, .25); box-shadow: 0 14px 34px rgba(20, 40, 120, .25); overflow: hidden; }
+.hero.cor .lbl, .hero.cor .stat small { color: rgba(255, 255, 255, .85); }
+.hero.cor .stat { background: rgba(255, 255, 255, .15); border-color: rgba(255, 255, 255, .18); }
+.hero.cor .stat > svg.i { color: #fff; background: rgba(255, 255, 255, .18); }
 
-/* destaque do mês atual: saldo no fim do mês + livre pra gastar */
 .destaque { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
 .destaque > .hero, .destaque > .card { margin-bottom: 0; }
-.livre .big { font-size: 34px; font-weight: 750; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.15; }
-.livre .pill { display: inline-flex; gap: 6px; align-items: center; margin-top: 12px; padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-soft); }
+.livre .big { font-size: 34px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.livre h2 svg.i { width: 30px; height: 30px; padding: 6px; border-radius: 9px; color: var(--violeta); background: color-mix(in srgb, var(--violeta) 14%, transparent); }
+.livre .pill { display: inline-flex; gap: 6px; align-items: center; margin-top: 12px; padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 650; color: var(--accent); background: var(--accent-soft); }
 .livre .medidor { height: 8px; border-radius: 99px; background: var(--grid); margin-top: 14px; overflow: hidden; }
-.livre .medidor i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), #38bdf8); }
+.livre .medidor i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--violeta)); }
 .livre.aperto .big { color: var(--crit); }
 .livre.aperto .pill { color: var(--crit); background: color-mix(in srgb, var(--crit) 11%, transparent); }
 
+/* grades */
+.grid2, .g21 { display: grid; gap: 16px; margin-bottom: 16px; }
+.grid2 { grid-template-columns: 1fr 1fr; }
+.g21 { grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); }
+.grid2 > .card, .g21 > .card { margin-bottom: 0; min-width: 0; }
+
 /* rosca de categorias */
-.rosca { display: flex; gap: 18px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.rosca { display: flex; gap: 18px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
 .rosca svg { width: 150px; height: 150px; flex: none; }
-.rosca .leg { flex: 1 1 160px; display: grid; gap: 6px; font-size: 13px; }
+.rosca .leg { flex: 1 1 160px; display: grid; gap: 7px; font-size: 13px; }
 .rosca .leg div { display: flex; align-items: center; gap: 8px; }
-.rosca .leg b { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rosca .leg b { margin-left: auto; font-weight: 650; font-variant-numeric: tabular-nums; }
 .rosca .leg span.n { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* atividade (próximos dias) */
+.feed { display: grid; gap: 2px; }
+.ev { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 8px; border-radius: 12px; }
+.ev:hover { background: var(--surface-2); }
+.ev.menor { background: color-mix(in srgb, var(--warn) 11%, transparent); }
+.ev-ico { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.ev-ico svg.i { width: 17px; height: 17px; }
+.ev-txt b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-txt small { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.ev-val { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ev-val b { display: block; font-size: 14px; }
+.ev-val small { font-size: 12px; color: var(--muted); }
 
 /* formulários */
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
-.row label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500; color: var(--text-2); flex: 1 1 140px; }
-input, select { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--edge); border-radius: 10px; padding: 9px 11px; min-width: 0; transition: border-color .15s, box-shadow .15s; }
+.row label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 550; color: var(--text-2); flex: 1 1 140px; }
+input, select { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--edge); border-radius: 11px; padding: 9px 12px; min-width: 0; transition: border-color .15s, box-shadow .15s; }
 input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 input[type=range] { padding: 0; accent-color: var(--accent); box-shadow: none; }
 input[type=checkbox] { accent-color: var(--accent); }
-.btn { font: inherit; font-weight: 600; font-size: 14px; border: 1px solid var(--edge); background: var(--surface); color: var(--text); border-radius: 10px; padding: 9px 16px; cursor: pointer; transition: transform .1s, box-shadow .15s, background .15s; }
+.btn { font: inherit; font-weight: 650; font-size: 14px; border: 1px solid var(--edge); background: var(--surface-solid); color: var(--text); border-radius: 11px; padding: 9px 16px; cursor: pointer; transition: transform .1s, box-shadow .15s, background .15s; }
 .btn:hover { background: var(--surface-2); }
 .btn:active { transform: translateY(1px); }
-.btn.primary { background: linear-gradient(135deg, var(--accent), #3b82f6); border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(37, 99, 235, .32); }
-.btn.primary:hover { filter: brightness(1.08); background: var(--accent); }
+.btn.primary { background: linear-gradient(135deg, #2563eb, #3b82f6); border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(37, 99, 235, .32); }
+.btn.primary:hover { filter: brightness(1.08); }
 button.link { border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 6px; }
 button.link:hover { color: var(--crit); background: var(--surface-2); }
 a { color: var(--accent); }
 
 /* tabelas */
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-th, td { text-align: left; padding: 10px 10px; border-bottom: 1px solid var(--grid); font-size: 14px; }
-th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+th, td { text-align: left; padding: 11px 10px; border-bottom: 1px solid var(--grid); font-size: 14px; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
 tbody tr { transition: background .12s; }
 tbody tr:hover { background: var(--surface-2); }
 td.num, th.num { text-align: right; white-space: nowrap; }
 .tbl-wrap { overflow-x: auto; margin: 0 -10px; }
+.it { display: flex; gap: 10px; align-items: center; }
+.av-cat { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
 .pos { color: var(--good); }
 .neg { color: var(--crit); }
-.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--edge); border-radius: 99px; padding: 1px 9px; white-space: nowrap; vertical-align: 1px; }
-.tag.t-bom { color: var(--good); background: color-mix(in srgb, var(--good) 11%, transparent); border-color: transparent; }
-.tag.t-aviso { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); border-color: transparent; }
+.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--edge); border-radius: 99px; padding: 1px 9px; white-space: nowrap; vertical-align: 1px; }
+.tag.t-bom { color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); border-color: transparent; }
+.tag.t-aviso { color: var(--warn); background: color-mix(in srgb, var(--warn) 13%, transparent); border-color: transparent; }
 .tag.t-azul { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+.tag.t-ruim { color: var(--crit); background: color-mix(in srgb, var(--crit) 11%, transparent); border-color: transparent; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
 
 /* filtro por cartão */
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-.chip { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 14px; font-weight: 550; padding: 7px 14px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; box-shadow: var(--shadow); transition: all .15s; }
+.chip { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 14px; font-weight: 600; padding: 7px 14px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; box-shadow: var(--shadow); transition: all .15s; }
 .chip:hover { color: var(--text); }
 .chip.on { background: var(--accent); color: #fff; border-color: transparent; box-shadow: 0 6px 16px rgba(37, 99, 235, .3); }
 
@@ -188,20 +242,20 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .cartao-row:hover { background: var(--surface-2); }
 .cartao-ico { width: 34px; height: 24px; border-radius: 6px; background: var(--c); display: grid; place-items: center; color: #fff; }
 .cartao-ico svg.i { width: 15px; height: 15px; }
-.cartao-row .nome { font-weight: 600; font-size: 14px; }
+.cartao-row .nome { font-weight: 650; font-size: 14px; }
 .cartao-row .mini { height: 6px; border-radius: 99px; background: var(--grid); margin-top: 6px; overflow: hidden; }
 .cartao-row .mini i { display: block; height: 100%; border-radius: 99px; background: var(--c); }
-.cartao-row .amt { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
+.cartao-row .amt { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cartao-row .amt small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
 
 /* categorias */
 .cat-row { display: grid; grid-template-columns: minmax(90px, 150px) 1fr auto; gap: 14px; align-items: center; padding: 8px 0; }
-.cat-row .name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-row .name { font-size: 14px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track { position: relative; height: 8px; background: var(--grid); border-radius: 99px; }
-.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: var(--s1); }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, var(--s1), var(--violeta)); }
 .limit { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 2px; background: var(--text-2); }
 .cat-row .amt { font-size: 13px; color: var(--text-2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.status { font-size: 12px; font-weight: 650; }
+.status { font-size: 12px; font-weight: 700; }
 .status.warn { color: var(--warn); }
 .status.crit { color: var(--crit); }
 
@@ -209,79 +263,109 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .chart { position: relative; }
 .chart svg { display: block; width: 100%; overflow: visible; }
 .chart text { fill: var(--muted); font-size: 11px; }
-.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; font-size: 13px; box-shadow: var(--shadow); white-space: nowrap; display: none; z-index: 2; }
+.tip { position: absolute; pointer-events: none; background: var(--surface-solid); border: 1px solid var(--edge); border-radius: 12px; padding: 9px 12px; font-size: 13px; box-shadow: 0 10px 30px rgba(20, 45, 120, .16); white-space: nowrap; display: none; z-index: 2; }
 .tip b { display: block; margin-bottom: 2px; }
 .legend { display: flex; gap: 16px; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .empty { color: var(--muted); text-align: center; padding: 28px 0; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.grid2 > .card { margin-bottom: 0; }
-.grid2 { margin-bottom: 16px; }
 
 /* importação de fatura */
-.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--edge); border-radius: 10px; padding: 2px; gap: 2px; }
-.seg button { font: inherit; font-size: 13px; font-weight: 550; border: 0; background: none; color: var(--text-2); padding: 5px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--edge); border-radius: 11px; padding: 2px; gap: 2px; }
+.seg button { font: inherit; font-size: 13px; font-weight: 600; border: 0; background: none; color: var(--text-2); padding: 5px 10px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
 .seg button:hover { color: var(--text); }
 .seg button.on { background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(37, 99, 235, .3); }
 .seg button.on.nao { background: var(--text-2); color: var(--surface-solid); box-shadow: none; }
 tr.pendente td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 tr.ignorado td { color: var(--muted); }
-.sec-title td { background: var(--surface-2); font-weight: 650; font-size: 13px; color: var(--text-2); }
-.barra-imp { position: sticky; bottom: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; box-shadow: 0 8px 30px rgba(16, 24, 40, .16); }
-.barra-imp .tot { font-size: 20px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.sec-title td { background: var(--surface-2); font-weight: 700; font-size: 13px; color: var(--text-2); }
+.barra-imp { position: sticky; bottom: 12px; background: var(--surface-solid); border: 1px solid var(--edge); border-radius: var(--radius); padding: 14px 18px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; box-shadow: 0 10px 34px rgba(20, 45, 120, .2); }
+.barra-imp .tot { font-size: 20px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
-dialog#dlg { border: 1px solid var(--border); border-radius: 22px; padding: 24px; background: var(--surface-solid); color: var(--text); width: min(560px, calc(100vw - 32px)); box-shadow: 0 24px 60px rgba(0, 0, 0, .3); }
-dialog#dlg::backdrop { background: rgba(10, 12, 20, .45); backdrop-filter: blur(3px); }
+dialog#dlg { border: 1px solid var(--edge); border-radius: 22px; padding: 24px; background: var(--surface-solid); color: var(--text); width: min(560px, calc(100vw - 32px)); box-shadow: 0 30px 70px rgba(6, 28, 120, .35); }
+dialog#dlg::backdrop { background: rgba(8, 20, 70, .4); backdrop-filter: blur(4px); }
 dialog#dlg h2 { font-size: 17px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
 td.num button.link svg.i { width: 15px; height: 15px; vertical-align: -3px; }
+
+/* tela larga: menu lateral dentro da janela */
+@media (min-width: 1100px) {
+  .janela { grid-template-columns: 250px minmax(0, 1fr); }
+  nav { position: sticky; top: 0; align-self: start; height: calc(100vh - 88px); flex-direction: column; gap: 4px; padding: 22px 16px; overflow-y: auto;
+    background: var(--lateral); border-right: 1px solid var(--janela-borda); border-radius: 30px 0 0 30px; }
+  nav button { padding: 11px 14px; font-size: 14.5px; }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; letter-spacing: -.01em; padding: 0 6px 22px; }
+  .topo::before { border-radius: 0 30px 0 0; }
+  header { padding: 20px 28px 16px; }
+  header .logo { display: none; }
+  main { padding: 20px 28px 36px; }
+}
+@media (min-width: 721px) and (max-width: 1099px) {
+  .janela { width: calc(100% - 48px); margin: 24px auto; }
+  .perfil .pn, #sync-st { display: none; }
+  nav { border-bottom: 1px solid var(--edge); padding-bottom: 10px; }
+}
+/* celular: sem a moldura; cartões brancos sobre o azul e menu embaixo */
 @media (max-width: 720px) {
-  .grid2 { grid-template-columns: 1fr; gap: 0; margin-bottom: 0; }
-  .grid2 > .card { margin-bottom: 16px; }
+  .janela { width: 100%; margin: 0; border-radius: 0; min-height: 100vh; }
+  .janela::before { display: none; }
+  .topo::before { border-radius: 0; }
+  header { padding: 12px 16px; gap: 8px; }
+  header h1 { font-size: 18px; }
+  .saud, .perfil, #sync-st { display: none; }
+  .tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { padding: 14px; flex-direction: column; gap: 8px; }
+  .tile .ico { order: 0; width: 34px; height: 34px; border-radius: 10px; }
+  .tile .ico svg.i { width: 17px; height: 17px; }
+  .tile .val { font-size: 19px; }
+  #mes { padding: 7px 10px; font-size: 13px; }
+  .ibtn { width: 36px; height: 36px; }
+  :root { --surface: rgba(255, 255, 255, .93); }
+  :root[data-theme="dark"] { --surface: rgba(17, 28, 68, .9); }
+  .grid2, .g21 { grid-template-columns: 1fr; }
+  .destaque { grid-template-columns: 1fr; }
   .cat-row { grid-template-columns: 90px 1fr; }
   .cat-row .amt { grid-column: 1 / -1; text-align: left; }
   .hero .big { font-size: 32px; }
-  .hero .stat { flex: 1 1 130px; min-width: 0; }
-  .destaque { grid-template-columns: 1fr; }
-
+  .hero .stat { flex: 1 1 130px; min-width: 0; padding: 9px 10px; gap: 8px; }
+  .hero .stat > svg.i { width: 28px; height: 28px; padding: 6px; }
+  .hero .stat b { font-size: 15px; }
+  .hero .hero-ico { width: 40px; height: 40px; right: 16px; top: 16px; }
+  #mes { max-width: 118px; }
   .card { padding: 16px; }
-  /* navegação embaixo, como app (o blur do topo prenderia a barra fixa dentro dele) */
-  nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; max-width: none; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--header-bg); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); border-top: 1px solid var(--border); justify-content: space-between; gap: 0; }
-  nav button { flex: 1; flex-direction: column; gap: 3px; padding: 6px 2px; font-size: 10px; border-radius: 12px; min-width: 0; }
+  .cubo { opacity: .55; }
+  nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--header-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-top: 1px solid var(--edge); justify-content: space-between; gap: 0; }
+  nav button { flex: 1; flex-direction: column; gap: 3px; padding: 6px 2px; font-size: 10px; border-radius: 12px; min-width: 0; position: relative; }
   nav button span { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   nav .longo { display: none; }
   nav .curto { display: inline; }
-  header h1 { font-size: 17px; }
-  #mes { padding: 6px 8px; font-size: 13px; }
-  main { padding-bottom: 96px; }
+  nav .badge { position: absolute; top: 2px; right: 18%; font-size: 9px; padding: 0 5px; }
+  main { padding: 16px 16px 96px; }
   .barra-imp { bottom: 76px; }
-  #sync-st { display: none; }
-}
-@media (min-width: 1180px) {
-  .topo { margin-left: 256px; border-bottom: 0; }
-  header { max-width: 1120px; margin: 0; padding: 22px 24px 6px; }
-  header .logo, header h1 .app-nome { display: none; }
-  header h1 .aba-nome { display: inline; }
-  header h1 { font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
-  nav { position: fixed; left: 16px; top: 16px; bottom: 16px; width: 224px; max-width: none; margin: 0; padding: 18px 12px; flex-direction: column; gap: 4px; overflow-y: auto;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
-  nav button { padding: 11px 14px; border-radius: 13px; font-size: 14.5px; }
-  nav button.on { background: linear-gradient(135deg, var(--accent), #3b82f6); color: #fff; box-shadow: 0 8px 18px rgba(37, 99, 235, .3); }
-  .marca { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 16px; letter-spacing: -.01em; padding: 2px 8px 20px; }
-  main { max-width: 1120px; margin: 0 0 0 256px; padding: 14px 24px 40px; }
 }
 </style>
 </head>
 <body>
-<div class="topo">
-  <header>
-    <div class="logo" id="logo"></div>
-    <h1>Minhas Finanças</h1>
-    <span id="sync-st"></span>
-    <select id="mes" aria-label="Mês"></select>
-  </header>
-  <nav id="tabs"></nav>
+<div id="fundo" aria-hidden="true">
+  <div class="cubo c1"></div><div class="cubo c2"></div>
+  <div class="cubo c3"><svg viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div>
+  <div class="cubo c4"></div><div class="cubo c5"></div><div class="cubo c6"></div>
 </div>
-<main id="app"></main>
+<div class="janela">
+  <nav id="tabs"></nav>
+  <div class="conteudo">
+    <div class="topo">
+      <header>
+        <div class="logo" id="logo"></div>
+        <div class="titulo"><h1>Minhas Finanças</h1><div class="saud" id="saud"></div></div>
+        <span id="sync-st"></span>
+        <select id="mes" aria-label="Mês"></select>
+        <button class="ibtn" id="tema" title="Tema claro / escuro"></button>
+        <button class="ibtn" id="sino" title="Pendências"></button>
+        <div class="perfil"><span class="av">J</span><span class="pn"><b>Jimmy</b><small>Pessoal</small></span></div>
+      </header>
+    </div>
+    <main id="app"></main>
+  </div>
+</div>
 <dialog id="dlg"></dialog>
 <datalist id="cats"></datalist>
 
@@ -303,6 +387,9 @@ const ICONES = {
   cartao: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
   pix: '<path d="M12 3 3 12l9 9 9-9z"/><path d="m8 12 4-4 4 4-4 4z"/>',
   sobe: '<path d="M7 17 17 7M9 7h8v8"/>',
+  lua: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  sino: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
   desce: '<path d="M7 7l10 10M17 9v8H9"/>',
   pizza: '<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
   lapis: '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
@@ -618,9 +705,10 @@ function linhaSaldo(el, linhas) {
   const every = Math.ceil(pts.length / Math.max(2, Math.floor((W - P.l) / 60)));
   pts.forEach((p, i) => { if (i % every === 0) s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${p.atual ? 'hoje' : nomeMes(p.m)}</text>`; });
   const trilha = pts.map((p, i) => (i ? 'L' : 'M') + x(i) + ',' + y(p.saldo)).join('');
-  s += `<defs><linearGradient id="g-proj" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--s1)" stop-opacity=".3"/><stop offset="1" stop-color="var(--s1)" stop-opacity="0"/></linearGradient></defs>`;
+  s += `<defs><linearGradient id="g-proj" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--violeta)" stop-opacity=".28"/><stop offset="1" stop-color="var(--s1)" stop-opacity="0"/></linearGradient></defs>`;
   s += `<path d="${trilha}V${y(Math.max(0, y0))}H${x(0)}Z" fill="url(#g-proj)"/>`;
-  s += `<path d="${trilha}" fill="none" stroke="var(--s1)" stroke-width="2.4" stroke-linejoin="round"/>`;
+  s += `<path d="${trilha}" fill="none" stroke="var(--s1)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+  s += pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.saldo)}" r="3.5" fill="var(--surface-solid)" stroke="var(--s1)" stroke-width="2"/>`).join('');
   const last = pts[pts.length - 1];
   s += `<circle cx="${x(pts.length - 1)}" cy="${y(last.saldo)}" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`;
   s += `<line class="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" style="display:none"/><circle class="dot" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" style="display:none"/>`;
@@ -745,27 +833,28 @@ function telaVisao() {
   const contaFim = linhaProj ? linhaProj.saldo : null;
   const hero = cartaoSel === null ? `
   <div class="hero">
+    <div class="hero-ico">${ico('carteira')}</div>
     ${contaFim !== null ? `<div class="lbl">Na conta no fim de ${nomeMes(mesSel)}${mesSel > mesAtual() ? ' (previsto)' : ''}</div>
     <div class="big">${fmt.format(contaFim)}</div>
     <div class="stats">
-      ${resto ? `<div class="stat">${ico('carteira')}<div><small>Saldo hoje</small><b>${fmt.format(S.saldoAtual)}</b></div></div>
-      <div class="stat">${ico('sobe')}<div><small>Ainda vai entrar${faltaEntrar ? ' · ' + quando(1) : ''}</small><b>${fmt.format(faltaEntrar)}</b></div></div>
-      <div class="stat">${ico('desce')}<div><small>Ainda vai sair${faltaSair ? ' · ' + quando(-1) : ''}</small><b>${fmt.format(faltaSair)}</b></div></div>`
-      : `<div class="stat">${ico('sobe')}<div><small>Entra no mês</small><b>${fmt.format(linhaProj.r)}</b></div></div>
-      <div class="stat">${ico('desce')}<div><small>Sai no mês (faturas pelo vencimento)</small><b>${fmt.format(linhaProj.d)}</b></div></div>`}
+      ${resto ? `<div class="stat" style="--c:var(--accent)">${ico('carteira')}<div><small>Saldo hoje</small><b>${fmt.format(S.saldoAtual)}</b></div></div>
+      <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Ainda vai entrar${faltaEntrar ? ' · ' + quando(1) : ''}</small><b>${fmt.format(faltaEntrar)}</b></div></div>
+      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Ainda vai sair${faltaSair ? ' · ' + quando(-1) : ''}</small><b>${fmt.format(faltaSair)}</b></div></div>`
+      : `<div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Entra no mês</small><b>${fmt.format(linhaProj.r)}</b></div></div>
+      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Sai no mês (faturas pelo vencimento)</small><b>${fmt.format(linhaProj.d)}</b></div></div>`}
     </div>
     <div class="orc" title="Receitas do mês menos os gastos do mês; compras no cartão contam no mês em que a fatura vence">Resultado do mês: receitas ${fmt.format(t.r)} − gastos ${fmt.format(t.d)} = <b>${fmt.format(t.saldo)}</b>
-      <span style="opacity:.8">· cartão no mês do vencimento</span></div>`
+      <span style="color:var(--muted)">· cartão no mês do vencimento</span></div>`
     : `<div class="lbl">Resultado de ${nomeMes(mesSel)}</div>
     <div class="big">${fmt.format(t.saldo)}</div>
     <div class="stats">
-      <div class="stat">${ico('sobe')}<div><small>Receitas</small><b>${fmt.format(t.r)}</b></div></div>
-      <div class="stat">${ico('desce')}<div><small>Gastos (cartão no mês do vencimento)</small><b>${fmt.format(t.d)}</b></div></div>
+      <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Receitas</small><b>${fmt.format(t.r)}</b></div></div>
+      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Gastos (cartão no mês do vencimento)</small><b>${fmt.format(t.d)}</b></div></div>
     </div>`}
     ${orcTotal ? `<div class="orc">Orçamento: ${fmt.format(gastoOrcado)} de ${fmt.format(orcTotal)} (${Math.round(gastoOrcado / orcTotal * 100)}%)${gastoOrcado > orcTotal ? ' · ▲ acima do limite' : ''}
       <div class="bar"><i style="width:${Math.min(100, gastoOrcado / orcTotal * 100)}%"></i></div></div>` : ''}
   </div>` : `
-  <div class="hero" style="background:linear-gradient(135deg, ${corCartao(cartaoSel)} 0%, color-mix(in srgb, ${corCartao(cartaoSel)} 55%, #1b1530) 100%)">
+  <div class="hero cor" style="background:linear-gradient(135deg, ${corCartao(cartaoSel)} 0%, color-mix(in srgb, ${corCartao(cartaoSel)} 55%, #1b1530) 100%)">
     <div class="lbl">${esc(nomeCartao(cartaoSel))} · ${nomeMes(mesSel)}</div>
     <div class="big">${fmt.format(t.d)}</div>
     <div class="stats">
@@ -784,7 +873,7 @@ function telaVisao() {
   // mês atual: quanto dá para gastar sem a conta ficar negativa
   const lv = cartaoSel === null && mesSel === mesAtual() ? livreParaGastar() : null;
   const cardLivre = lv ? `<div class="card livre ${lv.valor < 0 ? 'aperto' : ''}" title="Menor saldo previsto nos próximos 45 dias, já descontando contas fixas, faturas (com a estimativa de compras no cartão) e somando salários. É o que sobra para Pix/débito e compras fora do previsto.">
-      <h2>${ico('carteira')} ${lv.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</h2>
+      <h2>${ico('alvo')} ${lv.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</h2>
       <div class="big">${fmt.format(Math.abs(lv.valor))}</div>
       <p class="hint" style="margin-top:4px">${lv.valor < 0 ? `a conta fica negativa em ${ddmm(lv.ate)}` : lv.apertado ? `sem deixar a conta negativa até ${ddmm(lv.ate)}, o dia mais apertado` : `até a próxima entrada, em ${ddmm(lv.ate)}`}</p>
       ${lv.valor > 0 ? `<div class="pill">≈ ${fmt.format(lv.porDia)} por dia · ${lv.dias} ${lv.dias === 1 ? 'dia' : 'dias'}</div>
@@ -796,21 +885,30 @@ function telaVisao() {
   const parcelasFuturas = cartaoSel === null ? S.lanc.filter(l => l.tipo === 'despesa' && l.cartao && l.parcela && vencDoLanc(l) && vencDoLanc(l) > fimDoMes(mesSel)) : [];
   const ultParcela = parcelasFuturas.reduce((m, l) => vencDoLanc(l) > m ? vencDoLanc(l) : m, '');
   const kpis = cartaoSel === null ? `<div class="tiles">
-    ${tile('Receitas do mês', fmt.format(t.r), 'sobe', 'var(--good)', tAnt.r > 0 ? delta(t.r, tAnt.r, false, rot) : '')}
-    ${tile('Gastos do mês', fmt.format(t.d), 'desce', 'var(--crit)', totais(todosAnt).r > 0 ? delta(t.d, tAnt.d, true, rot) : '')}
+    ${tile('Receitas do mês', fmt.format(t.r), 'grafico', 'var(--accent)', tAnt.r > 0 ? delta(t.r, tAnt.r, false, rot) : '')}
+    ${tile('Gastos do mês', fmt.format(t.d), 'desce', 'var(--violeta)', totais(todosAnt).r > 0 ? delta(t.d, tAnt.d, true, rot) : '')}
     ${proxFat ? tile(`Próxima fatura · ${esc(nomeCartao(proxFat.cartao))}`, fmt.format(-proxFat.valor), 'cartao', corCartao(proxFat.cartao), `<div class="sub2">vence ${ddmm(proxFat.data)}${proxFat.estimado ? ` · ≈ ${fmt.format(proxFat.estimado)} estimado` : ''}</div>`) : ''}
-    ${parcelasFuturas.length ? tile('Parcelado em aberto', fmt.format(r2(parcelasFuturas.reduce((a, l) => a + l.valor, 0))), 'repete', 'var(--s2)', `<div class="sub2">parcelas depois de ${nomeMes(mesSel)} · até ${nomeMes(ultParcela.slice(0, 7))}</div>`) : ''}
+    ${parcelasFuturas.length ? tile('Parcelado em aberto', fmt.format(r2(parcelasFuturas.reduce((a, l) => a + l.valor, 0))), 'repete', '#db2777', `<div class="sub2">parcelas depois de ${nomeMes(mesSel)} · até ${nomeMes(ultParcela.slice(0, 7))}</div>`) : ''}
   </div>` : '';
-  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${cardLivre ? `<div class="destaque">${hero}${cardLivre}</div>` : hero}${kpis}${cartaoSel === null && mesSel === mesAtual() ? telaAgenda() : ''}
-  ${cardCartoes ? `<div class="grid2">${cardCartoes}${cardCats}</div>${cardHist}` : `<div class="grid2">${cardCats}${cardHist}</div>`}
-  <div class="card"><h2>${ico('lista')} Tudo de ${nomeMes(mesSel)}</h2>${tabelaItens(itens, true)}</div>`;
+  const agora = cartaoSel === null && mesSel === mesAtual();
+  const blocos = agora
+    ? `<div class="g21">${cardSaldoDia()}${cardCartoes || cardHist}</div>
+      <div class="g21">${cardCats}${cardAtividade()}</div>
+      ${cardCartoes ? cardHist : ''}`
+    : cardCartoes ? `<div class="grid2">${cardCartoes}${cardCats}</div>${cardHist}` : `<div class="grid2">${cardCats}${cardHist}</div>`;
+  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${cardLivre ? `<div class="destaque">${hero}${cardLivre}</div>` : hero}${kpis}
+  ${blocos}
+  <div class="card"><h2>${ico('lista')} Tudo de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</span></h2>${tabelaItens(itens, true)}</div>`;
 }
 
+// Cor fixa por categoria (para o círculo com a inicial)
+const CORES_AV = ['#2563eb', '#7c3aed', '#0ea5e9', '#db2777', '#d97706', '#059669', '#4f46e5', '#0d9488'];
+const corCategoria = c => { let h = 0; for (const ch of String(c)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return CORES_AV[h % CORES_AV.length]; };
 function tabelaItens(itens, mostraFixo) {
   if (!itens.length) return '<div class="empty">Nada por aqui ainda.</div>';
   itens = itens.slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td>${i.fixo ? '<span class="tag">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${!i.fixo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${i.data.split('-').reverse().join('/')}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</td><td>${esc(i.cat)}</td>
+    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? '<span class="tag t-azul">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${!i.fixo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${i.data.split('-').reverse().join('/')}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? '' : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
@@ -1518,13 +1616,13 @@ function delta(atual, antes, subirEhRuim, rotulo) {
   if (!(antes > 0)) return '';
   const p = (atual - antes) / antes;
   if (Math.abs(p) < 0.005) return `<span class="delta" style="color:var(--muted)">= <span>${rotulo}</span></span>`;
-  return `<span class="delta ${(p > 0) === subirEhRuim ? 'ruim' : 'bom'}">${p > 0 ? '▲' : '▼'} ${Math.round(Math.abs(p) * 100)}% <span>${rotulo}</span></span>`;
+  return `<span class="delta ${(p > 0) === subirEhRuim ? 'ruim' : 'bom'}">${p > 0 ? '↑' : '↓'} ${Math.round(Math.abs(p) * 100)}% <span>${rotulo}</span></span>`;
 }
 
 // Saldo da conta dia a dia (degraus), com área preenchida e o dia mais apertado marcado
 function graficoSaldoDia(el, ev) {
   if (!el) return;
-  const W = el.clientWidth || 600, H = 200, P = { l: 58, r: 14, t: 16, b: 26 };
+  const W = el.clientWidth || 600, H = 230, P = { l: 58, r: 14, t: 18, b: 26 };
   const pts = [{ data: hoje(), saldo: S.saldoAtual, desc: 'Hoje' }].concat(ev);
   const fimDia = pts.filter((p, i) => !pts[i + 1] || pts[i + 1].data !== p.data);   // saldo no fim de cada dia
   const fim = addDia(hoje(), 45);
@@ -1533,17 +1631,18 @@ function graficoSaldoDia(el, ev) {
   const ticks = niceTicks(Math.min(0, ...pts.map(p => p.saldo)), Math.max(1, ...pts.map(p => p.saldo)));
   const y0 = ticks[0], y1 = ticks[ticks.length - 1];
   const y = v => P.t + (H - P.t - P.b) * (1 - (v - y0) / (y1 - y0));
-  let linha = `M${x(pts[0].data)},${y(pts[0].saldo)}`;
-  for (const p of fimDia) linha += `H${x(p.data)}V${y(p.saldo)}`;
-  linha += `H${x(fim)}`;
+  // linha ligando o saldo no fim de cada dia com movimento
+  const nos = fimDia[0].data === hoje() ? fimDia : [pts[0]].concat(fimDia);
+  let linha = nos.map((p, i) => (i ? 'L' : 'M') + x(p.data) + ',' + y(p.saldo)).join('') + `L${x(fim)},${y(nos[nos.length - 1].saldo)}`;
   const menor = fimDia.reduce((m, p) => p.saldo < m.saldo ? p : m, fimDia[0]);
-  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Saldo da conta dia a dia"><defs><linearGradient id="g-saldo-dia" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--s1)" stop-opacity=".32"/><stop offset="1" stop-color="var(--s1)" stop-opacity="0"/></linearGradient></defs>`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Saldo da conta dia a dia"><defs><linearGradient id="g-saldo-dia" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--violeta)" stop-opacity=".28"/><stop offset=".55" stop-color="var(--s1)" stop-opacity=".12"/><stop offset="1" stop-color="var(--s1)" stop-opacity="0"/></linearGradient><linearGradient id="g-linha-dia" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--s1)"/><stop offset="1" stop-color="var(--violeta)"/></linearGradient></defs>`;
   for (const t of ticks) s += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--${t === 0 ? 'text-2' : 'grid'})" stroke-width="1"${t === 0 ? ' stroke-dasharray="4 3"' : ''}/><text x="${P.l - 8}" y="${y(t) + 4}" text-anchor="end">${fmtCurto(t)}</text>`;
   for (let k = 0; k <= 45; k += 7) { const d = addDia(hoje(), k); s += `<text x="${x(d)}" y="${H - 8}" text-anchor="middle">${k ? ddmm(d) : 'hoje'}</text>`; }
   s += `<path d="${linha}V${y(Math.max(0, y0))}H${x(hoje())}Z" fill="url(#g-saldo-dia)"/>`;
-  s += `<path d="${linha}" fill="none" stroke="var(--s1)" stroke-width="2.2" stroke-linejoin="round"/>`;
+  s += `<path d="${linha}" fill="none" stroke="url(#g-linha-dia)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+  s += nos.map(p => `<circle cx="${x(p.data)}" cy="${y(p.saldo)}" r="3.5" fill="var(--surface-solid)" stroke="var(--s1)" stroke-width="2"/>`).join('');
   s += `<circle cx="${x(menor.data)}" cy="${y(menor.saldo)}" r="5" fill="${menor.saldo < 0 ? 'var(--crit)' : 'var(--warn)'}" stroke="var(--surface-solid)" stroke-width="2"/>`;
-  s += `<text x="${Math.min(W - P.r - 4, Math.max(P.l + 4, x(menor.data)))}" y="${Math.max(P.t + 10, y(menor.saldo) - 11)}" text-anchor="middle" style="font-weight:650;fill:var(--text-2)">${fmtCurto(menor.saldo)} em ${ddmm(menor.data)}</text>`;
+  s += `<text x="${Math.min(W - P.r - 4, Math.max(P.l + 4, x(menor.data)))}" y="${Math.max(P.t + 10, y(menor.saldo) - 11)}" text-anchor="middle" style="font-weight:700;fill:var(--text-2);paint-order:stroke;stroke:var(--surface-solid);stroke-width:5px;stroke-linejoin:round">${fmtCurto(menor.saldo)} em ${ddmm(menor.data)}</text>`;
   s += `<line class="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--muted)" stroke-dasharray="3 3" style="display:none"/></svg><div class="tip"></div>`;
   el.innerHTML = s;
   const svg = el.querySelector('svg'), tip = el.querySelector('.tip'), xh = svg.querySelector('.xh');
@@ -1562,7 +1661,7 @@ function graficoSaldoDia(el, ev) {
 }
 
 // Rosca de gastos por categoria: as 5 maiores + o resto
-const CORES_CAT = ['#2563eb', '#38bdf8', '#8b5cf6', '#f59e0b', '#10b981', '#94a3b8'];
+const CORES_CAT = ['#2563eb', '#4f8bff', '#7c5cf6', '#a78bfa', '#38bdf8', '#c3cdf0'];
 function rosca(cats) {
   const total = cats.reduce((a, [, v]) => a + v, 0);
   if (!(total > 0)) return '';
@@ -1662,25 +1761,33 @@ function telaPendencias() {
   </div>`;
 }
 
-function telaAgenda() {
-  const ev = agenda();
+function cardSaldoDia() {
+  const ev = agenda(45);
   const semDia = S.fixos.filter(f => !f.cartao && !f.dias && !f.uteis && fixoAtivo(f, mesAtual())).length;
   const semVenc = cartoesUsados().filter(c => !diaFechamento(c) || !diaVencimento(c));
   const menor = ev.reduce((m, e) => !m || e.saldo < m.saldo ? e : m, null);
-  const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-  return `<div class="card"><h2>${ico('lista')} Próximos 30 dias <span class="sub">· o que ainda vai entrar e sair</span></h2>
+  return `<div class="card"><h2>${ico('grafico')} Saldo na conta <span class="sub">· próximos 45 dias</span></h2>
     ${campoSaldo()}
-    ${ev.length ? '<div class="chart" id="saldo-dia" style="margin:4px 0 14px"></div>' : ''}
-    ${menor && menor.saldo < 0 ? `<p class="status crit" style="margin:0 0 10px">▲ O saldo fica negativo em ${menor.data.split('-').reverse().slice(0, 2).join('/')} (${fmt.format(menor.saldo)}).</p>` : ''}
-    ${ev.length ? `<div class="tbl-wrap"><table><thead><tr><th>Dia</th><th>O quê</th><th class="num">Valor</th><th class="num">Saldo</th></tr></thead><tbody>
-      ${ev.map(e => `<tr${e === menor ? ' style="background:color-mix(in srgb, var(--warn) 10%, transparent)"' : ''}>
-        <td style="white-space:nowrap">${e.data.slice(8)}/${e.data.slice(5, 7)} <span class="hint">${DIAS_SEM[new Date(e.data + 'T12:00').getDay()]}</span></td>
-        <td>${esc(e.desc)}${e.outros ? ` <span class="hint" title="Fatura toda: ${fmt.format(-e.valor + e.outros)}">(+ ${fmt.format(e.outros)} da ${NOME_OUTRO})</span>` : ''} ${e.cartao ? tagCartao(e.cartao) + (e.estimado ? ` <span class="tag t-aviso" title="A fatura ainda não fechou: inclui uma estimativa de compras novas pela média do cartão">≈ ${fmt.format(e.estimado)} estimado</span>` : e.previa ? ' <span class="tag t-aviso" title="A fatura ainda não fechou: o valor pode crescer">parcial</span>' : ' <span class="tag t-azul">fechada</span>') : `<span class="tag ${e.tag === 'entrada' ? 't-bom' : e.tag === 'planejado' ? 't-azul' : ''}">${e.tag}</span>`}</td>
-        <td class="num ${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</td>
-        <td class="num ${e.saldo < 0 ? 'neg' : ''}"><b>${fmt.format(e.saldo)}</b>${e === menor ? ' <span class="hint">▼ menor</span>' : ''}</td></tr>`).join('')}
-    </tbody></table></div>` : '<div class="empty">Nada previsto para os próximos 30 dias.</div>'}
-    ${semDia ? `<p class="hint">${semDia} ${semDia === 1 ? 'item fixo está' : 'itens fixos estão'} sem dia definido e não aparece${semDia === 1 ? '' : 'm'} aqui (aba Fixos, campo "Dia(s) do mês").</p>` : ''}
+    ${menor && menor.saldo < 0 ? `<p class="status crit" style="margin:0 0 10px">▲ O saldo fica negativo em ${ddmm(menor.data)} (${fmt.format(menor.saldo)}).</p>` : ''}
+    ${ev.length ? '<div class="chart" id="saldo-dia" style="margin-top:10px"></div>' : '<div class="empty">Nada previsto para os próximos dias.</div>'}
+    ${semDia ? `<p class="hint">${semDia} ${semDia === 1 ? 'item fixo está' : 'itens fixos estão'} sem dia definido e não entra${semDia === 1 ? '' : 'm'} aqui (aba Fixos, campo "Dia(s) do mês").</p>` : ''}
     ${semVenc.length ? `<p class="hint">Sem dia de fechamento/vencimento: ${semVenc.map(esc).join(', ')}. Informe em Importar fatura → Fatura em andamento.</p>` : ''}
+  </div>`;
+}
+
+function cardAtividade() {
+  const ev = agenda();
+  const menor = ev.reduce((m, e) => !m || e.saldo < m.saldo ? e : m, null);
+  const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const visual = e => e.cartao ? ['cartao', corCartao(e.cartao)] : e.tag === 'entrada' ? ['sobe', 'var(--good)'] : e.tag === 'planejado' ? ['lista', 'var(--accent)'] : ['repete', 'var(--warn)'];
+  return `<div class="card"><h2>${ico('lista')} Próximos 30 dias <span class="sub">· entra e sai</span></h2>
+    ${ev.length ? `<div class="feed">${ev.map(e => { const [ic, cor] = visual(e); return `<div class="ev${e === menor ? ' menor' : ''}">
+      <span class="ev-ico" style="--c:${cor}">${ico(ic)}</span>
+      <div class="ev-txt"><b title="${esc(e.desc)}">${esc(e.desc)}</b><small>${ddmm(e.data)} ${DIAS_SEM[new Date(e.data + 'T12:00').getDay()]}
+        ${e.cartao ? (e.estimado ? `<span class="tag t-aviso" title="A fatura ainda não fechou: inclui uma estimativa de compras novas pela média do cartão">≈ ${fmt.format(e.estimado)} estimado</span>` : e.previa ? '<span class="tag t-aviso" title="A fatura ainda não fechou: o valor pode crescer">parcial</span>' : '<span class="tag t-azul">fechada</span>') : `<span class="tag ${e.tag === 'entrada' ? 't-bom' : e.tag === 'planejado' ? 't-azul' : ''}">${e.tag}</span>`}
+        ${e.outros ? `<span title="Fatura toda: ${fmt.format(-e.valor + e.outros)}">+ ${fmt.format(e.outros)} da ${NOME_OUTRO}</span>` : ''}${e === menor ? '<span class="tag t-aviso">dia mais apertado</span>' : ''}</small></div>
+      <div class="ev-val"><b class="${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</b><small class="${e.saldo < 0 ? 'neg' : ''}">saldo ${fmt.format(e.saldo)}</small></div>
+    </div>`; }).join('')}</div>` : '<div class="empty">Nada previsto para os próximos 30 dias.</div>'}
   </div>`;
 }
 
@@ -1902,7 +2009,16 @@ function render() {
   document.getElementById('cats').innerHTML = catsUsadas().map(c => `<option value="${esc(c)}">`).join('');
   const abaAtual = ABAS.find(a => a[0] === aba);
   document.querySelector('header h1').innerHTML = `<span class="app-nome">Minhas Finanças</span><span class="aba-nome">${abaAtual[1]}</span>`;
-  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div>Minhas Finanças</div>` + ABAS.map(([id, nome, icone, curto]) => `<button data-t="${id}" class="${id === aba ? 'on' : ''}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span></button>`).join('');
+  const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const h = new Date(hoje() + 'T12:00'), hr = new Date().getHours();
+  document.getElementById('saud').textContent = `${hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite'}, Jimmy · ${DIAS_SEMANA[h.getDay()]}, ${h.getDate()} de ${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][h.getMonth()]}`;
+  // contadores no menu: compras lançadas à mão esperando a fatura, pendências na visão geral
+  const npend = pendencias().length;
+  const contador = { lanc: S.lanc.filter(l => l.provisorio).length, visao: npend };
+  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div>Minhas Finanças</div>` + ABAS.map(([id, nome, icone, curto]) => `<button data-t="${id}" class="${id === aba ? 'on' : ''}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('');
+  document.getElementById('sino').innerHTML = ico('sino') + (npend ? '<span class="ponto"></span>' : '');
+  document.getElementById('sino').title = npend ? `${npend} ${npend === 1 ? 'pendência' : 'pendências'}` : 'Nenhuma pendência';
+  document.getElementById('tema').innerHTML = ico(document.documentElement.dataset.theme === 'dark' ? 'sol' : 'lua');
   const app = document.getElementById('app');
   app.innerHTML = { visao: telaVisao, lanc: telaLanc, fixos: telaFixos, orc: telaOrc, proj: telaProj, dados: telaDados, fatura: telaFatura }[aba]();
   if (aba === 'visao') {
@@ -1914,6 +2030,13 @@ function render() {
 
 // ---------- eventos ----------
 document.getElementById('logo').innerHTML = ico('carteira');
+document.getElementById('tema').addEventListener('click', () => {
+  const escuro = document.documentElement.dataset.theme !== 'dark';
+  if (escuro) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem('financas.tema', escuro ? 'dark' : 'light'); } catch (e) {}
+  render();
+});
+document.getElementById('sino').addEventListener('click', () => { aba = 'visao'; cartaoSel = null; render(); window.scrollTo(0, 0); });
 document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b) { aba = b.dataset.t; render(); window.scrollTo(0, 0); } });
 document.getElementById('mes').addEventListener('change', e => { mesSel = e.target.value; render(); });
 
