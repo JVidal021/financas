@@ -576,6 +576,10 @@ function normalizar(d) {
   // parcela prevista que já chegou numa fatura com centavos diferentes: fica só a da fatura
   const reais = s.lanc.filter(l => l.parcela && !l.prevista && l.key);
   s.lanc = s.lanc.filter(l => !(l.prevista && l.key && reais.some(r => mesmaParcela(l, r))));
+  // a mesma parcela futura prevista por duas faturas importadas (ex.: a de setembro e a de outubro): fica a da mais recente
+  const ficam = [];
+  for (const l of s.lanc.filter(l => l.prevista && l.key).sort((a, b) => b.data.localeCompare(a.data))) if (!ficam.some(r => mesmaParcela(l, r))) ficam.push(l);
+  s.lanc = s.lanc.filter(l => !(l.prevista && l.key) || ficam.includes(l));
   return s;
 }
 // Mesma parcela da mesma compra: mesmo cartão, descrição, número/total de parcelas e valor até R$ 1 de diferença.
@@ -1054,11 +1058,19 @@ function telaVisao() {
 // Cor fixa por categoria (para o círculo com a inicial)
 const CORES_AV = ['#2563eb', '#7c3aed', '#0ea5e9', '#db2777', '#d97706', '#059669', '#4f46e5', '#0d9488'];
 const corCategoria = c => { let h = 0; for (const ch of String(c)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return CORES_AV[h % CORES_AV.length]; };
+// Data em que a compra foi feita. Parcelas guardam em `data` o fechamento da fatura em que caem
+// (é o que decide a fatura); a data real vem da compra lançada à mão ou da chave do item da fatura.
+function dataDaCompra(l) {
+  if (l.compra && l.compra.data) return l.compra.data;
+  const k = l.key && l.key.split('|')[2];
+  return k && /^\d{4}-\d\d-\d\d$/.test(k) ? k : l.data;
+}
+const dataBR = d => d.split('-').reverse().join('/');
 function tabelaItens(itens, mostraFixo) {
   if (!itens.length) return '<div class="empty">Nada por aqui ainda.</div>';
-  itens = itens.slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  itens = itens.slice().sort((a, b) => (b.fixo ? '' : dataDaCompra(b)).localeCompare(a.fixo ? '' : dataDaCompra(a)));
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? '<span class="tag t-azul">fixo</span>' : i.data.split('-').reverse().join('/')}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${!i.fixo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${i.data.split('-').reverse().join('/')}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
+    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? '<span class="tag t-azul">fixo</span>' : dataBR(dataDaCompra(i))}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${!i.fixo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? '' : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
@@ -1972,6 +1984,19 @@ function parteOutros(c, fech) {
     if (f.banco !== c || (S.cartaoDiaUtil[c] ? proxDiaUtil(f.vencimento) : f.vencimento) !== venc) continue;
     for (const it of f.itens) if (!S.lanc.some(l => l.key === it.key && !l.prevista)) v += it.valor;
   }
+  // próximas parcelas das compras parceladas que não são suas (vieram na fatura, marcadas "não é meu");
+  // numa fatura já importada elas já estão nos itens dela
+  const importada = S.faturas.some(f => f.banco === c && (S.cartaoDiaUtil[c] ? proxDiaUtil(f.vencimento) : f.vencimento) === venc);
+  for (const f of importada ? [] : S.faturas) {
+    if (f.banco !== c) continue;
+    for (const it of f.itens) {
+      if (!it.parc || it.parc.n >= it.parc.N || it.valor <= 0 || S.lanc.some(l => l.key === it.key)) continue;
+      for (let k = it.parc.n + 1; k <= it.parc.N; k++) {
+        const quando = addMes(f.fechamento.slice(0, 7), k - it.parc.n) + f.fechamento.slice(7);
+        if (vencimentoDe(c, fechamentoDaCompra(c, quando)) === venc) v += it.valor;
+      }
+    }
+  }
   const info = S.infoFatura[c];
   if (info && info.fech === fech && info.total > info.minha) v += info.total - info.minha;
   return r2(v);
@@ -2216,7 +2241,7 @@ function desenharGraficos() {
 const semAcento = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 let _indice = null;
 function indiceBusca() {
-  if (!_indice) _indice = S.lanc.map(l => ({ l, t: semAcento([l.desc, l.cat, l.cartao || 'pix debito', l.data.split('-').reverse().join('/'), fmt.format(l.valor), l.tipo].join(' ')) }));
+  if (!_indice) _indice = S.lanc.map(l => ({ l, t: semAcento([l.desc, l.cat, l.cartao || 'pix debito', dataBR(dataDaCompra(l)), fmt.format(l.valor), l.tipo].join(' ')) }));
   return _indice;
 }
 const ATALHOS = [['Novo lançamento', 'lanc', 'lista', 'adicionar despesa receita compra'], ['Importar fatura', 'fatura', 'envia', 'pdf cartao'],
@@ -2226,7 +2251,7 @@ function buscar(q) {
   const tokens = semAcento(q).split(/\s+/).filter(Boolean);
   if (!tokens.length) return null;
   const casa = t => tokens.every(k => t.includes(k));
-  const lanc = indiceBusca().filter(x => casa(x.t)).map(x => x.l).sort((a, b) => b.data.localeCompare(a.data));
+  const lanc = indiceBusca().filter(x => casa(x.t)).map(x => x.l).sort((a, b) => dataDaCompra(b).localeCompare(dataDaCompra(a)));
   const fixos = S.fixos.filter(f => casa(semAcento([f.desc, f.cat, f.cartao || '', fmt.format(f.valor)].join(' '))));
   const cats = catsUsadas().filter(c => casa(semAcento(c)));
   const cartoes = cartoesUsados().filter(c => casa(semAcento(c)));
@@ -2256,7 +2281,7 @@ function mostrarBusca(q) {
   const avIco = (icone, cor) => `<span class="av-cat" style="--c:${cor}">${ico(icone)}</span>`;
   const html =
     grupo('Lançamentos', r.lanc.length ? `${r.lanc.length} · ${fmt.format(somaDesp(r.lanc))} em gastos` : '', r.lanc.slice(0, 6).map(l => linha('lanc:' + l.id, avCat(l.cat), marcar(l.desc, r.tokens),
-      `${l.data.split('-').reverse().join('/')} · ${marcar(l.cat, r.tokens)} · ${esc(nomeCartao(l.cartao || SEM_CARTAO))}`, `<span class="${l.tipo === 'receita' ? 'pos' : ''}">${l.tipo === 'receita' ? '+' : '−'} ${fmt.format(l.valor)}</span>`)).join(''))
+      `${dataBR(dataDaCompra(l))} · ${marcar(l.cat, r.tokens)} · ${esc(nomeCartao(l.cartao || SEM_CARTAO))}`, `<span class="${l.tipo === 'receita' ? 'pos' : ''}">${l.tipo === 'receita' ? '+' : '−'} ${fmt.format(l.valor)}</span>`)).join(''))
     + grupo('Categorias', '', r.cats.slice(0, 4).map(c => { const ls = S.lanc.filter(l => l.cat === c); return linha('cat:' + c, avCat(c), marcar(c, r.tokens), `${ls.length} lançamentos`, fmt.format(somaDesp(ls))); }).join(''))
     + grupo('Cartões', '', r.cartoes.slice(0, 4).map(c => { const ls = S.lanc.filter(l => l.cartao === c); return linha('cartao:' + c, avIco('cartao', corCartao(c)), marcar(c, r.tokens), `${ls.length} lançamentos`, fmt.format(somaDesp(ls))); }).join(''))
     + grupo('Fixos', '', r.fixos.slice(0, 4).map(f => linha('fixo:' + f.id, avIco('repete', f.tipo === 'receita' ? 'var(--good)' : 'var(--warn)'), marcar(f.desc, r.tokens), `${esc(f.cat)} · ${f.tipo === 'receita' ? 'receita' : 'despesa'} fixa`, fmt.format(f.valor))).join(''))
