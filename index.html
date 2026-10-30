@@ -1581,6 +1581,17 @@ function marcarItens(itens, banco, fechamento) {
     const tomados = new Set();
     for (const { it, l } of pares) if (!parManual.has(it) && !tomados.has(l.id)) { parManual.set(it, l); tomados.add(l.id); }
   }
+  // item fixo no cartão cobrado em duas linhas no mesmo dia que somam o valor dele (ex.: academia em duas cobranças)
+  const fixoEmDois = new Map();
+  if (banco && fechamento) {
+    const livres = itens.filter(it => it.sec === 'despesa' && !S.lanc.some(l => l.key === it.key));
+    for (const f of S.fixos.filter(f => f.cartao === banco && f.tipo === 'despesa' && fixoAtivo(f, fechamento.slice(0, 7)))) {
+      const perto = v => Math.abs(f.valor - v) <= Math.max(1, f.valor * 0.05);
+      if (livres.some(it => perto(it.valor))) continue;
+      for (let a = 0; a < livres.length && !fixoEmDois.size; a++) for (let b = a + 1; b < livres.length; b++)
+        if (livres[a].data === livres[b].data && perto(livres[a].valor + livres[b].valor)) { fixoEmDois.set(livres[a], f).set(livres[b], f); break; }
+    }
+  }
   itens.forEach((it, i) => {
     it.id = i;
     let ja = S.lanc.find(l => l.key === it.key);
@@ -1603,6 +1614,7 @@ function marcarItens(itens, banco, fechamento) {
       const fx = S.fixos.find(f => !fixosUsados.has(f.id) && f.cartao === banco && f.tipo === 'despesa' && fixoAtivo(f, fechamento.slice(0, 7))
         && Math.abs(f.valor - it.valor) <= Math.max(1, f.valor * 0.05));
       if (fx) { fixosUsados.add(fx.id); it.fixo = fx.desc; it.escolha = 'nao'; it.cat = fx.cat; }
+      else if (fixoEmDois.has(it)) { const f2 = fixoEmDois.get(it); it.fixo = f2.desc; it.escolha = 'nao'; it.cat = f2.cat; }
     }
   });
 }
@@ -1827,7 +1839,7 @@ function lancarCompraCartao(f, valor, share, destino = S.lanc) {
 // Quanto menor, mais parecidos: diferença de valor e de dias, com bônus quando os nomes se parecem.
 // Abaixo de 2 = mesma compra (nome parecido, ou mesmo valor com até 3 dias de diferença)
 function notaPar(l, it) {
-  const dataL = l.compra ? l.compra.data : l.key.split('|')[2], valorL = l.compra ? l.compra.valor : +l.key.split('|')[1];
+  const dataL = l.compra ? l.compra.data : l.key.split('|')[2], valorL = l.compra ? l.compra.valor / (l.compra.N === 1 && it.parc ? it.parc.N : 1) : +l.key.split('|')[1];
   const pal = t => semAcento(descBase(t)).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 4).map(w => w.slice(0, 5));
   const a = pal(l.desc), b = pal(it.desc), parecido = a.some(w => b.includes(w));
   return Math.abs(valorL - it.valor) * 5 + Math.abs(new Date(dataL) - new Date(it.data)) / 864e5 * .5 - (parecido ? 10 : 0);
@@ -1853,6 +1865,8 @@ function parcelaPrevistaIgual(l, it, banco) {
 function casaComFatura(l, it, banco) {
   if (!l.provisorio || l.cartao !== banco) return false;
   const c = l.compra, n = it.parc ? it.parc.n : 1, N = it.parc ? it.parc.N : 1;
+  // lançada à vista, mas o banco parcelou: a 1ª parcela vezes o número de parcelas dá o total lançado
+  if (c.N === 1 && n === 1 && N > 1) return Math.abs(c.valor - it.valor * N) <= Math.max(1, c.valor * 0.03) && Math.abs(new Date(c.data) - new Date(it.data)) <= 5 * 864e5;
   if (c.n !== n || c.N !== N) return false;
   if (Math.abs(c.valor - it.valor) > Math.max(1, it.valor * 0.03)) return false;
   return Math.abs(new Date(c.data) - new Date(it.data)) <= 5 * 864e5;
