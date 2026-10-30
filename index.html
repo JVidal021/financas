@@ -466,6 +466,7 @@ body.fundo-img #fundo::after, body.fundo-img .fv-in::after { content: ""; positi
 
 /* simulação */
 .sug:empty { display: none; }
+.row label[hidden] { display: none; }
 .sug { display: flex; align-items: center; gap: 6px; color: var(--accent); }
 .sug svg.i { width: 14px; height: 14px; }
 .sim-tiles { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
@@ -1607,7 +1608,7 @@ function marcarItens(itens, banco, fechamento) {
       : regra ? regra.escolha : null;
     // já tinha sido importada e este item não virou lançamento: foi marcado "não é meu"
     if (!ja && !regra && S.faturas.some(f => f.itens.some(x => x.key === it.key))) it.escolha = 'nao';
-    if (it.escolha === 'div') Object.assign(it, ja ? lerFracao(fracaoTxt(ja.share)) : { k: regra.k, n: regra.n });
+    if (it.escolha === 'div') { const fr = ja ? lerFracao(fracaoTxt(ja.share)) : { k: regra.k, n: regra.n }; if (fr) Object.assign(it, fr); else it.meu = r2(Math.abs(ja.valor)); }
     it.cat = ja ? ja.cat : regra && regra.cat ? regra.cat : palpiteCat(it.desc);
     // cobrança que já está em Fixos neste cartão (assinatura): não conta de novo
     if (!ja && banco && fechamento && it.sec === 'despesa') {
@@ -1659,7 +1660,8 @@ function desfazerFatura(id) {
 }
 
 const SHARE = { meu: 1, metade: 0.5, nao: 0 };
-const fracao = it => it.escolha === 'div' ? it.k / it.n : SHARE[it.escolha] || 0;
+// "Dividir" guarda a fração (k/n) ou, quando você informa em reais, quanto é seu (meu)
+const fracao = it => it.escolha === 'div' ? (it.meu != null ? it.meu / it.valor : it.k / it.n) : SHARE[it.escolha] || 0;
 const rotuloFracao = share => share === 1 ? '' : share === 0.5 ? ' · metade' : ` · ${fracaoTxt(share)} seu`;
 // 0.6667 → "2/3"
 function fracaoTxt(share) {
@@ -1700,7 +1702,7 @@ function telaFatura() {
       <td>${it.data.slice(8)}/${it.data.slice(5, 7)}</td>
       <td>${esc(it.desc)}${it.parc ? ` <span class="tag">${it.parc.n}/${it.parc.N}</span>` : ''}${it.manual ? ` <span class="tag" title="${esc(S.lanc.find(l => l.id === it.manual)?.desc || '')}">✓ ${S.lanc.find(l => l.id === it.manual)?.aberta ? 'da fatura aberta' : 'lançada à mão'}</span>` : ''}${it.prevista ? ' <span class="tag" title="Parcela que o app já previa de uma fatura anterior">✓ parcela prevista</span>' : ''}${it.fixo ? ` <span class="tag" title="Já conta pelo item fixo; marcado como Não é meu para não contar duas vezes">✓ já está em Fixos: ${esc(it.fixo)}</span>` : ''}</td>
       <td class="num">${fmt.format(it.valor)}</td>
-      <td><span class="seg">${btn(it, 'meu', 'Meu')}${btn(it, 'metade', 'Metade')}${btn(it, 'div', it.escolha === 'div' ? `${it.k}/${it.n} seu` : 'Dividir…')}${btn(it, 'nao', 'Não é meu')}</span></td>
+      <td><span class="seg">${btn(it, 'meu', 'Meu')}${btn(it, 'metade', 'Metade')}${btn(it, 'div', it.escolha === 'div' ? (it.meu != null ? `${fmt.format(it.meu)} seu` : `${it.k}/${it.n} seu`) : 'Dividir…')}${btn(it, 'nao', 'Não é meu')}</span></td>
       <td><input list="cats" data-cat-it="${it.id}" value="${esc(it.cat)}" style="width:130px" ${it.escolha === 'nao' ? 'disabled' : ''}></td>
       <td class="num">${it.escolha && it.escolha !== 'nao' ? fmt.format(r2(it.valor * fracao(it))) : ''}</td></tr>`).join('');
   }
@@ -2257,7 +2259,8 @@ function telaFaturasAbertas() {
 function confirmarImportacao() {
   let novos = 0, futuras = 0;
   for (const it of imp.itens) {
-    if (it.escolha) S.regras[it.desc] = { escolha: it.escolha, cat: it.cat, ...(it.escolha === 'div' ? { k: it.k, n: it.n } : {}) };
+    // valor em reais vale só para esta compra: não vira regra da loja
+    if (it.escolha && !(it.escolha === 'div' && it.meu != null)) S.regras[it.desc] = { escolha: it.escolha, cat: it.cat, ...(it.escolha === 'div' ? { k: it.k, n: it.n } : {}) };
     if (!it.escolha) continue;   // sem marcação: não mexe no que já existe
     const manual = it.manual && S.lanc.find(l => l.id === it.manual);
     if (manual) {
@@ -2336,6 +2339,7 @@ function abrirEdicao(id) {
       <label>Cartão<select name="cartao">${opcoesCartao(l.cartao || SEM_CARTAO)}</select></label>
       <label>Valor total${irmas.length > 1 ? ' da parcela' : ''} (R$)<input name="valor" inputmode="decimal" value="${String(r2(Math.abs(l.valor) / share)).replace('.', ',')}" required></label>
       <label>Sua parte<select name="parte">${opcoes.map(([v, t]) => `<option value="${v}" ${Math.abs(v - share) < 0.001 ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>ou quanto é seu (R$)<input name="parteValor" inputmode="decimal" placeholder="usar a fração"></label>
     </div>
     <p class="hint">Sua parte: <b id="edit-parte">${fmt.format(Math.abs(l.valor))}</b></p>
     ${irmas.length > 1 ? `<label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" name="todas" checked> Aplicar a todas as ${irmas.length} parcelas desta compra (a data de cada uma não muda)</label>` : ''}
@@ -2349,8 +2353,10 @@ function abrirEdicao(id) {
 }
 
 function salvarEdicao(f, id) {
-  const l = S.lanc.find(l => l.id === id), total = num(f.valor), share = +f.parte;
+  const l = S.lanc.find(l => l.id === id), total = num(f.valor), meu = f.parteValor.trim() ? num(f.parteValor) : null;
   if (!(total > 0)) return alert('Informe um valor maior que zero.');
+  if (meu != null && !(meu > 0 && meu <= total)) return alert('"Quanto é seu" precisa ser maior que zero e até o valor total.');
+  const share = meu != null ? meu / total : +f.parte;
   const sinal = l.valor < 0 ? -1 : 1, base = f.desc.trim();
   const alvo = f.todas ? parcelasIrmas(l) : [l];
   for (const x of alvo) {
@@ -2433,8 +2439,14 @@ const SIM_KEY = 'financas.sim';
 let SIM = (() => { try { return JSON.parse(localStorage.getItem(SIM_KEY)) || []; } catch (e) { return []; } })();
 const gravarSim = () => { try { localStorage.setItem(SIM_KEY, JSON.stringify(SIM)); } catch (e) {} };
 // Os lançamentos que um formulário de lançamento gera (o mesmo caminho do "Adicionar")
+// Sua parte escolhida no formulário: fração (2/3) ou valor em reais (do mesmo jeito que o Valor: total ou de cada parcela).
+// null = valor seu inválido.
+function shareDoForm(f, valor) {
+  if (f.parte === 'valor') { const v = num(f.parteValor); return v > 0 && v <= valor ? v / valor : null; }
+  const fr = lerFracao(f.parte); return fr ? fr.k / fr.n : 1;
+}
 function lancsDoForm(f, destino = []) {
-  const valor = num(f.valor), fr = lerFracao(f.parte), share = fr ? fr.k / fr.n : 1;
+  const valor = num(f.valor), share = shareDoForm(f, valor) ?? 1;
   if (f.cartao && f.tipo === 'despesa') return lancarCompraCartao(f, valor, share, destino);
   destino.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}) });
   return destino;
@@ -2491,7 +2503,8 @@ const camposLanc = (id, dataPadrao, cartao) => `
       <label>Cartão<select name="cartao">${opcoesCartao(cartao)}</select></label>
       <label>Parcelas<select name="parcelas">${Array.from({ length: 24 }, (_, i) => `<option value="${i + 1}">${i + 1}x</option>`).join('')}</select></label>
       <label>O valor é<select name="valorDe"><option value="total">Total da compra</option><option value="parcela">De cada parcela</option></select></label>
-      <label>Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option></select></label>`;
+      <label>Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option><option value="valor">Valor em R$…</option></select></label>
+      <label class="parte-valor" hidden>Quanto é seu (R$)<input name="parteValor" inputmode="decimal" placeholder="0,00"></label>`;
 // diferença entre os cenários; `subirEhRuim` para valores de fatura
 const difTxt = (a, b, subirEhRuim) => { const d = r2(b - a); return Math.abs(d) < .01 ? '<span class="sim-dif">sem mudança</span>' : `<span class="sim-dif ${(d < 0) !== !!subirEhRuim ? 'neg' : 'pos'}">${d < 0 ? '−' : '+'} ${fmt.format(Math.abs(d))}</span>`; };
 
@@ -2541,7 +2554,7 @@ function telaSim() {
     <div class="card"><h2>${ico('lista')} Itens simulados <span class="sub">· ${ativos.length} de ${SIM.length} ligados</span></h2>
       <div class="sim-lista">${SIM.map(s => `<div class="sim-it ${s.on ? '' : 'off'}">
         <label class="sim-on" title="${s.on ? 'Desligar' : 'Ligar'} na simulação"><input type="checkbox" data-sim-on="${s.id}" ${s.on ? 'checked' : ''}></label>
-        <div class="sim-txt"><b>${esc(s.f.desc)}</b><small>${esc(ondeCai(s.f))}${s.f.parte !== '1' ? ` · sua parte ${esc(s.f.parte)}` : ''}</small></div>
+        <div class="sim-txt"><b>${esc(s.f.desc)}</b><small>${esc(ondeCai(s.f))}${s.f.parte === 'valor' ? ` · seu ${fmt.format(num(s.f.parteValor))}` : s.f.parte !== '1' ? ` · sua parte ${esc(s.f.parte)}` : ''}</small></div>
         <div class="sim-val"><b class="${s.f.tipo === 'receita' ? 'pos' : ''}">${s.f.tipo === 'receita' ? '+' : '−'} ${fmt.format(num(s.f.valor))}</b>
           <span><button class="link" data-sim-lancar="${s.id}" title="Virar um lançamento de verdade">lançar</button><button class="link" data-sim-del="${s.id}" title="Tirar da simulação">✕</button></span></div>
       </div>`).join('')}</div>
@@ -2955,12 +2968,13 @@ document.addEventListener('submit', e => {
   const f = Object.fromEntries(new FormData(e.target));
   if (e.target.id === 'f-sim') {
     if (num(f.valor) <= 0) return alert('Informe um valor maior que zero.');
+    if (shareDoForm(f, num(f.valor)) == null) return alert('Em "Quanto é seu", informe um valor maior que zero e até o valor da compra.');
     SIM.push({ id: uid(), on: true, f });
     gravarSim(); render(); return;
   }
   if (e.target.id === 'f-lanc') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
-    const fr = lerFracao(f.parte), share = fr ? fr.k / fr.n : 1;
+    const share = shareDoForm(f, valor); if (share == null) return alert('Em "Quanto é seu", informe um valor maior que zero e até o valor da compra.');
     if (f.cartao && f.tipo === 'despesa') { lancarCompraCartao(f, valor, share); mesSel = f.data.slice(0, 7); salvar(); return; }
     S.lanc.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}) });
     mesSel = f.data.slice(0, 7);
@@ -3018,10 +3032,11 @@ document.addEventListener('click', e => {
   if (ch) { cartaoSel = ch.dataset.cartao === '*' ? null : ch.dataset.cartao; if (aba !== 'lanc') aba = 'visao'; animarProx = true; render(); return; }
   if (d.esc === 'div') {
     const it = imp.itens[d.it];
-    const resp = prompt('Quanto desta compra é seu? Ex.: 2/3 (dividido em 3, duas partes suas), 1/3, 1/4', it.escolha === 'div' ? `${it.k}/${it.n}` : '2/3');
-    const f = lerFracao(resp);
-    if (f) { Object.assign(it, f, { escolha: 'div' }); render(); }
-    else if (resp !== null) alert('Use o formato partes suas/total, por exemplo 2/3.');
+    const resp = prompt(`Quanto desta compra (${fmt.format(it.valor)}) é seu?\nEm partes: 2/3 (dividido em 3, duas suas), 1/3, 1/4…\nOu em reais: 25,90`, it.escolha === 'div' ? (it.meu != null ? String(it.meu).replace('.', ',') : `${it.k}/${it.n}`) : '2/3');
+    const f = lerFracao(resp), v = resp && !resp.includes('/') ? num(resp.replace(/R\$\s*/i, '')) : 0;
+    if (f) { delete it.meu; Object.assign(it, f, { escolha: 'div' }); render(); }
+    else if (v > 0 && v < it.valor) { it.meu = r2(v); it.escolha = 'div'; render(); }
+    else if (resp !== null) alert(v >= it.valor ? `O valor seu precisa ser menor que ${fmt.format(it.valor)}. Se for tudo seu, marque "Meu".` : 'Use partes (ex.: 2/3) ou um valor em reais (ex.: 25,90).');
   } else if (d.esc) { imp.itens[d.it].escolha = d.esc; render(); }
   if (d.todos) { imp.itens.forEach(i => { if (!i.escolha) i.escolha = d.todos; }); render(); }
   const pdBtn = e.target.closest('[data-pendente]');
@@ -3081,6 +3096,7 @@ document.addEventListener('change', e => {
   if (form && (form.id === 'f-sim' || form.id === 'f-lanc')) {
     if (e.target.name === 'desc') return aplicarSugestao(form);
     if (e.target.name === 'parte' || e.target.name === 'cartao') e.target.dataset.mexeu = 1;
+    if (e.target.name === 'parte') { const pv = form.querySelector('.parte-valor'); pv.hidden = e.target.value !== 'valor'; if (!pv.hidden) form.parteValor.focus(); }
   }
   if (e.target.id === 'fundo-arq' && e.target.files[0]) return lerImagemFundo(e.target.files[0]);
   if (e.target.id === 'cor-auto') return salvarFundo({ ...lerFundo(), corAuto: e.target.checked });
@@ -3133,7 +3149,7 @@ document.addEventListener('change', e => {
 document.addEventListener('input', e => {
   if (e.target.id === 'transp') { try { localStorage.setItem(FUNDO_KEY, JSON.stringify({ ...lerFundo(), transp: +e.target.value })); } catch (err) {} aplicarFundo(); return; }
   const fe = e.target.form;
-  if (fe && fe.id === 'f-edit') document.getElementById('edit-parte').textContent = fmt.format(r2(num(fe.valor.value) * +fe.parte.value)); if (e.target.id === 'ajuste') document.getElementById('aj-lbl').textContent = (e.target.value > 0 ? '+' : '') + e.target.value + '%'; });
+  if (fe && fe.id === 'f-edit') document.getElementById('edit-parte').textContent = fmt.format(fe.parteValor.value.trim() ? num(fe.parteValor.value) : r2(num(fe.valor.value) * +fe.parte.value)); if (e.target.id === 'ajuste') document.getElementById('aj-lbl').textContent = (e.target.value > 0 ? '+' : '') + e.target.value + '%'; });
 
 let rz, larguraAnt = innerWidth;
 window.addEventListener('resize', () => {
