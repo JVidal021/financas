@@ -464,6 +464,35 @@ body.fundo-img #fundo::after, body.fundo-img .fv-in::after { content: ""; positi
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
+/* simulação */
+.sug:empty { display: none; }
+.sug { display: flex; align-items: center; gap: 6px; color: var(--accent); }
+.sug svg.i { width: 14px; height: 14px; }
+.sim-tiles { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.sim-tiles .lbl .sub { color: var(--muted); font-weight: 500; }
+.sim-tiles .sub2 { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.sim-dif { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td .sim-dif { display: block; font-size: 12px; font-weight: 600; }
+.sim-dif:not(.neg):not(.pos) { color: var(--muted); font-weight: 500; }
+.tile.sim-ruim { border-color: color-mix(in srgb, var(--crit) 45%, transparent); }
+.sim-leg i { background: var(--s1); }
+.sim-leg i.tr { margin-left: 8px; height: 0; border-top: 2px dashed var(--muted); background: none; }
+.sim-lista { display: grid; gap: 2px; }
+.sim-it { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 8px; border-radius: 12px; transition: background .15s, opacity .2s; animation: subir .35s var(--suave); }
+.sim-it:hover { background: var(--surface-2); }
+.sim-it.off { opacity: .5; }
+.sim-on input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+.sim-txt b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-txt small { display: block; font-size: 12px; color: var(--muted); }
+.sim-val { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sim-val b { display: block; font-size: 14px; }
+.sim-val .link { font-size: 12px; padding: 2px 5px; }
+.sim-val [data-sim-lancar]:hover { color: var(--accent); }
+.sim-orc { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--grid); font-size: 14px; }
+.sim-orc span:first-child { color: var(--text-2); }
+.sim-orc b { font-variant-numeric: tabular-nums; }
+.sim-orc.warn b { color: var(--warn); } .sim-orc.crit b { color: var(--crit); }
+
 /* tela larga: menu lateral dentro da janela */
 @media (min-width: 1100px) {
   .janela { grid-template-columns: 250px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
@@ -627,12 +656,13 @@ const ICONES = {
   desce: '<path d="M7 7l10 10M17 9v8H9"/>',
   pizza: '<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
   alerta: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+  frasco: '<path d="M9 3h6M10 3v6.5L4.6 18.4A1.7 1.7 0 0 0 6.1 21h11.8a1.7 1.7 0 0 0 1.5-2.6L14 9.5V3"/><path d="M7.2 15h9.6"/>',
   lapis: '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
 };
 const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONES[n]}</svg>`;
 // [id, nome, ícone, nome curto da barra do celular]
 const ABAS = [['visao', 'Visão geral', 'home', 'Início'], ['lanc', 'Lançamentos', 'lista', 'Lançar'], ['fixos', 'Fixos', 'repete', 'Fixos'],
-  ['orc', 'Orçamento', 'alvo', 'Limites'], ['proj', 'Projeção', 'grafico', 'Projeção'], ['fatura', 'Importar fatura', 'envia', 'Fatura'], ['dados', 'Dados', 'dados', 'Dados']];
+  ['orc', 'Orçamento', 'alvo', 'Limites'], ['proj', 'Projeção', 'grafico', 'Projeção'], ['sim', 'Simular', 'frasco', 'Simular'], ['fatura', 'Importar fatura', 'envia', 'Fatura'], ['dados', 'Dados', 'dados', 'Dados']];
 
 // Cartões: cada lançamento pode ter um cartão (importados da fatura já vêm com o banco).
 // Sem cartão = Pix, débito ou dinheiro.
@@ -1207,19 +1237,13 @@ function telaLanc() {
   ${telaBusca()}
   <div class="card"><h2>Novo lançamento</h2>
     <form id="f-lanc" class="row">
-      <label>Tipo<select name="tipo"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></label>
-      <label>Data<input type="date" name="data" value="${dataPadrao}" required></label>
-      <label style="flex:2 1 200px">Descrição<input name="desc" required placeholder="Ex.: mercado, uber, freela…"></label>
-      <label>Categoria<input name="cat" list="cats" required placeholder="Alimentação"></label>
-      <label>Valor (R$)<input name="valor" inputmode="decimal" required placeholder="0,00"></label>
-      <label>Cartão<select name="cartao">${opcoesCartao(cartaoSel || SEM_CARTAO)}</select></label>
-      <label>Parcelas<select name="parcelas">${Array.from({ length: 24 }, (_, i) => `<option value="${i + 1}">${i + 1}x</option>`).join('')}</select></label>
-      <label>O valor é<select name="valorDe"><option value="total">Total da compra</option><option value="parcela">De cada parcela</option></select></label>
-      <label>Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option></select></label>
+${camposLanc('f-lanc', dataPadrao, cartaoSel || SEM_CARTAO)}
       <button class="btn primary">Adicionar</button>
     </form>
+    <p class="hint sug"></p>
     <p class="hint">Comprou no cartão? Escolha o cartão e as parcelas: cada parcela vai para a fatura em que vai cair e entra na projeção já. Quando você importar a fatura, a compra é reconhecida e não duplica. Em "Sua parte", informe o valor total da conta: o app lança só a sua fração. Use datas futuras para gastos planejados (IPVA, viagem, presente) — eles entram na projeção.</p>
   </div>
+  <datalist id="descs">${[...new Set(Object.keys(S.regras).concat(S.lanc.map(l => baseDesc(l.desc))))].sort().slice(0, 400).map(d => `<option value="${esc(d)}">`).join('')}</datalist>
   ${chipsCartao()}
   <div class="card"><h2>${ico('lista')} Lançamentos de ${nomeMes(mesSel)} ${cartaoSel !== null ? `<span class="sub">· ${esc(nomeCartao(cartaoSel))} · ${fmt.format(totais(doMes).d)}</span>` : ''}</h2>${tabelaItens(doMes)}</div>`;
 }
@@ -1743,7 +1767,7 @@ function anteciparVirada(c, dia) {
 
 // Compra no cartão lançada à mão: cada parcela vai para a fatura em que vai cair.
 // Fica marcada "a conferir" até a fatura ser importada e trocar pela de verdade.
-function lancarCompraCartao(f, valor, share) {
+function lancarCompraCartao(f, valor, share, destino = S.lanc) {
   const N = Math.max(1, +f.parcelas || 1);
   const vParc = r2(f.valorDe === 'parcela' ? valor : valor / N);
   const fech1 = fechamentoDaCompra(f.cartao, f.data);
@@ -1751,9 +1775,10 @@ function lancarCompraCartao(f, valor, share) {
   for (let k = 1; k <= N; k++) {
     // à vista fica na data da compra; parcelas, no fechamento de cada fatura (como na importação)
     const data = N === 1 ? f.data : fech1 ? fechamentoEm(f.cartao, addMes(fech1.slice(0, 7), k - 1)) : addMes(f.data.slice(0, 7), k - 1) + f.data.slice(7);
-    S.lanc.push({ id: uid(), tipo: 'despesa', data, desc: f.desc.trim() + (N > 1 ? ` (${k}/${N})` : '') + rotuloFracao(share), cat: f.cat.trim(),
+    destino.push({ id: uid(), tipo: 'despesa', data, desc: f.desc.trim() + (N > 1 ? ` (${k}/${N})` : '') + rotuloFracao(share), cat: f.cat.trim(),
       valor: r2(vParc * share), share, cartao: f.cartao, parcela: N > 1, provisorio: true, compra: { ...compra, n: k } });
   }
+  return destino;
 }
 
 // A compra lançada à mão corresponde a este item da fatura? Mesmo cartão, mesma parcela,
@@ -1907,7 +1932,8 @@ function delta(atual, antes, subirEhRuim, rotulo) {
 }
 
 // Saldo da conta dia a dia (degraus), com área preenchida e o dia mais apertado marcado
-function graficoSaldoDia(el, ev) {
+// `base` (opcional, na simulação): { ev, saldo } de outro cenário, desenhado tracejado por baixo para comparar
+function graficoSaldoDia(el, ev, base) {
   if (!el) return;
   const W = el.clientWidth || 600, H = 250, P = { l: 62, r: 16, t: 22, b: 28 };
   const pts = [{ data: hoje(), saldo: S.saldoAtual, desc: 'Hoje' }].concat(ev);
@@ -1915,19 +1941,25 @@ function graficoSaldoDia(el, ev) {
   const fim = addDia(hoje(), 45);
   const t0 = new Date(hoje()).getTime(), t1 = new Date(fim).getTime();
   const x = d => P.l + (W - P.l - P.r) * ((new Date(d).getTime() - t0) / (t1 - t0));
-  const ticks = niceTicks(Math.min(0, ...pts.map(p => p.saldo)), Math.max(1, ...pts.map(p => p.saldo)));
+  const ptsB = base ? [{ data: hoje(), saldo: base.saldo }].concat(base.ev) : [];
+  const todos = pts.concat(ptsB);
+  const ticks = niceTicks(Math.min(0, ...todos.map(p => p.saldo)), Math.max(1, ...todos.map(p => p.saldo)));
   const y0 = ticks[0], y1 = ticks[ticks.length - 1];
   const y = v => P.t + (H - P.t - P.b) * (1 - (v - y0) / (y1 - y0));
   // um ponto por dia com movimento (saldo no fim do dia), ligados por uma curva suave
   const nos = fimDia[0].data === hoje() ? fimDia.slice() : [pts[0]].concat(fimDia);
   const ultimo = nos[nos.length - 1];
   const linha = curva(nos.map(p => [x(p.data), y(p.saldo)]).concat(ultimo.data < fim ? [[x(fim), y(ultimo.saldo)]] : []));
-  const base = y(Math.max(0, y0));
+  const baseY = y(Math.max(0, y0));
   const menor = fimDia.reduce((m, p) => p.saldo < m.saldo ? p : m, fimDia[0]);
   let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Saldo da conta dia a dia">${defsLinha('g-dia')}`;
   s += gradeY(ticks, y, P.l, W - P.r);
   for (let k = 0; k <= 45; k += 7) { const d = addDia(hoje(), k); s += `<text x="${x(d)}" y="${H - 8}" text-anchor="middle">${k ? ddmm(d) : 'hoje'}</text>`; }
-  s += `<path d="${linha}L${x(fim)},${base}L${x(hoje())},${base}Z" fill="url(#g-dia-a)" class="area"/>`;
+  s += `<path d="${linha}L${x(fim)},${baseY}L${x(hoje())},${baseY}Z" fill="url(#g-dia-a)" class="area"/>`;
+  if (base) {
+    const fimB = ptsB.filter((p, i) => !ptsB[i + 1] || ptsB[i + 1].data !== p.data), nosB = fimB[0].data === hoje() ? fimB : [ptsB[0]].concat(fimB), ultB = nosB[nosB.length - 1];
+    s += `<path d="${curva(nosB.map(p => [x(p.data), y(p.saldo)]).concat(ultB.data < fim ? [[x(fim), y(ultB.saldo)]] : []))}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 6" opacity=".75"/>`;
+  }
   s += `<path d="${linha}" fill="none" stroke="url(#g-dia-l)" stroke-width="3" stroke-linecap="round" filter="url(#g-dia-f)" class="linha" pathLength="1"/>`;
   s += nos.map(p => `<circle cx="${x(p.data)}" cy="${y(p.saldo)}" r="3.2" fill="var(--surface-solid)" stroke="var(--s1)" stroke-width="2"/>`).join('');
   const cm = menor.saldo < 0 ? 'var(--crit)' : 'var(--warn)';
@@ -2304,6 +2336,144 @@ function abrirEdicaoFixo(id) {
 }
 
 // ---------- render ----------
+// ---------- simulação ----------
+// Gastos (ou entradas) de mentira que passam pelas mesmas regras de um lançamento de verdade: cartão,
+// melhor dia de compra, fatura em que caem, parcelas e sua parte. Ficam só neste aparelho e não entram
+// nos dados nem na sincronização até você clicar em "Lançar de verdade".
+const SIM_KEY = 'financas.sim';
+let SIM = (() => { try { return JSON.parse(localStorage.getItem(SIM_KEY)) || []; } catch (e) { return []; } })();
+const gravarSim = () => { try { localStorage.setItem(SIM_KEY, JSON.stringify(SIM)); } catch (e) {} };
+// Os lançamentos que um formulário de lançamento gera (o mesmo caminho do "Adicionar")
+function lancsDoForm(f, destino = []) {
+  const valor = num(f.valor), fr = lerFracao(f.parte), share = fr ? fr.k / fr.n : 1;
+  if (f.cartao && f.tipo === 'despesa') return lancarCompraCartao(f, valor, share, destino);
+  destino.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}) });
+  return destino;
+}
+// Roda `fn` como se os itens simulados já estivessem lançados. Pix/débito com data até hoje sai do
+// saldo de hoje (a agenda só conta o que vem depois de hoje).
+function comSimulacao(fn, itens = SIM.filter(s => s.on)) {
+  if (!itens.length) return fn();
+  const lanc = S.lanc, saldo = S.saldoAtual;
+  let hojeAjuste = 0;
+  const extra = itens.flatMap(s => lancsDoForm(s.f)).filter(l => {
+    if (l.cartao || l.data > hoje()) return true;
+    hojeAjuste += l.tipo === 'receita' ? l.valor : -l.valor; return false;
+  });
+  S.lanc = lanc.concat(extra); S.saldoAtual = r2(saldo + hojeAjuste);
+  try { return fn(); } finally { S.lanc = lanc; S.saldoAtual = saldo; }
+}
+// Quando cada item simulado pesa na conta
+function ondeCai(f) {
+  const ls = lancsDoForm(f);
+  if (!f.cartao || f.tipo !== 'despesa') return f.data <= hoje() ? (f.tipo === 'receita' ? 'entra hoje' : 'sai da conta hoje') : `${f.tipo === 'receita' ? 'entra' : 'sai'} em ${ddmm(f.data)}`;
+  const vs = ls.map(vencDoLanc);
+  if (vs.some(v => !v)) return `${nomeCartao(f.cartao)} sem dia de fechamento: conta no mês da compra`;
+  const p = ls.length > 1 ? `${ls.length}x de ${fmt.format(ls[0].valor)} · ` : '';
+  return `${p}fatura ${nomeCartao(f.cartao)} que vence ${ddmm(vs[0])}${vs.length > 1 ? ` (última ${ddmm(vs[vs.length - 1])})` : ''}`;
+}
+// Sugestões pela loja: regra marcada nas faturas importadas ou o último lançamento com a mesma descrição
+const baseDesc = d => String(d).replace(/\s*\(\d+\/\d+\)/, '').replace(/\s*·.*$/, '').trim();
+function sugestaoLoja(desc) {
+  const k = semAcento(baseDesc(desc));
+  if (!k) return null;
+  const regra = Object.entries(S.regras).find(([d]) => semAcento(d) === k);
+  const ult = S.lanc.filter(l => semAcento(baseDesc(l.desc)) === k).sort((a, b) => b.data.localeCompare(a.data))[0];
+  if (!regra && !ult) return null;
+  const r = regra && regra[1], parte = !r ? (ult.share && ult.share !== 1 ? fracaoTxt(ult.share) : '1')
+    : r.escolha === 'metade' ? '1/2' : r.escolha === 'div' ? `${r.k}/${r.n}` : r.escolha === 'nao' ? null : '1';
+  return { cat: (r && r.cat) || (ult && ult.cat), cartao: ult && ult.cartao, parte, nao: r && r.escolha === 'nao', origem: regra ? 'regra das faturas' : 'último lançamento' };
+}
+function aplicarSugestao(form) {
+  const s = sugestaoLoja(form.desc.value), dica = form.parentElement.querySelector('.sug');
+  if (dica) dica.innerHTML = '';
+  if (!s) return;
+  if (s.cat && !form.cat.value) form.cat.value = s.cat;
+  if (s.parte && !form.parte.dataset.mexeu && [...form.parte.options].some(o => o.value === s.parte)) form.parte.value = s.parte;
+  if (s.cartao && !form.cartao.dataset.mexeu && [...form.cartao.options].some(o => o.value === s.cartao)) form.cartao.value = s.cartao;
+  if (dica) dica.innerHTML = `${ico('lapis')} Preenchido pela ${s.origem}: ${esc(s.cat || '')}${s.parte && s.parte !== '1' ? ` · sua parte ${s.parte}` : ''}${s.cartao ? ` · ${esc(nomeCartao(s.cartao))}` : ''}${s.nao ? ' · <b>nas faturas você marca essa loja como "não é meu"</b>' : ''}`;
+}
+const camposLanc = (id, dataPadrao, cartao) => `
+      <label>Tipo<select name="tipo"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></label>
+      <label>Data<input type="date" name="data" value="${dataPadrao}" required></label>
+      <label style="flex:2 1 200px">Descrição<input name="desc" list="descs" required placeholder="Ex.: mercado, uber, freela…" autocomplete="off"></label>
+      <label>Categoria<input name="cat" list="cats" required placeholder="Alimentação"></label>
+      <label>Valor (R$)<input name="valor" inputmode="decimal" required placeholder="0,00"></label>
+      <label>Cartão<select name="cartao">${opcoesCartao(cartao)}</select></label>
+      <label>Parcelas<select name="parcelas">${Array.from({ length: 24 }, (_, i) => `<option value="${i + 1}">${i + 1}x</option>`).join('')}</select></label>
+      <label>O valor é<select name="valorDe"><option value="total">Total da compra</option><option value="parcela">De cada parcela</option></select></label>
+      <label>Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option></select></label>`;
+// diferença entre os cenários; `subirEhRuim` para valores de fatura
+const difTxt = (a, b, subirEhRuim) => { const d = r2(b - a); return Math.abs(d) < .01 ? '<span class="sim-dif">sem mudança</span>' : `<span class="sim-dif ${(d < 0) !== !!subirEhRuim ? 'neg' : 'pos'}">${d < 0 ? '−' : '+'} ${fmt.format(Math.abs(d))}</span>`; };
+
+function telaSim() {
+  const ativos = SIM.filter(s => s.on);
+  const base = { proj: projecao().linhas, lv: livreParaGastar() };
+  const sim = comSimulacao(() => ({ proj: projecao().linhas, lv: livreParaGastar() }));
+  const fim = base.proj[0], fimS = sim.proj[0], k6 = Math.min(5, base.proj.length - 1);
+  const lvTxt = lv => lv.valor < 0 ? `falta ${fmt.format(-lv.valor)} em ${ddmm(lv.ate)}` : `${fmt.format(lv.valor)} · ${fmt.format(lv.porDia)}/dia`;
+  // faturas que mudam
+  const faturas = [];
+  comSimulacao(() => cartoesUsados()).forEach(c => {
+    if (!diaFechamento(c) || !diaVencimento(c)) return;
+    for (let i = 0; i <= Math.min(12, S.horizonte); i++) for (const fech of faturasQueVencem(c, addMes(mesAtual(), i))) {
+      const a = valorFatura(c, fech), b = comSimulacao(() => valorFatura(c, fech));
+      if (Math.abs(b - a) >= .01) faturas.push({ c, venc: vencimentoDe(c, fech), a, b });
+    }
+  });
+  // limites do orçamento afetados (no mês em que cada gasto pesa)
+  const orc = [];
+  for (const s of ativos) {
+    const cat = s.f.cat.trim(), lim = S.orc[cat];
+    if (!(lim > 0) || s.f.tipo !== 'despesa') continue;
+    const m = mesDoLanc(lancsDoForm(s.f)[0]);
+    if (orc.some(o => o.cat === cat && o.m === m)) continue;
+    const gasto = () => itensDoMes(m).filter(i => i.tipo === 'despesa' && i.cat === cat).reduce((a, i) => a + i.valor, 0);
+    orc.push({ cat, m, lim, a: r2(gasto()), b: r2(comSimulacao(gasto)) });
+  }
+  const descs = [...new Set(Object.keys(S.regras).concat(S.lanc.map(l => baseDesc(l.desc))))].sort().slice(0, 400);
+  return `
+  <div class="card"><h2>${ico('frasco')} Simular um gasto <span class="sub">· não entra nos seus dados</span></h2>
+    <form id="f-sim" class="row">${camposLanc('f-sim', hoje(), cartaoSel || SEM_CARTAO)}
+      <button class="btn primary">Simular</button>
+    </form>
+    <p class="hint sug"></p>
+    <p class="hint">Segue as regras de um lançamento: no cartão, cai na fatura certa pelo melhor dia de compra e as parcelas vão para as faturas seguintes; Pix ou débito com a data de hoje sai do saldo de hoje. Lojas conhecidas preenchem categoria, sua parte e cartão pelas regras das faturas. Fica só neste aparelho.</p>
+  </div>
+  <datalist id="descs">${descs.map(d => `<option value="${esc(d)}">`).join('')}</datalist>
+  ${SIM.length ? `
+  <div class="tiles sim-tiles">
+    <div class="tile"><div><div class="lbl">Na conta no fim de ${nomeMes(fim.m)}</div><div class="val">${fmt.format(fimS.saldo)}</div><div class="sub2">sem simular ${fmt.format(fim.saldo)} · ${difTxt(fim.saldo, fimS.saldo)}</div></div></div>
+    <div class="tile ${sim.lv.valor < 0 ? 'sim-ruim' : ''}"><div><div class="lbl">${sim.lv.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'} <span class="sub">· 45 dias</span></div><div class="val ${sim.lv.valor < 0 ? 'neg' : ''}">${fmt.format(Math.abs(sim.lv.valor))}</div><div class="sub2">sem simular ${lvTxt(base.lv)} · ${difTxt(base.lv.valor, sim.lv.valor)}</div></div></div>
+    <div class="tile"><div><div class="lbl">Na conta no fim de ${nomeMes(base.proj[k6].m)}</div><div class="val">${fmt.format(sim.proj[k6].saldo)}</div><div class="sub2">sem simular ${fmt.format(base.proj[k6].saldo)} · ${difTxt(base.proj[k6].saldo, sim.proj[k6].saldo)}</div></div></div>
+  </div>
+  <div class="g21">
+    <div class="card"><h2>${ico('grafico')} Saldo na conta <span class="sub">· próximos 45 dias</span><span class="leg-pill sim-leg"><i></i>com a simulação <i class="tr"></i>sem</span></h2><div class="chart" id="sim-dia"></div></div>
+    <div class="card"><h2>${ico('lista')} Itens simulados <span class="sub">· ${ativos.length} de ${SIM.length} ligados</span></h2>
+      <div class="sim-lista">${SIM.map(s => `<div class="sim-it ${s.on ? '' : 'off'}">
+        <label class="sim-on" title="${s.on ? 'Desligar' : 'Ligar'} na simulação"><input type="checkbox" data-sim-on="${s.id}" ${s.on ? 'checked' : ''}></label>
+        <div class="sim-txt"><b>${esc(s.f.desc)}</b><small>${esc(ondeCai(s.f))}${s.f.parte !== '1' ? ` · sua parte ${esc(s.f.parte)}` : ''}</small></div>
+        <div class="sim-val"><b class="${s.f.tipo === 'receita' ? 'pos' : ''}">${s.f.tipo === 'receita' ? '+' : '−'} ${fmt.format(num(s.f.valor))}</b>
+          <span><button class="link" data-sim-lancar="${s.id}" title="Virar um lançamento de verdade">lançar</button><button class="link" data-sim-del="${s.id}" title="Tirar da simulação">✕</button></span></div>
+      </div>`).join('')}</div>
+      <div class="row" style="margin-top:14px"><button class="btn" data-sim-limpar style="flex:0 0 auto">Limpar simulação</button></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>${ico('cartao')} Faturas que mudam</h2>
+      ${faturas.length ? `<div class="tbl-wrap"><table><thead><tr><th>Fatura</th><th class="num">Sem simular</th><th class="num">Com a simulação</th></tr></thead><tbody>
+      ${faturas.map(x => `<tr><td><span class="it"><span class="dot" style="background:${corCartao(x.c)}"></span>${esc(nomeCartao(x.c))} · vence ${ddmm(x.venc)}</span></td><td class="num">${fmt.format(x.a)}</td><td class="num"><b>${fmt.format(x.b)}</b> ${difTxt(x.a, x.b, true)}</td></tr>`).join('')}
+      </tbody></table></div><p class="hint">Só a sua parte. A projeção ainda soma a média de compras novas de cada cartão.</p>` : '<p class="empty">Nenhuma fatura muda: os itens ligados são Pix, débito ou entradas.</p>'}
+      ${orc.length ? `<h2 style="margin-top:18px">${ico('alvo')} Limites do orçamento</h2>${orc.map(o => `<div class="sim-orc ${o.b > o.lim ? 'crit' : o.b >= o.lim * .8 ? 'warn' : ''}"><span>${esc(o.cat)} em ${nomeMes(o.m)}</span><b>${fmt.format(o.a)} → ${fmt.format(o.b)} de ${fmt.format(o.lim)}</b>${o.b > o.lim ? `<span class="status crit">▲ estoura ${fmt.format(o.b - o.lim)}</span>` : ''}</div>`).join('')}` : ''}
+    </div>
+    <div class="card"><h2>${ico('grafico')} Mês a mês</h2>
+      <div class="tbl-wrap"><table><thead><tr><th>Fim do mês</th><th class="num">Sem simular</th><th class="num">Com a simulação</th></tr></thead><tbody>
+      ${base.proj.slice(0, 7).map((l, i) => `<tr><td>${nomeMes(l.m)}${i === 0 ? ' <span class="tag">atual</span>' : ''}</td><td class="num ${l.saldo < 0 ? 'neg' : ''}">${fmt.format(l.saldo)}</td><td class="num"><b class="${sim.proj[i].saldo < 0 ? 'neg' : ''}">${fmt.format(sim.proj[i].saldo)}</b> ${difTxt(l.saldo, sim.proj[i].saldo)}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>
+  </div>` : `<div class="card"><p class="empty">Simule uma compra acima para ver como fica o saldo até o fim do mês, o "livre pra gastar", as faturas e os próximos meses.</p></div>`}`;
+}
+
 // ---------- seletor de mês ----------
 // Grade com os 12 meses do ano; ponto embaixo = mês com lançamentos. As setas da pílula andam um mês.
 let popAno = +mesAtual().slice(0, 4);
@@ -2335,7 +2505,7 @@ function render() {
   _venc.clear(); _vencImportado = null; _indice = null;   // dias do cartão ou faturas importadas podem ter mudado
   document.getElementById('mes-nome').innerHTML = `${nomeMes(mesSel)}${mesSel === mesAtual() ? '<small>atual</small>' : ''}`;
   if (!document.getElementById('mes-pop').hidden) desenharMeses();
-  document.getElementById('mes-pill').style.visibility = ['proj', 'dados', 'fixos', 'fatura'].includes(aba) ? 'hidden' : '';
+  document.getElementById('mes-pill').style.visibility = ['proj', 'sim', 'dados', 'fixos', 'fatura'].includes(aba) ? 'hidden' : '';
   document.getElementById('cats').innerHTML = catsUsadas().map(c => `<option value="${esc(c)}">`).join('');
   const abaAtual = ABAS.find(a => a[0] === aba);
   document.querySelector('header h1').innerHTML = `<span class="app-nome">Minhas Finanças</span><span class="aba-nome">${abaAtual[1]}</span>`;
@@ -2344,9 +2514,9 @@ function render() {
   document.getElementById('saud').textContent = `${hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite'}, Jimmy · ${DIAS_SEMANA[h.getDay()]}, ${h.getDate()} de ${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][h.getMonth()]}`;
   // contadores no menu: compras lançadas à mão esperando a fatura, pendências na visão geral
   const npend = pendencias().length;
-  const contador = { lanc: S.lanc.filter(l => l.provisorio).length, visao: npend };
+  const contador = { lanc: S.lanc.filter(l => l.provisorio).length, visao: npend, sim: SIM.filter(x => x.on).length };
   const lvLado = livreParaGastar();
-  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div><span>Minhas Finanças<small>controle pessoal</small></span></div><div class="sec">Menu</div>` + ABAS.map(([id, nome, icone, curto]) => `${id === 'fatura' ? '<div class="sec">Ferramentas</div>' : ''}<button data-t="${id}" class="${id === aba ? 'on' : ''}" title="${nome}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('')
+  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div><span>Minhas Finanças<small>controle pessoal</small></span></div><div class="sec">Menu</div>` + ABAS.map(([id, nome, icone, curto]) => `${id === 'fatura' ? '<div class="sec">Ferramentas</div>' : ''}<button data-t="${id}" class="${id === aba ? 'on' : ''}" title="${nome}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : id === 'sim' ? 'Itens ligados na simulação' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('')
     + `<div class="lado-card ${lvLado.valor < 0 ? 'aperto' : ''}" data-t="visao" role="button" title="Menor saldo previsto nos próximos 45 dias">
         <small>${lvLado.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</small><b>${fmt.format(Math.abs(lvLado.valor))}</b>
         <span>${lvLado.valor < 0 ? `em ${ddmm(lvLado.ate)}` : `≈ ${fmt.format(lvLado.porDia)}/dia até ${ddmm(lvLado.ate)}`}</span></div>`
@@ -2358,7 +2528,7 @@ function render() {
   const anim = animarProx && !reduzirMovimento.matches;
   animarProx = false;
   app.classList.remove('entrar', 'entrar-lado');
-  app.innerHTML = { visao: telaVisao, lanc: telaLanc, fixos: telaFixos, orc: telaOrc, proj: telaProj, dados: telaDados, fatura: telaFatura }[aba]();
+  app.innerHTML = { visao: telaVisao, lanc: telaLanc, fixos: telaFixos, orc: telaOrc, proj: telaProj, sim: telaSim, dados: telaDados, fatura: telaFatura }[aba]();
   desenharGraficos();
   if (anim) { void app.offsetWidth; app.classList.add(anim === 'lado' ? 'entrar-lado' : 'entrar'); contarValores(app); }
 }
@@ -2406,6 +2576,7 @@ function desenharGraficos() {
     if (document.getElementById('saldo-dia')) graficoSaldoDia(document.getElementById('saldo-dia'), agenda(45));
   }
   if (aba === 'proj') linhaSaldo(document.getElementById('proj'), projecao().linhas);
+  if (aba === 'sim' && document.getElementById('sim-dia')) { const base = { ev: agenda(45), saldo: S.saldoAtual }; comSimulacao(() => graficoSaldoDia(document.getElementById('sim-dia'), agenda(45), base)); }
 }
 
 // ---------- busca ----------
@@ -2693,6 +2864,11 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.
 document.addEventListener('submit', e => {
   e.preventDefault();
   const f = Object.fromEntries(new FormData(e.target));
+  if (e.target.id === 'f-sim') {
+    if (num(f.valor) <= 0) return alert('Informe um valor maior que zero.');
+    SIM.push({ id: uid(), on: true, f });
+    gravarSim(); render(); return;
+  }
   if (e.target.id === 'f-lanc') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
     const fr = lerFracao(f.parte), share = fr ? fr.k / fr.n : 1;
@@ -2739,6 +2915,13 @@ document.addEventListener('click', e => {
   }
   const irAba = e.target.closest('#app [data-t]');
   if (irAba) { aba = irAba.dataset.t; animarProx = true; render(); rolarTopo(); return; }
+  if (d.simDel) { SIM = SIM.filter(x => x.id !== d.simDel); gravarSim(); render(); return; }
+  if (e.target.closest('[data-sim-limpar]')) { SIM = []; gravarSim(); render(); return; }
+  if (d.simLancar) {
+    const it = SIM.find(x => x.id === d.simLancar);
+    lancsDoForm(it.f, S.lanc);
+    SIM = SIM.filter(x => x !== it); gravarSim(); salvar(); return;
+  }
   if (d.delLanc) { S.lanc = S.lanc.filter(l => l.id !== d.delLanc); salvar(); }
   if (d.delFixo && confirm('Excluir este item fixo de todos os meses?')) { S.fixos = S.fixos.filter(f => f.id !== d.delFixo); salvar(); }
   if (d.encerrar) { const f = S.fixos.find(f => f.id === d.encerrar); f.fim = mesAtual(); salvar(); }
@@ -2802,6 +2985,12 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.simOn) { const it = SIM.find(x => x.id === e.target.dataset.simOn); it.on = e.target.checked; gravarSim(); render(); return; }
+  const form = e.target.form;
+  if (form && (form.id === 'f-sim' || form.id === 'f-lanc')) {
+    if (e.target.name === 'desc') return aplicarSugestao(form);
+    if (e.target.name === 'parte' || e.target.name === 'cartao') e.target.dataset.mexeu = 1;
+  }
   if (e.target.id === 'fundo-arq' && e.target.files[0]) return lerImagemFundo(e.target.files[0]);
   if (e.target.id === 'cor-auto') return salvarFundo({ ...lerFundo(), corAuto: e.target.checked });
   if (e.target.id === 'transp') return salvarFundo({ ...lerFundo(), transp: +e.target.value });
