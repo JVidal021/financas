@@ -867,7 +867,9 @@ function vencDoLanc(l) {
   if (!melhorDia(l.cartao) || !diaVencimento(l.cartao)) return null;
   const k = l.cartao + '|' + l.data + (l.prevista ? '|p' : '');
   if (!_venc.has(k)) {
-    let fech = fechamentoDaCompra(l.cartao, l.data), v = vencimentoDe(l.cartao, fech);
+    // parcela prevista é datada no fechamento da fatura dela; como o dia de fechamento muda com fins de semana
+    // e feriados (08/11, 07/12…), vale o fechamento mais próximo da data, não o primeiro depois dela
+    let fech = l.prevista ? fechamentoMaisProximo(l.cartao, l.data) : fechamentoDaCompra(l.cartao, l.data), v = vencimentoDe(l.cartao, fech);
     if (_fechadas.has(l.cartao + '|' + v)) {
       if (l.prevista) v = IGNORADA;
       else for (let i = 0; i < 3 && _fechadas.has(l.cartao + '|' + v); i++) { fech = fechamentoDaCompra(l.cartao, addDia(fech, 1)); v = vencimentoDe(l.cartao, fech); }
@@ -1803,6 +1805,8 @@ function fechamentoAnterior(c, fech) {
   const antes = [-2, -1, 0, 1].map(k => fechamentoEm(c, addMes(ym, k))).filter(f => f && f < fech).sort();
   return antes.length ? antes[antes.length - 1] : addMes(ym, -1) + fech.slice(7);
 }
+const fechamentoMaisProximo = (c, data) => [-1, 0, 1].map(k => fechamentoEm(c, addMes(data.slice(0, 7), k))).filter(Boolean)
+  .sort((a, b) => Math.abs(new Date(a) - new Date(data)) - Math.abs(new Date(b) - new Date(data)))[0];
 // Data de fechamento da fatura em que cai uma compra feita em `data`
 function fechamentoDaCompra(c, data) {
   if (!fechamentoEm(c, data.slice(0, 7))) return null;
@@ -2283,7 +2287,7 @@ function confirmarImportacao() {
       for (let k = it.parc.n + 1; k <= it.parc.N; k++) {
         const key = it.base + '|' + k;
         S.lanc = S.lanc.filter(l => l.key !== key && !parcelaPrevistaIgual(l, { desc: it.desc, valor: it.valor, data: it.data, parc: { n: k, N: it.parc.N } }, imp.banco));
-        S.lanc.push({ id: uid(), tipo: 'despesa', data: addMes(imp.fechamento.slice(0, 7), k - it.parc.n) + '-' + imp.fechamento.slice(8), desc: `${it.desc} (${k}/${it.parc.N})` + rotuloFracao(share), cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key, origem: 'fatura', cartao: imp.banco, parcela: true, prevista: true });
+        S.lanc.push({ id: uid(), tipo: 'despesa', data: fechamentoEm(imp.banco, addMes(imp.fechamento.slice(0, 7), k - it.parc.n)) || addMes(imp.fechamento.slice(0, 7), k - it.parc.n) + '-' + imp.fechamento.slice(8), desc: `${it.desc} (${k}/${it.parc.N})` + rotuloFracao(share), cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key, origem: 'fatura', cartao: imp.banco, parcela: true, prevista: true });
         futuras++;
       }
     }
