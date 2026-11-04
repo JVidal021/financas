@@ -317,6 +317,19 @@ main { padding: 18px 24px 36px; }
 .ev-val { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ev-val b { display: block; font-size: 14px; }
 .ev-val small { font-size: 12px; color: var(--muted); }
+.calc-res h3 { font-size: 14px; margin: 18px 0 6px; }
+.calc-big { padding: 16px 18px; border-radius: 16px; background: var(--accent-soft); margin-bottom: 12px; }
+.calc-big small { display: block; color: var(--text-2); font-size: 13px; font-weight: 600; }
+.calc-big b { display: block; font-size: 32px; font-weight: 800; letter-spacing: -.03em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.calc-big span { color: var(--muted); font-size: 13px; }
+.cl-grupo { border: 1px solid var(--card-borda); border-radius: 14px; padding: 4px 14px; margin-bottom: 10px; background: var(--surface-2); }
+.cl { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 14px; border-bottom: 1px dashed var(--grid); }
+.cl:last-child { border-bottom: 0; }
+.cl span { color: var(--text-2); }
+.cl b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl b.tot { font-size: 16px; color: var(--accent); }
+.cl b small { color: var(--muted); font-weight: 500; }
+.pessoa { padding: 12px 0; border-bottom: 1px solid var(--grid); margin-bottom: 12px; }
 .tl { position: relative; padding-left: 30px; }
 .tl::before { content: ""; position: absolute; left: 10px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: linear-gradient(var(--accent), var(--violeta)); opacity: .35; }
 .tl-mes { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 18px 0 4px -30px; padding: 6px 12px; border-radius: 10px; background: var(--surface-2); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
@@ -674,13 +687,14 @@ const ICONES = {
   desce: '<path d="M7 7l10 10M17 9v8H9"/>',
   pizza: '<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
   alerta: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+  calc: '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8.5 6.5h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h3.5"/>',
   frasco: '<path d="M9 3h6M10 3v6.5L4.6 18.4A1.7 1.7 0 0 0 6.1 21h11.8a1.7 1.7 0 0 0 1.5-2.6L14 9.5V3"/><path d="M7.2 15h9.6"/>',
   lapis: '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
 };
 const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONES[n]}</svg>`;
 // [id, nome, ícone, nome curto da barra do celular]
 const ABAS = [['visao', 'Visão geral', 'home', 'Início'], ['lanc', 'Lançamentos', 'lista', 'Lançar'], ['fixos', 'Fixos', 'repete', 'Fixos'],
-  ['orc', 'Orçamento', 'alvo', 'Limites'], ['proj', 'Previsão', 'grafico', 'Previsão'], ['sim', 'Simular', 'frasco', 'Simular'], ['fatura', 'Importar fatura', 'envia', 'Fatura'], ['dados', 'Dados', 'dados', 'Dados']];
+  ['orc', 'Orçamento', 'alvo', 'Limites'], ['proj', 'Previsão', 'grafico', 'Previsão'], ['sim', 'Simular', 'frasco', 'Simular'], ['calc', 'Calculadoras', 'calc', 'Cálculos'], ['fatura', 'Importar fatura', 'envia', 'Fatura'], ['dados', 'Dados', 'dados', 'Dados']];
 
 // Cartões: cada lançamento pode ter um cartão (importados da fatura já vêm com o banco).
 // Sem cartão = Pix, débito ou dinheiro.
@@ -2685,7 +2699,7 @@ function render() {
   _venc.clear(); _vencImportado = null; _indice = null;   // dias do cartão ou faturas importadas podem ter mudado
   document.getElementById('mes-nome').innerHTML = `${nomeMes(mesSel)}${mesSel === mesAtual() ? '<small>atual</small>' : ''}`;
   if (!document.getElementById('mes-pop').hidden) desenharMeses();
-  document.getElementById('mes-pill').style.visibility = ['proj', 'sim', 'dados', 'fixos', 'fatura'].includes(aba) ? 'hidden' : '';
+  document.getElementById('mes-pill').style.visibility = ['proj', 'sim', 'dados', 'fixos', 'fatura', 'calc'].includes(aba) ? 'hidden' : '';
   document.getElementById('cats').innerHTML = catsUsadas().map(c => `<option value="${esc(c)}">`).join('');
   const abaAtual = ABAS.find(a => a[0] === aba);
   document.querySelector('header h1').innerHTML = `<span class="app-nome">Minhas Finanças</span><span class="aba-nome">${abaAtual[1]}</span>`;
@@ -2708,7 +2722,7 @@ function render() {
   const anim = animarProx && !reduzirMovimento.matches;
   animarProx = false;
   app.classList.remove('entrar', 'entrar-lado');
-  app.innerHTML = { visao: telaVisao, lanc: telaLanc, fixos: telaFixos, orc: telaOrc, proj: telaProj, sim: telaSim, dados: telaDados, fatura: telaFatura }[aba]();
+  app.innerHTML = { visao: telaVisao, lanc: telaLanc, fixos: telaFixos, orc: telaOrc, proj: telaProj, sim: telaSim, calc: telaCalc, dados: telaDados, fatura: telaFatura }[aba]();
   desenharGraficos();
   if (anim) { void app.offsetWidth; app.classList.add(anim === 'lado' ? 'entrar-lado' : 'entrar'); contarValores(app); }
 }
@@ -2817,6 +2831,258 @@ function mostrarBusca(q) {
   const prim = box.querySelector('.br'); if (prim) prim.classList.add('sel');
 }
 // Filtro aplicado na aba Lançamentos: texto livre, uma categoria ou um cartão
+// ---------- calculadoras do trabalho (CLT): férias, 13º, salário líquido e rescisão ----------
+// Tabelas de 2026. A 1ª faixa do INSS bate com os contracheques (R$ 1.621); confira as demais quando mudarem.
+const TAB_INSS = [[1621.00, .075], [2902.84, .09], [4354.27, .12], [8475.55, .14]];
+const TAB_IR = [[2428.80, 0, 0], [2826.65, .075, 182.16], [3751.05, .15, 394.16], [4664.68, .225, 675.49], [Infinity, .275, 908.73]];
+const DEP_IR = 189.59, DESC_SIMPLIFICADO = 607.20;
+function inss(base) {
+  let v = 0, ant = 0;
+  for (const [lim, a] of TAB_INSS) { if (base > ant) v += (Math.min(base, lim) - ant) * a; ant = lim; }
+  return r2(v);
+}
+// IR na fonte: usa o mais vantajoso entre deduções (INSS + dependentes) e o desconto simplificado.
+// Redução de 2026 (Lei 15.270/2025): zera até R$ 5.000 e diminui aos poucos até R$ 7.350.
+function irrf(bruto, inssV, dep = 0) {
+  const base = r2(bruto - Math.max(inssV + dep * DEP_IR, DESC_SIMPLIFICADO));
+  if (base <= 0 || bruto <= 5000) return 0;
+  const [, a, ded] = TAB_IR.find(([lim]) => base <= lim);
+  let ir = Math.max(0, base * a - ded);
+  if (bruto <= 7350) ir = Math.max(0, ir - (978.62 - 0.133145 * bruto));
+  return r2(ir);
+}
+function antDiaUtil(iso) {
+  const d = new Date(iso + 'T12:00');
+  for (;;) {
+    const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (d.getDay() !== 0 && d.getDay() !== 6 && !feriados(d.getFullYear()).has(s)) return s;
+    d.setDate(d.getDate() - 1);
+  }
+}
+const diasNoMes = ym => +fimDoMes(ym).slice(8);
+// meses "cheios" entre duas datas: conta o mês em que trabalhou 15 dias ou mais
+function avos(ini, fim) {
+  if (!ini || fim < ini) return 0;
+  let n = 0, m = ini.slice(0, 7);
+  while (m <= fim.slice(0, 7)) {
+    const a = m === ini.slice(0, 7) ? +ini.slice(8) : 1, b = m === fim.slice(0, 7) ? +fim.slice(8) : diasNoMes(m);
+    if (b - a + 1 >= 15) n++;
+    m = addMes(m, 1);
+  }
+  return n;
+}
+
+// Pessoas (guardadas nos dados sincronizados, que são privados)
+const PESSOA_NOVA = { nome: '', bruto: 0, adicionais: 0, descontos: 0, adiant: 0, dep: 0, recebe: 'quinzenal', admissao: '', domestica: false, fixo: '' };
+const pessoas = () => S.pessoas || (S.pessoas = []);
+const baseDe = p => r2((+p.bruto || 0) + (+p.adicionais || 0));
+// Salário líquido de um mês com `dias` trabalhados (30 = mês cheio)
+function liquidoMes(p, dias = 30, extras = 0) {
+  const bruto = r2(baseDe(p) / 30 * dias + extras), i = inss(bruto), ir = irrf(bruto, i, +p.dep || 0);
+  const liq = r2(bruto - i - ir - (+p.descontos || 0));
+  return { bruto, inss: i, ir, desc: +p.descontos || 0, liq, adiant: p.recebe === 'quinzenal' ? +p.adiant || 0 : 0, saldo: r2(liq - (p.recebe === 'quinzenal' ? +p.adiant || 0 : 0)) };
+}
+// Data em que cai o salário do mês `m` (o saldo, no quinzenal)
+const pagamentoDoMes = (p, m) => p.recebe === 'quinzenal' ? dataDia(m, 30) : diaUtil(addMes(m, 1), 5);
+
+let calcAba = 'ferias', calcPessoa = null;
+const calcF = { inicio: '', dias: 30, vender: 0, media: 0, adiant13: false, avos13: '', recebi1: false, horas50: 0, horas100: 0, saida: '', motivo: 'sem', aviso: 'indenizado', vencidas: 0, fgts: '' };
+
+function calcFerias(p) {
+  const base = r2(baseDe(p) + (+calcF.media || 0)), dias = Math.max(1, Math.min(30, +calcF.dias || 30)), vend = Math.max(0, Math.min(10, +calcF.vender || 0));
+  const ferias = r2(base / 30 * dias), terco = r2(ferias / 3), abono = r2(base / 30 * vend), tercoAbono = r2(abono / 3);
+  const i = inss(ferias + terco), ir = irrf(ferias + terco, i, +p.dep || 0), d13 = calcF.adiant13 ? r2(base / 2) : 0;
+  const liquido = r2(ferias + terco + abono + tercoAbono - i - ir + d13);
+  const ini = calcF.inicio || addDia(hoje(), 30), fim = addDia(ini, dias - 1);
+  const pagamento = antDiaUtil(addDia(ini, -2));
+  // salários dos meses que as férias pegam: só os dias trabalhados
+  const normal = liquidoMes(p, 30);
+  const meses = [];
+  for (let m = ini.slice(0, 7); m <= fim.slice(0, 7); m = addMes(m, 1)) {
+    const a = m === ini.slice(0, 7) ? ini : m + '-01', b = m === fim.slice(0, 7) ? fim : fimDoMes(m);
+    const off = Math.min(30, Math.round(diasEntre(a, b)) + 1), trab = Math.max(0, 30 - off), s = liquidoMes(p, trab);
+    const valor = p.recebe === 'quinzenal' ? s.saldo : s.liq, valorNormal = p.recebe === 'quinzenal' ? normal.saldo : normal.liq;
+    meses.push({ m, trab, data: pagamentoDoMes(p, m), valor, normal: valorNormal, dif: r2(valor - valorNormal) });
+  }
+  return { base, dias, vend, ferias, terco, abono, tercoAbono, inss: i, ir, d13, liquido, ini, fim, volta: addDia(fim, 1), pagamento, meses };
+}
+function calc13(p) {
+  const base = r2(baseDe(p) + (+calcF.media || 0)), ano = hoje().slice(0, 4);
+  const autoAvos = p.admissao && p.admissao.slice(0, 4) === ano ? avos(p.admissao, ano + '-12-31') : 12;
+  const n = calcF.avos13 === '' ? autoAvos : Math.max(0, Math.min(12, +calcF.avos13));
+  const total = r2(base / 12 * n), i = inss(total), ir = irrf(total, i, +p.dep || 0), p1 = r2(total / 2);
+  return { base, n, autoAvos, total, inss: i, ir, p1, p2: r2(total - i - ir - p1), d1: antDiaUtil(ano + '-11-30'), d2: antDiaUtil(ano + '-12-20') };
+}
+function calcSalario(p) {
+  const hora = baseDe(p) / 220, extras = r2(hora * 1.5 * (+calcF.horas50 || 0) + hora * 2 * (+calcF.horas100 || 0));
+  return { hora: r2(hora), extras, ...liquidoMes(p, 30, extras) };
+}
+function calcRescisao(p) {
+  const base = baseDe(p), saida = calcF.saida || hoje(), adm = p.admissao || addMes(saida.slice(0, 7), -12) + '-01';
+  const anos = Math.floor(diasEntre(adm, saida) / 365.25);
+  const temAviso = calcF.motivo !== 'pedido' && calcF.aviso === 'indenizado';
+  const diasAviso = temAviso ? Math.min(90, 30 + 3 * anos) * (calcF.motivo === 'acordo' ? .5 : 1) : 0;
+  const projetada = addDia(saida, Math.round(diasAviso));   // o aviso indenizado conta como tempo de serviço
+  const saldoSal = r2(base / 30 * Math.min(30, +saida.slice(8))), aviso = r2(base / 30 * diasAviso);
+  const ano = projetada.slice(0, 4), ini13 = adm > ano + '-01-01' ? adm : ano + '-01-01';
+  const m13 = avos(ini13, projetada), dec = r2(base / 12 * m13);
+  // período aquisitivo atual: do último aniversário da admissão até a saída (projetada)
+  let aniv = projetada.slice(0, 4) + adm.slice(4); if (aniv > projetada) aniv = (+projetada.slice(0, 4) - 1) + adm.slice(4);
+  if (aniv < adm) aniv = adm;
+  const mFer = Math.min(12, avos(aniv, projetada)), ferProp = r2(base / 12 * mFer), ferVenc = r2(base / 30 * (+calcF.vencidas || 0));
+  const terco = r2((ferProp + ferVenc) / 3);
+  const iSal = inss(saldoSal), i13 = inss(dec);
+  const mesesFgts = Math.max(1, Math.round(diasEntre(adm, saida) / 30.4));
+  const fgts = calcF.fgts === '' ? r2(base * .08 * mesesFgts) : +calcF.fgts;
+  const multaPct = calcF.motivo === 'sem' ? .4 : calcF.motivo === 'acordo' ? .2 : 0;
+  // doméstica: a multa já é depositada todo mês (3,2%) numa conta separada
+  const multa = p.domestica ? (calcF.motivo === 'pedido' ? 0 : r2(base * .032 * mesesFgts * (calcF.motivo === 'acordo' ? .5 : 1))) : r2(fgts * multaPct);
+  const saque = calcF.motivo === 'sem' ? fgts : calcF.motivo === 'acordo' ? r2(fgts * .8) : 0;
+  const verbas = r2(saldoSal + aviso + dec + ferProp + ferVenc + terco), desc = r2(iSal + i13);
+  return { base, anos, diasAviso, projetada, saldoSal, aviso, m13, dec, mFer, ferProp, ferVenc, terco, iSal, i13, verbas, desc, liquido: r2(verbas - desc), fgts, saque, multa, mesesFgts };
+}
+
+// Lança no app: a entrada (férias ou 13º) e os salários menores nos meses das férias
+function lancarCalc(tipo) {
+  const p = pessoas().find(x => x.id === calcPessoa); if (!p) return;
+  const f = S.fixos.find(x => x.id === p.fixo);
+  const add = (data, desc, valor) => { S.lanc = S.lanc.filter(l => !(l.tipo === 'receita' && l.desc === desc)); if (valor > 0) S.lanc.push({ id: uid(), tipo: 'receita', data, desc, cat: 'Salário', valor }); };
+  let msg = [];
+  if (tipo === 'ferias') {
+    const r = calcFerias(p);
+    add(r.pagamento, `Férias ${p.nome} (${r.dias} dias + 1/3)`, r2(r.liquido - r.d13));
+    msg.push(`Férias: ${fmt.format(r2(r.liquido - r.d13))} em ${ddmm(r.pagamento)}`);
+    if (r.d13) { add(r.pagamento, `13º ${p.nome} – 1ª parcela`, r.d13); msg.push(`13º (1ª parcela): ${fmt.format(r.d13)}`); }
+    if (f) for (const x of r.meses) {
+      // dia em que esse salário cai no item fixo (o último do mês, no quinzenal; o 5º dia útil do mês seguinte, no mensal)
+      const oc = p.recebe === 'quinzenal' ? ocorrencias(f, x.m, true).slice(-1)[0] : ocorrencias(f, addMes(x.m, 1), true)[0];
+      if (!oc) continue;
+      f.ajustes = { ...(f.ajustes || {}), [oc.data]: x.valor };
+      msg.push(`Salário de ${ddmm(oc.data)} ajustado para ${fmt.format(x.valor)}`);
+    }
+  } else {
+    const r = calc13(p);
+    if (!calcF.recebi1) { add(r.d1, `13º ${p.nome} – 1ª parcela`, r.p1); msg.push(`1ª parcela: ${fmt.format(r.p1)} em ${ddmm(r.d1)}`); }
+    add(r.d2, `13º ${p.nome} – 2ª parcela`, r.p2); msg.push(`2ª parcela: ${fmt.format(r.p2)} em ${ddmm(r.d2)}`);
+  }
+  salvar();
+  alert('Lançado na previsão:\n' + msg.join('\n') + (tipo === 'ferias' && !f ? '\n\n(Escolha o item fixo do salário em "Pessoas" para o app ajustar os salários dos meses das férias.)' : ''));
+}
+
+function resultadoCalc() {
+  const p = pessoas().find(x => x.id === calcPessoa);
+  if (!p) return '<div class="empty">Cadastre uma pessoa abaixo para começar.</div>';
+  const L = (t, v, cls = '', dica = '') => `<div class="cl"><span${dica ? ` title="${esc(dica)}"` : ''}>${t}</span><b class="${cls}">${v}</b></div>`;
+  const R = v => fmt.format(v), menos = v => '− ' + fmt.format(v);
+  if (calcAba === 'ferias') {
+    const r = calcFerias(p);
+    return `<div class="calc-res">
+      <div class="calc-big"><small>Você recebe até ${ddmm(r.pagamento)}</small><b>${R(r.liquido)}</b><span>férias de ${ddmm(r.ini)} a ${ddmm(r.fim)} · volta em ${ddmm(r.volta)}</span></div>
+      <div class="cl-grupo">
+        ${L(`Férias (${r.dias} dias)`, R(r.ferias))}${L('+ 1/3 constitucional', R(r.terco))}
+        ${r.vend ? L(`Abono: ${r.vend} dias vendidos + 1/3`, R(r2(r.abono + r.tercoAbono)), '', 'Sem INSS e sem IR') : ''}
+        ${L('INSS', menos(r.inss), 'neg')}${L('IR', r.ir ? menos(r.ir) : 'isento', r.ir ? 'neg' : '')}
+        ${r.d13 ? L('+ 1ª parcela do 13º (adiantada)', R(r.d13)) : ''}
+        ${L('Líquido', R(r.liquido), 'tot')}
+      </div>
+      <h3>Salários dos meses das férias</h3>
+      <p class="hint" style="margin:0 0 8px">O dinheiro das férias é adiantado: nos meses em que elas acontecem, o salário vem só pelos dias trabalhados.</p>
+      <div class="tbl-wrap"><table><thead><tr><th>Mês</th><th>Dias trabalhados</th><th>Cai em</th><th class="num">Estimado</th><th class="num">Normal</th><th class="num">Diferença</th></tr></thead><tbody>
+        ${r.meses.map(x => `<tr><td>${nomeMes(x.m)}</td><td>${x.trab}</td><td>${ddmm(x.data)}</td><td class="num"><b>${R(x.valor)}</b></td><td class="num">${R(x.normal)}</td><td class="num neg">${R(x.dif)}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="hint">No total: ${R(r.liquido)} agora e ${R(-r.meses.reduce((a, x) => a + x.dif, 0))} a menos nos salários seguintes. Pagamento até 2 dias antes do início (art. 145 da CLT).</p>
+      <div class="row" style="margin-top:12px"><button class="btn primary" data-lancar-calc="ferias">Lançar na previsão</button></div>
+    </div>`;
+  }
+  if (calcAba === '13') {
+    const r = calc13(p);
+    return `<div class="calc-res">
+      <div class="calc-big"><small>13º de ${hoje().slice(0, 4)} · ${r.n}/12 avos</small><b>${R(r2(r.total - r.inss - r.ir))}</b><span>líquido no total</span></div>
+      <div class="cl-grupo">
+        ${L(`13º bruto (${r.n} meses)`, R(r.total))}
+        ${L(`1ª parcela, até ${ddmm(r.d1)}`, calcF.recebi1 ? `${R(r.p1)} <small>(já recebida)</small>` : R(r.p1), '', 'Metade do bruto, sem descontos')}
+        ${L('INSS (sobre o 13º inteiro)', menos(r.inss), 'neg')}${L('IR (exclusivo)', r.ir ? menos(r.ir) : 'isento', r.ir ? 'neg' : '')}
+        ${L(`2ª parcela, até ${ddmm(r.d2)}`, R(r.p2), 'tot')}
+      </div>
+      <p class="hint">Conta 1/12 por mês em que trabalhou 15 dias ou mais${p.admissao ? ` (desde a admissão: ${r.autoAvos}/12)` : ''}. Se pegou o adiantamento do 13º nas férias ou no início do ano, marque "já recebi a 1ª parcela".</p>
+      <div class="row" style="margin-top:12px"><button class="btn primary" data-lancar-calc="13">Lançar na previsão</button></div>
+    </div>`;
+  }
+  if (calcAba === 'salario') {
+    const r = calcSalario(p);
+    return `<div class="calc-res">
+      <div class="calc-big"><small>Salário líquido no mês</small><b>${R(r.liq)}</b><span>${r.adiant ? `${R(r.adiant)} no dia 15 + ${R(r.saldo)} no dia 30` : p.recebe === 'quinzenal' ? 'no dia 30' : 'no 5º dia útil do mês seguinte'}</span></div>
+      <div class="cl-grupo">
+        ${L('Salário + adicionais', R(baseDe(p)))}${r.extras ? L('+ Horas extras', R(r.extras), '', `Hora normal: ${R(r.hora)} (salário ÷ 220)`) : ''}
+        ${L('INSS', menos(r.inss), 'neg')}${L('IR', r.ir ? menos(r.ir) : 'isento', r.ir ? 'neg' : '')}
+        ${r.desc ? L('Outros descontos (VR, VT, plano…)', menos(r.desc), 'neg') : ''}
+        ${L('Líquido', R(r.liq), 'tot')}
+      </div>
+      <p class="hint">INSS progressivo de 2026 e IR com a isenção até R$ 5.000. Use para conferir o contracheque ou ver quanto horas extras rendem.</p>
+    </div>`;
+  }
+  const r = calcRescisao(p);
+  return `<div class="calc-res">
+    <div class="calc-big"><small>Rescisão estimada</small><b>${R(r.liquido)}</b><span>${r.saque || r.multa ? `+ FGTS: ${R(r2(r.saque + r.multa))} para sacar` : 'sem saque do FGTS'}</span></div>
+    <div class="cl-grupo">
+      ${L(`Saldo de salário (${Math.min(30, +(calcF.saida || hoje()).slice(8))} dias)`, R(r.saldoSal))}
+      ${r.aviso ? L(`Aviso prévio indenizado (${Math.round(r.diasAviso)} dias)`, R(r.aviso), '', '30 dias + 3 por ano completo, até 90') : ''}
+      ${L(`13º proporcional (${r.m13}/12)`, R(r.dec))}
+      ${L(`Férias proporcionais (${r.mFer}/12)`, R(r.ferProp))}${r.ferVenc ? L('Férias vencidas', R(r.ferVenc)) : ''}
+      ${L('+ 1/3 das férias', R(r.terco))}
+      ${L('INSS (salário e 13º)', menos(r.desc), 'neg')}
+      ${L('Líquido da rescisão', R(r.liquido), 'tot')}
+    </div>
+    <div class="cl-grupo">
+      ${L(`FGTS ${calcF.fgts === '' ? `(estimado: 8% × ${r.mesesFgts} meses)` : '(informado)'}`, R(r.fgts))}
+      ${L(p.domestica ? 'Indenização compensatória (3,2% ao mês)' : `Multa de ${calcF.motivo === 'sem' ? 40 : calcF.motivo === 'acordo' ? 20 : 0}%`, R(r.multa))}
+      ${L('Saque do FGTS', R(r.saque))}
+    </div>
+    <p class="hint">Estimativa. ${calcF.motivo === 'sem' ? 'Sem justa causa também dá direito ao seguro-desemprego, se cumprir os requisitos. ' : ''}${calcF.motivo === 'pedido' ? 'No pedido de demissão não há aviso indenizado nem saque do FGTS (o aviso não cumprido pode ser descontado). ' : ''}Para o valor exato do FGTS, veja o app FGTS.</p>
+  </div>`;
+}
+
+function telaCalc() {
+  const ps = pessoas();
+  if (!ps.some(p => p.id === calcPessoa)) calcPessoa = ps[0] ? ps[0].id : null;
+  const p = ps.find(x => x.id === calcPessoa);
+  const campo = (nome, rotulo, extra = '', tipo = 'text') => `<label>${rotulo}<input data-calc="${nome}" type="${tipo}" ${tipo === 'checkbox' ? (calcF[nome] ? 'checked' : '') : `value="${esc(calcF[nome])}"`} ${extra}></label>`;
+  const forms = {
+    ferias: `${campo('inicio', 'Início das férias', '', 'date')}${campo('dias', 'Dias de descanso', 'inputmode="numeric"')}${campo('vender', 'Dias vendidos (abono)', 'inputmode="numeric" placeholder="0 a 10"')}
+      ${campo('media', 'Média de horas extras/comissões (R$)', 'inputmode="decimal" placeholder="0"')}<label class="chk" style="flex:1 1 220px;flex-direction:row"><input type="checkbox" data-calc="adiant13" ${calcF.adiant13 ? 'checked' : ''}> Adiantar a 1ª parcela do 13º</label>`,
+    13: `${campo('avos13', 'Meses trabalhados no ano', 'inputmode="numeric" placeholder="automático"')}${campo('media', 'Média de variáveis (R$)', 'inputmode="decimal" placeholder="0"')}
+      <label class="chk" style="flex:1 1 220px;flex-direction:row"><input type="checkbox" data-calc="recebi1" ${calcF.recebi1 ? 'checked' : ''}> Já recebi a 1ª parcela</label>`,
+    salario: `${campo('horas50', 'Horas extras 50%', 'inputmode="decimal" placeholder="0"')}${campo('horas100', 'Horas extras 100%', 'inputmode="decimal" placeholder="0"')}`,
+    rescisao: `${campo('saida', 'Data de saída', '', 'date')}
+      <label>Motivo<select data-calc="motivo">${[['sem', 'Demissão sem justa causa'], ['pedido', 'Pedido de demissão'], ['acordo', 'Acordo (art. 484-A)']].map(([v, t]) => `<option value="${v}" ${calcF.motivo === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>Aviso prévio<select data-calc="aviso">${[['indenizado', 'Indenizado'], ['trabalhado', 'Trabalhado']].map(([v, t]) => `<option value="${v}" ${calcF.aviso === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      ${campo('vencidas', 'Dias de férias vencidas', 'inputmode="numeric" placeholder="0"')}${campo('fgts', 'Saldo do FGTS (R$)', 'inputmode="decimal" placeholder="estimar"')}`,
+  };
+  return `<div class="card"><h2>${ico('calc')} Calculadoras do trabalho <span class="sub">· CLT, tabelas de 2026</span></h2>
+    <div class="seg" style="margin-bottom:14px">${[['ferias', 'Férias'], ['13', '13º salário'], ['salario', 'Salário líquido'], ['rescisao', 'Rescisão']].map(([v, t]) => `<button class="${calcAba === v ? 'on' : ''}" data-calc-aba="${v}">${t}</button>`).join('')}</div>
+    <div class="chips" style="margin-bottom:12px">${ps.map(x => `<button class="chip ${x.id === calcPessoa ? 'on' : ''}" data-calc-pessoa="${x.id}">${esc(x.nome || 'sem nome')}</button>`).join('')}</div>
+    ${p ? `<div class="row">${forms[calcAba]}</div>` : ''}
+    <div id="calc-res" style="margin-top:16px">${resultadoCalc()}</div>
+  </div>
+  <div class="card"><h2>${ico('lista')} Pessoas <span class="sub">· dados do contracheque, usados nas contas</span></h2>
+    ${ps.map(x => `<div class="pessoa"><div class="row">
+      <label>Nome<input data-pessoa="${x.id}|nome" value="${esc(x.nome)}"></label>
+      <label>Salário bruto (R$)<input data-pessoa="${x.id}|bruto" inputmode="decimal" value="${String(x.bruto || '').replace('.', ',')}"></label>
+      <label title="Anuênio, adicional noturno, insalubridade… o que vem todo mês">Adicionais fixos (R$)<input data-pessoa="${x.id}|adicionais" inputmode="decimal" value="${String(x.adicionais || '').replace('.', ',')}"></label>
+      <label title="VR, VT, plano de saúde, coparticipação…">Outros descontos/mês (R$)<input data-pessoa="${x.id}|descontos" inputmode="decimal" value="${String(x.descontos || '').replace('.', ',')}"></label>
+      <label>Como recebe<select data-pessoa="${x.id}|recebe"><option value="quinzenal" ${x.recebe === 'quinzenal' ? 'selected' : ''}>Dia 15 (adiantamento) e 30</option><option value="5util" ${x.recebe === '5util' ? 'selected' : ''}>5º dia útil do mês seguinte</option></select></label>
+      ${x.recebe === 'quinzenal' ? `<label>Adiantamento do dia 15 (R$)<input data-pessoa="${x.id}|adiant" inputmode="decimal" value="${String(x.adiant || '').replace('.', ',')}"></label>` : ''}
+      <label>Dependentes (IR)<input data-pessoa="${x.id}|dep" inputmode="numeric" value="${x.dep || 0}"></label>
+      <label>Admissão<input type="date" data-pessoa="${x.id}|admissao" value="${x.admissao || ''}"></label>
+      <label>Salário no app (item fixo)<select data-pessoa="${x.id}|fixo"><option value="">—</option>${S.fixos.filter(f => f.tipo === 'receita').map(f => `<option value="${f.id}" ${x.fixo === f.id ? 'selected' : ''}>${esc(f.desc)}</option>`).join('')}</select></label>
+      <label class="chk" style="flex:0 1 200px;flex-direction:row"><input type="checkbox" data-pessoa="${x.id}|domestica" ${x.domestica ? 'checked' : ''}> Empregada doméstica</label>
+      <button class="link" data-del-pessoa="${x.id}" title="Remover">✕</button>
+    </div></div>`).join('')}
+    <button class="btn" data-nova-pessoa>+ Adicionar pessoa</button>
+    <p class="hint">Fica nos seus dados sincronizados (repositório privado). "Salário no app" liga a pessoa ao item fixo do salário, para o botão "Lançar na previsão" ajustar os meses das férias.</p>
+  </div>`;
+}
+
 let filtroBusca = null;
 
 // ---------- linha do tempo: dia a dia, o que entra e sai e o saldo depois de cada dia ----------
@@ -3145,6 +3411,11 @@ document.addEventListener('click', e => {
     return;
   }
   if (d.tl) { tlDias = +d.tl; render(); return; }
+  if (d.calcAba) { calcAba = d.calcAba; render(); return; }
+  if (d.calcPessoa) { calcPessoa = d.calcPessoa; render(); return; }
+  if (d.lancarCalc) { if (confirm('Lançar estes valores na previsão? (substitui um lançamento igual feito antes)')) lancarCalc(d.lancarCalc); return; }
+  if (e.target.closest('[data-nova-pessoa]')) { const id = uid(); pessoas().push({ id, ...PESSOA_NOVA, nome: 'Nova pessoa' }); calcPessoa = id; salvar(); return; }
+  if (d.delPessoa) { if (confirm('Remover esta pessoa das calculadoras?')) { S.pessoas = pessoas().filter(x => x.id !== d.delPessoa); salvar(); } return; }
   if (d.fatPaga) { S.faturasPagas = { ...(S.faturasPagas || {}), [d.fatPaga]: true }; salvar(); return; }
   if (d.desajustar) {
     const [id, data] = d.desajustar.split('|'), f = S.fixos.find(x => x.id === id);
@@ -3221,6 +3492,11 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.pessoa) {
+    const [id, campo] = e.target.dataset.pessoa.split('|'), x = pessoas().find(q => q.id === id);
+    if (x) { x[campo] = e.target.type === 'checkbox' ? e.target.checked : ['bruto', 'adicionais', 'descontos', 'adiant'].includes(campo) ? num(e.target.value) || 0 : campo === 'dep' ? +e.target.value || 0 : e.target.value; salvar(); }
+    return;
+  }
   if (e.target.dataset && e.target.dataset.simOn) { const it = SIM.find(x => x.id === e.target.dataset.simOn); it.on = e.target.checked; gravarSim(); render(); return; }
   const form = e.target.form;
   if (form && (form.id === 'f-sim' || form.id === 'f-lanc')) {
@@ -3277,6 +3553,11 @@ document.addEventListener('change', e => {
   }
 });
 document.addEventListener('input', e => {
+  if (e.target.dataset && e.target.dataset.calc) {
+    calcF[e.target.dataset.calc] = e.target.type === 'checkbox' ? e.target.checked : e.target.value.replace(',', '.');
+    document.getElementById('calc-res').innerHTML = resultadoCalc();
+    return;
+  }
   if (e.target.id === 'transp') { try { localStorage.setItem(FUNDO_KEY, JSON.stringify({ ...lerFundo(), transp: +e.target.value })); } catch (err) {} aplicarFundo(); return; }
   const fe = e.target.form;
   if (fe && fe.id === 'f-edit') document.getElementById('edit-parte').textContent = fmt.format(fe.parteValor.value.trim() ? num(fe.parteValor.value) : r2(num(fe.valor.value) * +fe.parte.value)); if (e.target.id === 'ajuste') document.getElementById('aj-lbl').textContent = (e.target.value > 0 ? '+' : '') + e.target.value + '%'; });
