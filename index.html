@@ -665,7 +665,7 @@ const ICONES = {
 const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONES[n]}</svg>`;
 // [id, nome, ícone, nome curto da barra do celular]
 const ABAS = [['visao', 'Visão geral', 'home', 'Início'], ['lanc', 'Lançamentos', 'lista', 'Lançar'], ['fixos', 'Fixos', 'repete', 'Fixos'],
-  ['orc', 'Orçamento', 'alvo', 'Limites'], ['proj', 'Projeção', 'grafico', 'Projeção'], ['sim', 'Simular', 'frasco', 'Simular'], ['fatura', 'Importar fatura', 'envia', 'Fatura'], ['dados', 'Dados', 'dados', 'Dados']];
+  ['orc', 'Orçamento', 'alvo', 'Limites'], ['proj', 'Previsão', 'grafico', 'Previsão'], ['sim', 'Simular', 'frasco', 'Simular'], ['fatura', 'Importar fatura', 'envia', 'Fatura'], ['dados', 'Dados', 'dados', 'Dados']];
 
 // Cartões: cada lançamento pode ter um cartão (importados da fatura já vêm com o banco).
 // Sem cartão = Pix, débito ou dinheiro.
@@ -895,7 +895,7 @@ function totais(itens) {
 // Média mensal de compras novas (sem parcelas) dos últimos 3 meses com dados.
 // `filtro` escolhe os lançamentos: os de um cartão ou os sem cartão (Pix/débito).
 function mediaCompras(filtro) {
-  const ls = S.lanc.filter(l => l.tipo === 'despesa' && !l.parcela && !l.agregado && !l.prevista && l.data <= hoje() && filtro(l));
+  const ls = S.lanc.filter(l => l.tipo === 'despesa' && !l.parcela && !l.agregado && !l.prevista && !l.fixoRef && l.data <= hoje() && filtro(l));
   const meses = [];
   for (let i = 1; i <= 3; i++) { const m = addMes(mesAtual(), -i); if (ls.some(l => l.data.slice(0, 7) === m)) meses.push(m); }
   if (!meses.length) return 0;
@@ -1032,7 +1032,7 @@ function barrasHistorico(el, meses) {
   const W = el.clientWidth || 600, H = 220, P = { l: 64, r: 8, t: 8, b: 26 };
   // com um cartão selecionado, mostra só os gastos dele (uma série, na cor do cartão)
   const soGastos = cartaoSel !== null;
-  const dados = meses.map(m => ({ m, ...totais(filtraCartao(itensDoMes(m))) }));
+  const dados = meses.map(m => ({ m, ...totais(filtraCartao(itensReais(m))) }));
   if (soGastos) dados.forEach(d => d.r = 0);
   const ticks = niceTicks(0, Math.max(1, ...dados.flatMap(d => [d.r, d.d])));
   const y1 = ticks[ticks.length - 1];
@@ -1077,18 +1077,54 @@ function catsUsadas() {
   return [...set];
 }
 
+// ---------- dados reais: o que já aconteceu ----------
+// Vezes em que um item fixo entra ou sai no mês `m`, com o valor de cada uma
+function ocorrencias(f, m) {
+  if (!fixoAtivo(f, m)) return [];
+  const fr = fracoesAgenda(f);
+  return [...(f.uteis || []).map(n => [diaUtil(m, n), fr['u' + n]]), ...(f.dias || []).map(d => [dataDia(m, d), fr['d' + d]])]
+    .filter(([d, p]) => d && p > 0).map(([data, p]) => ({ data, valor: r2(f.valor * p) }));
+}
+// Número da parcela (n de N) de um lançamento parcelado, ou null
+function parcelaDe(l) {
+  if (l.compra && l.compra.N > 1) return { n: l.compra.n, N: l.compra.N };
+  const k = l.key && l.key.split('|');
+  return k && k.length === 5 && +k[3] > 1 ? { n: +k[4], N: +k[3] } : null;
+}
+// O que de fato aconteceu no mês (até hoje, no mês atual): receitas e contas fixas cujo dia já passou
+// (ou que já foram pagas), Pix/débito e compras no cartão pela data da compra. Compra parcelada conta
+// inteira no mês em que foi feita; as parcelas seguintes de compras antigas não são gasto novo.
+function itensReais(m) {
+  if (m > mesAtual()) return [];
+  const ate = m === mesAtual() ? hoje() : fimDoMes(m), out = [];
+  for (const f of S.fixos) for (const o of ocorrencias(f, m))
+    if (o.data <= ate || pagoAntes(f, o.data)) out.push({ ...f, fixo: true, data: o.data, valor: o.valor, quando: o.data > ate ? hoje() : o.data });
+  for (const l of S.lanc) {
+    if (l.prevista) continue;
+    const dc = dataDaCompra(l);
+    if (dc.slice(0, 7) !== m || dc > ate) continue;
+    const pc = parcelaDe(l);
+    if (pc && pc.n > 1) continue;
+    out.push(pc ? { ...l, valor: r2(l.valor * pc.N), parcInfo: pc, quando: dc } : { ...l, quando: dc });
+  }
+  return out;
+}
+// Mesmo período do mês anterior (até o mesmo dia), para comparar com o mês atual ainda em andamento
+const reaisAteODia = (m, dia) => itensReais(m).filter(i => i.quando.slice(8) <= dia);
+
 function telaVisao() {
-  const todos = itensDoMes(mesSel), itens = filtraCartao(todos), t = totais(itens);
+  const atual = mesSel === mesAtual();
+  const todos = itensReais(mesSel), itens = filtraCartao(todos), t = totais(itens);
   const desp = itens.filter(i => i.tipo === 'despesa');
   const porCat = {};
   desp.forEach(i => porCat[i.cat] = (porCat[i.cat] || 0) + i.valor);
   if (cartaoSel === null) Object.keys(S.orc).forEach(c => { if (S.orc[c] > 0 && !(c in porCat)) porCat[c] = 0; });
   const cats = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
-  // mês anterior, para comparar
-  // (só compara quando o mês anterior tem receitas: antes disso o histórico está incompleto)
-  const mesAnt = addMes(mesSel, -1), todosAnt = itensDoMes(mesAnt), tAnt = totais(filtraCartao(todosAnt));
+  // mês anterior até o mesmo dia (só compara quando ele tem receitas: antes disso o histórico está incompleto)
+  const mesAnt = addMes(mesSel, -1), todosAnt = atual ? reaisAteODia(mesAnt, hoje().slice(8)) : itensReais(mesAnt), tAnt = totais(filtraCartao(todosAnt));
+  const comparaAnt = totais(itensReais(mesAnt)).r > 0;
   const porCatAnt = {};
-  if (totais(todosAnt).r > 0) filtraCartao(todosAnt).filter(i => i.tipo === 'despesa').forEach(i => porCatAnt[i.cat] = (porCatAnt[i.cat] || 0) + i.valor);
+  if (comparaAnt) filtraCartao(todosAnt).filter(i => i.tipo === 'despesa').forEach(i => porCatAnt[i.cat] = (porCatAnt[i.cat] || 0) + i.valor);
   const maxG = Math.max(1, ...cats.map(([c, v]) => Math.max(v, cartaoSel === null ? S.orc[c] || 0 : 0)));
   const orcTotal = Object.values(S.orc).reduce((a, b) => a + (b || 0), 0);
   const gastoOrcado = Object.keys(S.orc).reduce((a, c) => a + (porCat[c] || 0), 0);
@@ -1099,62 +1135,52 @@ function telaVisao() {
     else if (lim && pct >= 0.8) st = `<span class="status warn">● ${Math.round(pct * 100)}% usado</span>`;
     return `<div class="cat-row"><div class="name">${esc(c)}</div>
       <div class="track"><div class="fill" style="width:${(v / maxG) * 100}%;${cartaoSel !== null ? `background:${corCartao(cartaoSel)}` : ''}"></div>${lim ? `<div class="limit" style="left:${(lim / maxG) * 100}%" title="Limite ${fmt.format(lim)}"></div>` : ''}</div>
-      <div class="amt">${fmt.format(v)}${lim ? ' de ' + fmt.format(lim) : ''}${porCatAnt[c] > 0 && v > 0 && Math.abs(v / porCatAnt[c] - 1) >= 0.05 ? `<span class="dl ${v > porCatAnt[c] ? 'ruim' : 'bom'}" title="${nomeMes(mesAnt)}: ${fmt.format(porCatAnt[c])}">${v > porCatAnt[c] ? '▲' : '▼'}${Math.round(Math.abs(v / porCatAnt[c] - 1) * 100)}%</span>` : ''} ${st}</div></div>`;
+      <div class="amt">${fmt.format(v)}${lim ? ' de ' + fmt.format(lim) : ''}${porCatAnt[c] > 0 && v > 0 && Math.abs(v / porCatAnt[c] - 1) >= 0.05 ? `<span class="dl ${v > porCatAnt[c] ? 'ruim' : 'bom'}" title="${nomeMes(mesAnt)}${atual ? ' até o mesmo dia' : ''}: ${fmt.format(porCatAnt[c])}">${v > porCatAnt[c] ? '▲' : '▼'}${Math.round(Math.abs(v / porCatAnt[c] - 1) * 100)}%</span>` : ''} ${st}</div></div>`;
   }).join('');
 
-  // gastos do mês por cartão (só aparece quando há algum cartão)
+  // cartões: no mês atual, as faturas como estão agora no banco (fechada a pagar e aberta até hoje);
+  // nos outros meses, quanto se comprou em cada um
+  const faturasAgora = atual && cartaoSel === null ? cartoesUsados().filter(c => melhorDia(c) && diaVencimento(c)).map(c => {
+    const aberta = fechamentoDaCompra(c, hoje()), fechada = fechamentoAnterior(c, aberta), vf = vencimentoDe(c, fechada);
+    return { c, aberta, vAberta: valorFatura(c, aberta), vencAberta: vencimentoDe(c, aberta), maeA: parteOutros(c, aberta),
+      fechada: vf >= hoje() ? fechada : null, vFechada: vf >= hoje() ? valorFatura(c, fechada) : 0, vencFechada: vf, maeF: vf >= hoje() ? parteOutros(c, fechada) : 0 };
+  }) : null;
   const porCartao = {};
-  todos.filter(i => i.tipo === 'despesa').forEach(i => {
-    const c = grupoCartao(i);
-    porCartao[c] = porCartao[c] || { v: 0, n: 0 };
-    porCartao[c].v += i.valor; porCartao[c].n++;
-  });
+  todos.filter(i => i.tipo === 'despesa').forEach(i => { const c = grupoCartao(i); porCartao[c] = porCartao[c] || { v: 0, n: 0 }; porCartao[c].v += i.valor; porCartao[c].n++; });
   const listaCartoes = Object.entries(porCartao).sort((a, b) => b[1].v - a[1].v);
   const maxCartao = Math.max(1, ...listaCartoes.map(([, x]) => x.v));
-  const cardCartoes = cartoesUsados().length ? `
-    <div class="card"><h2>${ico('cartao')} Por cartão <span class="sub">· sua parte em ${nomeMes(mesSel)}</span></h2>
-      ${listaCartoes.map(([c, x]) => `<div class="cartao-row" data-cartao="${esc(c)}" style="--c:${corCartao(c)}">
+  const linhaCartao = (c, valor, sub) => `<div class="cartao-row" data-cartao="${esc(c)}" style="--c:${corCartao(c)}">
         <div class="cartao-ico">${ico(c === FIXAS ? 'repete' : c ? 'cartao' : 'pix')}</div>
-        <div><div class="nome">${esc(nomeCartao(c))}</div><div class="mini"><i style="width:${x.v / maxCartao * 100}%"></i></div></div>
-        <div class="amt">${fmt.format(x.v)}<small>${x.n} ${x.n === 1 ? 'item' : 'itens'}${(() => { const o = c && diaVencimento(c) ? r2(faturasQueVencem(c, mesSel).reduce((a, f) => a + parteOutros(c, f), 0)) : 0; return o ? ` · ${NOME_OUTRO} ${fmt.format(o)}` : ''; })()}</small></div></div>`).join('') || '<div class="empty">Nenhuma despesa neste mês.</div>'}
+        <div><div class="nome">${esc(nomeCartao(c))}</div>${sub}</div>${valor}</div>`;
+  const cardCartoes = faturasAgora && faturasAgora.length ? `
+    <div class="card"><h2>${ico('cartao')} Faturas agora <span class="sub">· sua parte, sem estimativas</span></h2>
+      ${faturasAgora.map(x => linhaCartao(x.c, `<div class="amt">${fmt.format(r2(x.vFechada + x.vAberta))}<small>${x.maeF + x.maeA >= 0.01 ? `${NOME_OUTRO} ${fmt.format(r2(x.maeF + x.maeA))}` : 'no total'}</small></div>`,
+        `${x.fechada ? `<div class="hint" style="margin:2px 0 0">Fechada: <b>${fmt.format(x.vFechada)}</b> · vence ${ddmm(x.vencFechada)}</div>` : ''}<div class="hint" style="margin:2px 0 0">Aberta: <b>${fmt.format(x.vAberta)}</b> até hoje · fecha ${ddmm(x.aberta)}, vence ${ddmm(x.vencAberta)}</div>`)).join('')}
+      <p class="hint">A fatura aberta soma as parcelas que caem nela e as compras já feitas. O quanto ela ainda pode crescer fica na aba Previsão.</p>
+    </div>` : cartoesUsados().length ? `
+    <div class="card"><h2>${ico('cartao')} Por cartão <span class="sub">· sua parte em ${nomeMes(mesSel)}</span></h2>
+      ${listaCartoes.map(([c, x]) => linhaCartao(c, `<div class="amt">${fmt.format(x.v)}<small>${x.n} ${x.n === 1 ? 'item' : 'itens'}</small></div>`, `<div class="mini"><i style="width:${x.v / maxCartao * 100}%"></i></div>`)).join('') || '<div class="empty">Nenhuma despesa neste mês.</div>'}
       <p class="hint">Toque num cartão para ver só os gastos dele.</p>
     </div>` : '';
 
-  // no mês atual: o que ainda vai entrar/sair daqui até o fim do mês
-  const resto = mesSel === mesAtual() ? eventos(hoje(), fimDoMes(mesSel)) : null;
-  const faltaEntrar = resto ? r2(resto.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0)) : 0;
-  const faltaSair = resto ? r2(-resto.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0)) : 0;
-  const quando = sinal => resto.filter(e => sinal * e.valor > 0).map(e => e.data.slice(8) + '/' + e.data.slice(5, 7)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 3).join(', ');
-  // mês atual: dinheiro na conta no fim do mês (saldo de hoje + o que ainda entra − o que ainda sai);
-  // meses seguintes: o saldo previsto pela projeção; meses passados: só o resultado do mês
-  const proj = cartaoSel === null && mesSel >= mesAtual() ? projecao() : null;
-  const linhaProj = proj && proj.linhas.find(l => l.m === mesSel);
-  const contaFim = linhaProj ? linhaProj.saldo : null;
+  const dias = S.saldoData ? Math.round((new Date(hoje()) - new Date(S.saldoData)) / 864e5) : null;
   const hero = cartaoSel === null ? `
   <div class="hero">
     <div class="hero-ico">${ico('carteira')}</div>
-    ${contaFim !== null ? `<div class="lbl">Na conta no fim de ${nomeMes(mesSel)}${mesSel > mesAtual() ? ' (previsto)' : ''}</div>
-    <div class="big">${fmt.format(contaFim)}</div>
+    ${atual ? `<div class="lbl">Saldo na conta${dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}</div>
+    <div class="big">${fmt.format(S.saldoAtual)}</div>` : `<div class="lbl">Resultado de ${nomeMes(mesSel)}</div>
+    <div class="big">${fmt.format(t.saldo)}</div>`}
     <div class="stats">
-      ${resto ? `<div class="stat" style="--c:var(--accent)">${ico('carteira')}<div><small>Saldo hoje</small><b>${fmt.format(S.saldoAtual)}</b></div></div>
-      <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Ainda vai entrar${faltaEntrar ? ' · ' + quando(1) : ''}</small><b>${fmt.format(faltaEntrar)}</b></div></div>
-      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Ainda vai sair${faltaSair ? ' · ' + quando(-1) : ''}</small><b>${fmt.format(faltaSair)}</b></div></div>`
-      : `<div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Entra no mês</small><b>${fmt.format(linhaProj.r)}</b></div></div>
-      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Sai no mês (faturas pelo vencimento)</small><b>${fmt.format(linhaProj.d)}</b></div></div>`}
+      <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Entrou ${atual ? 'até hoje' : 'no mês'}</small><b>${fmt.format(t.r)}</b></div></div>
+      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Gastei ${atual ? 'até hoje' : 'no mês'}</small><b>${fmt.format(t.d)}</b></div></div>
+      ${atual ? `<div class="stat" style="--c:var(--accent)">${ico('grafico')}<div><small>Resultado até hoje</small><b class="${t.saldo < 0 ? 'neg' : ''}">${fmt.format(t.saldo)}</b></div></div>` : ''}
     </div>
-    <div class="orc" title="Receitas do mês menos os gastos do mês; compras no cartão contam no mês em que a fatura vence">Resultado do mês: receitas ${fmt.format(t.r)} − gastos ${fmt.format(t.d)} = <b>${fmt.format(t.saldo)}</b>
-      <span style="color:var(--muted)">· cartão no mês do vencimento</span></div>`
-    : `<div class="lbl">Resultado de ${nomeMes(mesSel)}</div>
-    <div class="big">${fmt.format(t.saldo)}</div>
-    <div class="stats">
-      <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Receitas</small><b>${fmt.format(t.r)}</b></div></div>
-      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Gastos (cartão no mês do vencimento)</small><b>${fmt.format(t.d)}</b></div></div>
-    </div>`}
+    ${atual ? `<div style="margin-top:16px">${campoSaldo()}</div>` : ''}
     ${orcTotal ? `<div class="orc">Orçamento: ${fmt.format(gastoOrcado)} de ${fmt.format(orcTotal)} (${Math.round(gastoOrcado / orcTotal * 100)}%)${gastoOrcado > orcTotal ? ' · ▲ acima do limite' : ''}
       <div class="bar"><i style="width:${Math.min(100, gastoOrcado / orcTotal * 100)}%"></i></div></div>` : ''}
   </div>` : `
   <div class="hero cor" style="background:linear-gradient(135deg, ${corCartao(cartaoSel)} 0%, color-mix(in srgb, ${corCartao(cartaoSel)} 55%, #1b1530) 100%)">
-    <div class="lbl">${esc(nomeCartao(cartaoSel))} · ${nomeMes(mesSel)}</div>
+    <div class="lbl">${esc(nomeCartao(cartaoSel))} · gasto em ${nomeMes(mesSel)}${atual ? ' até hoje' : ''}</div>
     <div class="big">${fmt.format(t.d)}</div>
     <div class="stats">
       <div class="stat">${ico('lista')}<div><small>Lançamentos</small><b>${desp.length}</b></div></div>
@@ -1163,41 +1189,38 @@ function telaVisao() {
     </div>
   </div>`;
 
-  const cardCats = `<div class="card"><h2>${ico('pizza')} Gastos por categoria</h2>
+  const cardCats = `<div class="card"><h2>${ico('pizza')} Onde o dinheiro foi <span class="sub">· ${nomeMes(mesSel)}${atual ? ' até hoje' : ''}</span></h2>
       ${rosca(cats)}
-      ${rows || '<div class="empty">Nenhuma despesa neste mês.</div>'}
+      ${rows || '<div class="empty">Nenhum gasto neste mês ainda.</div>'}
       ${cartaoSel !== null ? '' : Object.keys(S.orc).length ? '<p class="hint">A linha vertical marca o limite do orçamento.</p>' : '<p class="hint">Defina limites na aba Orçamento para acompanhar cada categoria.</p>'}
     </div>`;
-  const cardHist = `<div class="card"><h2>${ico('grafico')} Últimos 6 meses ${cartaoSel !== null ? `<span class="sub">· gastos no ${esc(nomeCartao(cartaoSel))}</span>` : ''}</h2><div class="chart" id="hist"></div></div>`;
-  // mês atual: quanto dá para gastar sem a conta ficar negativa
-  const lv = cartaoSel === null && mesSel === mesAtual() ? livreParaGastar() : null;
-  const cardLivre = lv ? `<div class="card livre ${lv.valor < 0 ? 'aperto' : ''}" title="Menor saldo previsto nos próximos 45 dias, já descontando contas fixas, faturas (com a estimativa de compras no cartão) e somando salários. É o que sobra para Pix/débito e compras fora do previsto.">
-      <h2>${ico('alvo')} ${lv.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</h2>
-      <div class="big">${fmt.format(Math.abs(lv.valor))}</div>
-      <p class="hint" style="margin-top:4px">${lv.valor < 0 ? `a conta fica negativa em ${ddmm(lv.ate)}` : lv.apertado ? `sem deixar a conta negativa até ${ddmm(lv.ate)}, o dia mais apertado` : `até a próxima entrada, em ${ddmm(lv.ate)}`}</p>
-      ${lv.valor > 0 ? `<div class="pill">≈ ${fmt.format(lv.porDia)} por dia · ${lv.dias} ${lv.dias === 1 ? 'dia' : 'dias'}</div>
-      <div class="medidor" title="Parte do saldo de hoje que está livre"><i style="width:${Math.min(100, Math.max(2, S.saldoAtual > 0 ? lv.valor / S.saldoAtual * 100 : 100))}%"></i></div>` : ''}
-    </div>` : '';
-  // números do mês com a variação em relação ao mês anterior
-  const rot = 'vs ' + nomeMes(mesAnt);
-  const proxFat = lv && lv.ev.find(e => e.cartao);
-  const parcelasFuturas = cartaoSel === null ? S.lanc.filter(l => l.tipo === 'despesa' && l.cartao && l.parcela && vencDoLanc(l) && vencDoLanc(l) > fimDoMes(mesSel)) : [];
+  const cardHist = `<div class="card"><h2>${ico('grafico')} Últimos 6 meses ${cartaoSel !== null ? `<span class="sub">· gastos no ${esc(nomeCartao(cartaoSel))}</span>` : '<span class="sub">· o que entrou e o que foi gasto</span>'}</h2><div class="chart" id="hist"></div></div>`;
+  // números do mês
+  const rot = 'vs ' + nomeMes(mesAnt) + (atual ? ' até o dia ' + +hoje().slice(8) : '');
+  const parcelasFuturas = cartaoSel === null && atual ? S.lanc.filter(l => l.tipo === 'despesa' && l.cartao && l.parcela && vencDoLanc(l) && vencDoLanc(l) > hoje()) : [];
   const ultParcela = parcelasFuturas.reduce((m, l) => vencDoLanc(l) > m ? vencDoLanc(l) : m, '');
+  const aPagar = faturasAgora ? r2(faturasAgora.reduce((a, x) => a + x.vFechada + x.vAberta, 0)) : 0;
   const kpis = cartaoSel === null ? `<div class="tiles">
-    ${tile('Receitas do mês', fmt.format(t.r), 'grafico', 'var(--accent)', tAnt.r > 0 ? delta(t.r, tAnt.r, false, rot) : '')}
-    ${tile('Gastos do mês', fmt.format(t.d), 'desce', 'var(--violeta)', totais(todosAnt).r > 0 ? delta(t.d, tAnt.d, true, rot) : '')}
-    ${proxFat ? tile(`Próxima fatura · ${esc(nomeCartao(proxFat.cartao))}`, fmt.format(-proxFat.valor), 'cartao', corCartao(proxFat.cartao), `<div class="sub2">vence ${ddmm(proxFat.data)}${proxFat.estimado ? ` · ≈ ${fmt.format(proxFat.estimado)} estimado` : ''}</div>`) : ''}
-    ${parcelasFuturas.length ? tile('Parcelado em aberto', fmt.format(r2(parcelasFuturas.reduce((a, l) => a + l.valor, 0))), 'repete', '#db2777', `<div class="sub2">parcelas depois de ${nomeMes(mesSel)} · até ${nomeMes(ultParcela.slice(0, 7))}</div>`) : ''}
+    ${tile(`Entrou em ${nomeMes(mesSel)}`, fmt.format(t.r), 'sobe', 'var(--good)', comparaAnt ? delta(t.r, tAnt.r, false, rot) : '')}
+    ${tile(`Gastei em ${nomeMes(mesSel)}`, fmt.format(t.d), 'desce', 'var(--violeta)', comparaAnt ? delta(t.d, tAnt.d, true, rot) : '')}
+    ${faturasAgora ? tile('Cartões a pagar', fmt.format(aPagar), 'cartao', 'var(--accent)', `<div class="sub2">faturas fechadas + abertas até hoje</div>`) : ''}
+    ${parcelasFuturas.length ? tile('Parcelas a vencer', fmt.format(r2(parcelasFuturas.reduce((a, l) => a + l.valor, 0))), 'repete', '#db2777', `<div class="sub2">já compradas · até ${nomeMes(ultParcela.slice(0, 7))}</div>`) : ''}
   </div>` : '';
-  const agora = cartaoSel === null && mesSel === mesAtual();
-  const blocos = agora
-    ? `<div class="g21">${cardSaldoDia()}${cardCartoes || cardHist}</div>
-      <div class="g21">${cardCats}${cardAtividade()}</div>
-      ${cardCartoes ? cardHist : ''}`
-    : cardCartoes ? `<div class="grid2">${cardCartoes}${cardCats}</div>${cardHist}` : `<div class="grid2">${cardCats}${cardHist}</div>`;
-  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${cardLivre ? `<div class="destaque">${hero}${cardLivre}</div>` : hero}${kpis}
-  ${blocos}
-  <div class="card"><h2>${ico('lista')} Tudo de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</span></h2>${tabelaItens(itens, true)}</div>`;
+  // últimas movimentações
+  const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const ultimas = itens.slice().sort((a, b) => b.quando.localeCompare(a.quando)).slice(0, 9);
+  const visual = i => i.tipo === 'receita' ? ['sobe', 'var(--good)'] : i.cartao ? ['cartao', corCartao(i.cartao)] : i.fixo ? ['repete', 'var(--warn)'] : ['pix', 'var(--accent)'];
+  const cardUltimas = `<div class="card"><h2>${ico('lista')} Últimas movimentações</h2>
+    ${ultimas.length ? `<div class="feed">${ultimas.map(i => { const [ic, cor] = visual(i); return `<div class="ev">
+      <span class="ev-ico" style="--c:${cor}">${ico(ic)}</span>
+      <div class="ev-txt"><b title="${esc(i.desc)}">${esc(i.desc)}</b><small>${ddmm(i.quando)} ${DIAS_SEM[new Date(i.quando + 'T12:00').getDay()]} · ${esc(i.cat)}${i.cartao ? ' · ' + esc(nomeCartao(i.cartao)) : ''}${i.parcInfo ? ` · ${i.parcInfo.N}x` : ''}</small></div>
+      <div class="ev-val"><b class="${i.tipo === 'receita' ? 'pos' : ''}">${i.tipo === 'receita' ? '+' : '−'} ${fmt.format(i.valor)}</b></div></div>`; }).join('')}</div>` : '<div class="empty">Nada neste mês ainda.</div>'}
+  </div>`;
+  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${hero}${kpis}
+  <div class="g21">${cardCats}${cardCartoes || cardUltimas}</div>
+  <div class="g21">${cardHist}${cardCartoes ? cardUltimas : ''}</div>
+  <div class="card"><h2>${ico('lista')} Movimentações de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}${atual ? ' até hoje' : ''}</span></h2>${tabelaItens(itens, true)}</div>
+  ${mesSel > mesAtual() ? '<p class="hint">Este mês ainda não começou: veja o que está previsto na aba Previsão.</p>' : ''}`;
 }
 
 // Cor fixa por categoria (para o círculo com a inicial)
@@ -1213,9 +1236,10 @@ function dataDaCompra(l) {
 const dataBR = d => d.split('-').reverse().join('/');
 function tabelaItens(itens, mostraFixo) {
   if (!itens.length) return '<div class="empty">Nada por aqui ainda.</div>';
-  itens = itens.slice().sort((a, b) => (b.fixo ? '' : dataDaCompra(b)).localeCompare(a.fixo ? '' : dataDaCompra(a)));
+  const dataItem = i => i.quando || (i.fixo ? i.data || '' : dataDaCompra(i));
+  itens = itens.slice().sort((a, b) => dataItem(b).localeCompare(dataItem(a)));
   return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? '<span class="tag t-azul">fixo</span>' : dataBR(dataDaCompra(i))}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${!i.fixo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
+    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? (i.data ? dataBR(i.data) + ' ' : '') + '<span class="tag t-azul">fixo</span>' : dataBR(dataDaCompra(i))}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.parcInfo ? ` <span class="tag">${i.parcInfo.N}x de ${fmt.format(r2(i.valor / i.parcInfo.N))}</span>` : ''}${!i.fixo && !i.parcInfo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? '' : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
@@ -1310,7 +1334,30 @@ function telaProj() {
   const { linhas, media } = projecao();
   const fim = linhas[linhas.length - 1];
   const negativo = linhas.find(l => l.saldo < 0);
-  return `
+  // resto do mês atual: o que ainda vai entrar e sair
+  const resto = eventos(hoje(), fimDoMes(mesAtual()));
+  const faltaEntrar = r2(resto.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0));
+  const faltaSair = r2(-resto.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0));
+  const quando = sinal => resto.filter(e => sinal * e.valor > 0).map(e => ddmm(e.data)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 3).join(', ');
+  const lv = livreParaGastar();
+  const heroPrev = `<div class="hero">
+    <div class="hero-ico">${ico('grafico')}</div>
+    <div class="lbl">Previsto na conta no fim de ${nomeMes(mesAtual())}</div>
+    <div class="big ${linhas[0].saldo < 0 ? 'neg' : ''}">${fmt.format(linhas[0].saldo)}</div>
+    <div class="stats">
+      <div class="stat" style="--c:var(--accent)">${ico('carteira')}<div><small>Saldo hoje</small><b>${fmt.format(S.saldoAtual)}</b></div></div>
+      <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Ainda vai entrar${faltaEntrar ? ' · ' + quando(1) : ''}</small><b>${fmt.format(faltaEntrar)}</b></div></div>
+      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Ainda vai sair${faltaSair ? ' · ' + quando(-1) : ''}</small><b>${fmt.format(faltaSair)}</b></div></div>
+    </div></div>`;
+  const cardLivre = `<div class="card livre ${lv.valor < 0 ? 'aperto' : ''}" title="Menor saldo previsto nos próximos 45 dias, já descontando contas fixas, faturas (com a estimativa de compras no cartão) e somando salários. É o que sobra para Pix/débito e compras fora do previsto.">
+      <h2>${ico('alvo')} ${lv.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</h2>
+      <div class="big">${fmt.format(Math.abs(lv.valor))}</div>
+      <p class="hint" style="margin-top:4px">${lv.valor < 0 ? `a conta fica negativa em ${ddmm(lv.ate)}` : lv.apertado ? `sem deixar a conta negativa até ${ddmm(lv.ate)}, o dia mais apertado` : `até a próxima entrada, em ${ddmm(lv.ate)}`}</p>
+      ${lv.valor > 0 ? `<div class="pill">≈ ${fmt.format(lv.porDia)} por dia · ${lv.dias} ${lv.dias === 1 ? 'dia' : 'dias'}</div>
+      <div class="medidor"><i style="width:${Math.min(100, Math.max(2, S.saldoAtual > 0 ? lv.valor / S.saldoAtual * 100 : 100))}%"></i></div>` : ''}
+    </div>`;
+  return `<div class="destaque">${heroPrev}${cardLivre}</div>
+  <div class="g21">${cardSaldoDia()}${cardAtividade()}</div>
   <div class="card"><h2>Premissas</h2>
     <div class="row">
       <label>Saldo na conta hoje (R$)<input id="saldo" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
@@ -2186,7 +2233,6 @@ function cardSaldoDia() {
   const semVenc = cartoesUsados().filter(c => !diaFechamento(c) || !diaVencimento(c));
   const menor = ev.reduce((m, e) => !m || e.saldo < m.saldo ? e : m, null);
   return `<div class="card"><h2>${ico('grafico')} Saldo na conta <span class="sub">· próximos 45 dias</span><span class="leg-pill"><i></i>saldo previsto</span></h2>
-    ${campoSaldo()}
     ${menor && menor.saldo < 0 ? `<p class="status crit" style="margin:0 0 10px">▲ O saldo fica negativo em ${ddmm(menor.data)} (${fmt.format(menor.saldo)}).</p>` : ''}
     ${ev.length ? '<div class="chart" id="saldo-dia" style="margin-top:10px"></div>' : '<div class="empty">Nada previsto para os próximos dias.</div>'}
     ${semDia ? `<p class="hint">${semDia} ${semDia === 1 ? 'item fixo está' : 'itens fixos estão'} sem dia definido e não entra${semDia === 1 ? '' : 'm'} aqui (aba Fixos, campo "Dia(s) do mês").</p>` : ''}
@@ -2630,7 +2676,7 @@ function render() {
   const contador = { lanc: S.lanc.filter(l => l.provisorio).length, visao: npend, sim: SIM.filter(x => x.on).length };
   const lvLado = livreParaGastar();
   document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div><span>Minhas Finanças<small>controle pessoal</small></span></div><div class="sec">Menu</div>` + ABAS.map(([id, nome, icone, curto]) => `${id === 'fatura' ? '<div class="sec">Ferramentas</div>' : ''}<button data-t="${id}" class="${id === aba ? 'on' : ''}" title="${nome}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : id === 'sim' ? 'Itens ligados na simulação' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('')
-    + `<div class="lado-card ${lvLado.valor < 0 ? 'aperto' : ''}" data-t="visao" role="button" title="Menor saldo previsto nos próximos 45 dias">
+    + `<div class="lado-card ${lvLado.valor < 0 ? 'aperto' : ''}" data-t="proj" role="button" title="Menor saldo previsto nos próximos 45 dias">
         <small>${lvLado.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</small><b>${fmt.format(Math.abs(lvLado.valor))}</b>
         <span>${lvLado.valor < 0 ? `em ${ddmm(lvLado.ate)}` : `≈ ${fmt.format(lvLado.porDia)}/dia até ${ddmm(lvLado.ate)}`}</span></div>`
     + `<button class="menu-tog" data-menu-tog title="${menuAberto() ? 'Recolher menu' : 'Expandir menu'}">${ico(menuAberto() ? 'recolher' : 'expandir')}<span>Recolher</span></button>`;
@@ -2684,11 +2730,11 @@ function trocarTema(origem) {
 // No computador o conteúdo rola dentro da janela; no celular, a página
 function rolarTopo() { window.scrollTo(0, 0); document.getElementById('app').scrollTo(0, 0); }
 function desenharGraficos() {
-  if (aba === 'visao') {
-    const h = []; for (let i = 5; i >= 0; i--) h.push(addMes(mesSel, -i)); barrasHistorico(document.getElementById('hist'), h);
+  if (aba === 'visao') { const h = []; for (let i = 5; i >= 0; i--) h.push(addMes(mesSel, -i)); barrasHistorico(document.getElementById('hist'), h); }
+  if (aba === 'proj') {
+    linhaSaldo(document.getElementById('proj'), projecao().linhas);
     if (document.getElementById('saldo-dia')) graficoSaldoDia(document.getElementById('saldo-dia'), agenda(45));
   }
-  if (aba === 'proj') linhaSaldo(document.getElementById('proj'), projecao().linhas);
   if (aba === 'sim' && document.getElementById('sim-dia')) { const base = { ev: agenda(45), saldo: S.saldoAtual }; comSimulacao(() => graficoSaldoDia(document.getElementById('sim-dia'), agenda(45), base)); }
 }
 
