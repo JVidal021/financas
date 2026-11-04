@@ -2,7 +2,12 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanças">
+<meta name="theme-color" content="#1748ec">
 <title>Minhas Finanças</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -226,7 +231,8 @@ nav button svg.i { color: var(--text-2); transition: color .15s; }
 nav button:hover { background: color-mix(in srgb, var(--surface-solid) 60%, transparent); color: var(--text); }
 nav button.on { background: var(--menu-on); color: var(--accent); font-weight: 650; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent); }
 nav button.on svg.i { color: var(--accent); }
-nav .sec, .lado-card, .menu-tog { display: none; }
+nav .sec, .lado-card, .menu-tog, .so-movel, .mais { display: none; }
+* { -webkit-tap-highlight-color: transparent; }
 .ajustes { display: grid; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--grid); }
 .chk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; font-weight: 550; cursor: pointer; }
 .chk input { width: 18px; height: 18px; }
@@ -607,14 +613,74 @@ td .sim-dif { display: block; font-size: 12px; font-weight: 600; }
   .hero .hero-ico { width: 40px; height: 40px; right: 16px; top: 16px; }
   .card { padding: 16px; }
   :root { --shadow: 0 1px 2px hsl(var(--sh) / .05), 0 4px 12px hsl(var(--sh) / .06); }
-  nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--header-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--edge); justify-content: space-between; gap: 0; }
-  nav button { flex: 1; flex-direction: column; gap: 3px; padding: 6px 2px; font-size: 10px; border-radius: 12px; min-width: 0; position: relative; }
-  nav button span { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  /* barra de baixo flutuante: Início · Lançamentos · (+) · Previsão · Mais */
+  nav { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 20; margin: 0; padding: 6px; height: 64px;
+    display: flex; align-items: center; justify-content: space-between; gap: 2px; overflow: visible;
+    background: var(--header-bg); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    border: 1px solid var(--card-borda); border-radius: 24px; box-shadow: 0 12px 34px rgba(10, 30, 110, .22); }
+  nav button[data-t]:not(.princ) { display: none; }
+  nav button { flex: 1 1 0; flex-direction: column; justify-content: center; gap: 3px; height: 52px; padding: 0 2px; font-size: 11px; font-weight: 600; border-radius: 16px; min-width: 0; position: relative; color: var(--muted); }
+  nav button svg.i { width: 22px; height: 22px; color: inherit; }
+  nav button.on { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+  nav button.on svg.i { color: var(--accent); }
+  nav button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   nav .longo { display: none; }
-  nav .curto { display: inline; }
-  nav .badge { position: absolute; top: 2px; right: 18%; font-size: 9px; padding: 0 5px; }
-  main { padding: 16px 16px 96px; }
-  .barra-imp { bottom: 76px; }
+  nav .curto { display: block; }
+  nav .so-movel { display: flex; }
+  nav [data-t="visao"] { order: 1; } nav [data-t="lanc"] { order: 2; } nav .novo { order: 3; } nav [data-t="proj"] { order: 4; } nav [data-mais] { order: 5; }
+  nav .novo { flex: 0 0 56px; width: 56px; height: 56px; margin-top: -26px; border-radius: 50%; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 0 5px var(--surface-solid); }
+  nav .novo svg.i { width: 26px; height: 26px; color: #fff; stroke-width: 2.4; }
+  nav .badge { position: absolute; top: 3px; left: calc(50% + 4px); right: auto; font-size: 10px; padding: 0 5px; line-height: 16px; box-shadow: 0 0 0 2px var(--surface-solid); }
+  main { padding: 14px 14px calc(100px + env(safe-area-inset-bottom)); }
+  .barra-imp { bottom: calc(86px + env(safe-area-inset-bottom)); }
+  /* folha "Mais" */
+  .mais:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 40; }
+  .mais-fundo { position: absolute; inset: 0; background: rgba(5, 15, 50, .35); opacity: 0; transition: opacity .2s; }
+  .mais-painel { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(18px + env(safe-area-inset-bottom)); background: var(--surface-solid);
+    border-radius: 26px 26px 0 0; box-shadow: 0 -10px 40px rgba(5, 15, 50, .25); transform: translateY(100%); transition: transform .22s ease; }
+  .mais.aberto .mais-fundo { opacity: 1; }
+  .mais.aberto .mais-painel { transform: none; }
+  .mais-alca { width: 40px; height: 5px; border-radius: 3px; background: var(--grid); margin: 0 auto 14px; }
+  .mais-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .mais-item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 4px; border: 0; border-radius: 16px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 600; text-align: center; }
+  .mais-item span { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+  .mais-item span svg.i { width: 21px; height: 21px; }
+  .mais-item.on { outline: 2px solid var(--accent); }
+  .mais-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .mais-op { display: flex; align-items: center; justify-content: center; gap: 8px; height: 46px; border: 1px solid var(--edge); border-radius: 14px; background: none; color: var(--text); font: inherit; font-size: 13px; font-weight: 600; }
+  /* topo: nome da aba, busca, mês e avisos (tema vai para "Mais") */
+  header { padding: calc(10px + env(safe-area-inset-top)) 14px 10px; }
+  header .logo, #tema { display: none; }
+  .titulo { display: block; min-width: 0; flex: 1; }
+  header h1 { font-size: 21px; }
+  header h1 .app-nome { display: none; }
+  header h1 .aba-nome { display: inline; }
+  .saud { display: none; }
+  header .mes-pill { margin-left: 0; }
+  /* Safari amplia a tela ao tocar em campo com letra menor que 16px */
+  input, select, textarea, .busca input { font-size: 16px; }
+  /* filtros e números deslizam de lado em vez de quebrar linha */
+  .chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -14px 14px; padding: 2px 14px 6px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; }
+  .hero .stats { display: grid; grid-template-columns: 1fr 1fr; }
+  .hero .stat:nth-child(3):last-child { grid-column: 1 / -1; }
+  .seg { display: flex; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  .seg::-webkit-scrollbar { display: none; }
+  .seg button { flex: none; }
+  /* lançamentos em cartões: descrição e valor em cima, data e ações embaixo */
+  .tbl-wrap:has(.tabela-mov) { margin: 0; overflow: visible; }
+  .tabela-mov thead { display: none; }
+  .tabela-mov tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 11px 2px; border-bottom: 1px solid var(--grid); }
+  .tabela-mov td { border: 0; padding: 0; }
+  .tabela-mov td:nth-child(2) { grid-column: 1; grid-row: 1; font-size: 14.5px; }
+  .tabela-mov td:nth-child(1) { grid-column: 1; grid-row: 2; font-size: 12px; color: var(--muted); padding-left: 42px; }
+  .tabela-mov td:nth-child(3) { display: none; }
+  .tabela-mov td:nth-child(4) { grid-column: 2; grid-row: 1; font-weight: 700; }
+  .tabela-mov td:nth-child(5) { grid-column: 2; grid-row: 2; }
+  .tabela-mov .tag { font-size: 11px; }
+  .tile .delta { flex-wrap: wrap; row-gap: 0; }
 }
 </style>
 </head>
@@ -628,6 +694,7 @@ td .sim-dif { display: block; font-size: 12px; font-weight: 600; }
   <div class="cubo c1"></div><div class="cubo c2"></div><div class="cubo c3"></div>
   <div class="cubo c4"></div><div class="cubo c5"></div><div class="cubo c6"></div><div class="cubo c7"></div>
 </div></div>
+<div class="mais" id="mais" hidden></div>
 <div class="janela">
   <nav id="tabs"></nav>
   <div class="conteudo">
@@ -678,6 +745,8 @@ const ICONES = {
   cartao: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
   pix: '<path d="M12 3 3 12l9 9 9-9z"/><path d="m8 12 4-4 4 4-4 4z"/>',
   sobe: '<path d="M7 17 17 7M9 7h8v8"/>',
+  mais: '<path d="M12 5v14M5 12h14"/>',
+  grade: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
   expandir: '<path d="m13 6 6 6-6 6M5 6l6 6-6 6"/>',
   recolher: '<path d="m11 6-6 6 6 6M19 6l-6 6 6 6"/>',
   lupa: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
@@ -693,7 +762,7 @@ const ICONES = {
 };
 const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONES[n]}</svg>`;
 // [id, nome, ícone, nome curto da barra do celular]
-const ABAS = [['visao', 'Visão geral', 'home', 'Início'], ['lanc', 'Lançamentos', 'lista', 'Lançar'], ['fixos', 'Fixos', 'repete', 'Fixos'],
+const ABAS = [['visao', 'Visão geral', 'home', 'Início'], ['lanc', 'Lançamentos', 'lista', 'Extrato'], ['fixos', 'Fixos', 'repete', 'Fixos'],
   ['orc', 'Orçamento', 'alvo', 'Limites'], ['proj', 'Previsão', 'grafico', 'Previsão'], ['sim', 'Simular', 'frasco', 'Simular'], ['calc', 'Calculadoras', 'calc', 'Cálculos'], ['fatura', 'Importar fatura', 'envia', 'Fatura'], ['dados', 'Dados', 'dados', 'Dados']];
 
 // Cartões: cada lançamento pode ter um cartão (importados da fatura já vêm com o banco).
@@ -1267,7 +1336,7 @@ function tabelaItens(itens, mostraFixo) {
   if (!itens.length) return '<div class="empty">Nada por aqui ainda.</div>';
   const dataItem = i => i.quando || (i.fixo ? i.data || '' : dataDaCompra(i));
   itens = itens.slice().sort((a, b) => dataItem(b).localeCompare(dataItem(a)));
-  return `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
+  return `<div class="tbl-wrap"><table class="tabela-mov"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
     itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? (i.data ? dataBR(i.data) + ' ' : '') + '<span class="tag t-azul">fixo</span>' : dataBR(dataDaCompra(i))}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.parcInfo ? ` <span class="tag">${i.parcInfo.N}x de ${fmt.format(r2(i.valor / i.parcInfo.N))}</span>` : ''}${!i.fixo && !i.parcInfo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? '' : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
@@ -2710,10 +2779,12 @@ function render() {
   const npend = pendencias().length;
   const contador = { lanc: S.lanc.filter(l => l.provisorio).length, visao: npend, sim: SIM.filter(x => x.on).length };
   const lvLado = livreParaGastar();
-  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div><span>Minhas Finanças<small>controle pessoal</small></span></div><div class="sec">Menu</div>` + ABAS.map(([id, nome, icone, curto]) => `${id === 'fatura' ? '<div class="sec">Ferramentas</div>' : ''}<button data-t="${id}" class="${id === aba ? 'on' : ''}" title="${nome}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : id === 'sim' ? 'Itens ligados na simulação' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('')
+  document.getElementById('tabs').innerHTML = `<div class="marca"><div class="logo">${ico('carteira')}</div><span>Minhas Finanças<small>controle pessoal</small></span></div><div class="sec">Menu</div>` + ABAS.map(([id, nome, icone, curto]) => `${id === 'fatura' ? '<div class="sec">Ferramentas</div>' : ''}<button data-t="${id}" class="${id === aba ? 'on' : ''}${['visao', 'lanc', 'proj'].includes(id) ? ' princ' : ''}" title="${nome}">${ico(icone)}<span class="longo">${nome}</span><span class="curto">${curto}</span>${contador[id] ? `<em class="badge" title="${id === 'lanc' ? 'Compras a conferir quando a fatura chegar' : id === 'sim' ? 'Itens ligados na simulação' : 'Informações faltando'}">${contador[id]}</em>` : ''}</button>`).join('')
     + `<div class="lado-card ${lvLado.valor < 0 ? 'aperto' : ''}" data-t="proj" role="button" title="Menor saldo previsto nos próximos 45 dias">
         <small>${lvLado.valor < 0 ? 'Vai faltar' : 'Livre pra gastar'}</small><b>${fmt.format(Math.abs(lvLado.valor))}</b>
         <span>${lvLado.valor < 0 ? `em ${ddmm(lvLado.ate)}` : `≈ ${fmt.format(lvLado.porDia)}/dia até ${ddmm(lvLado.ate)}`}</span></div>`
+    + `<button class="so-movel novo" data-novo title="Novo lançamento" aria-label="Novo lançamento">${ico('mais')}</button>`
+    + `<button class="so-movel${['visao', 'lanc', 'proj'].includes(aba) ? '' : ' on'}" data-mais aria-label="Mais opções">${ico('grade')}<span class="curto">Mais</span></button>`
     + `<button class="menu-tog" data-menu-tog title="${menuAberto() ? 'Recolher menu' : 'Expandir menu'}">${ico(menuAberto() ? 'recolher' : 'expandir')}<span>Recolher</span></button>`;
   document.getElementById('sino').innerHTML = ico('sino') + (npend ? '<span class="ponto"></span>' : '');
   document.getElementById('sino').title = npend ? `${npend} ${npend === 1 ? 'pendência' : 'pendências'}` : 'Nenhuma pendência';
@@ -3325,13 +3396,42 @@ function cardAparencia() {
   </div>`;
 }
 
+// ---------- celular: folha "Mais" com as outras abas e ajustes ----------
+function abrirMais() {
+  const el = document.getElementById('mais');
+  const escuro = document.documentElement.dataset.theme === 'dark';
+  el.innerHTML = `<div class="mais-fundo" data-fechar-mais></div>
+    <div class="mais-painel" role="dialog" aria-label="Mais opções"><div class="mais-alca"></div>
+      <div class="mais-grade">${ABAS.filter(([id]) => !['visao', 'lanc', 'proj'].includes(id)).map(([id, nome, icone]) =>
+        `<button class="mais-item${id === aba ? ' on' : ''}" data-ir-aba="${id}"><span>${ico(icone)}</span>${nome}</button>`).join('')}</div>
+      <div class="mais-linha">
+        <button class="mais-op" data-tema-mais>${ico(escuro ? 'sol' : 'lua')} Tema ${escuro ? 'claro' : 'escuro'}</button>
+        <button class="mais-op" data-ir-aba="dados">${ico('home')} Aparência e fundo</button>
+      </div></div>`;
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('aberto'));
+}
+function fecharMais() {
+  const el = document.getElementById('mais');
+  el.classList.remove('aberto');
+  setTimeout(() => { el.hidden = true; }, 220);
+}
+document.getElementById('mais').addEventListener('click', e => {
+  const b = e.target.closest('[data-ir-aba]');
+  if (b) { aba = b.dataset.irAba; fecharMais(); render(); rolarTopo(); return; }
+  if (e.target.closest('[data-tema-mais]')) { document.getElementById('tema').click(); abrirMais(); return; }
+  if (e.target.closest('[data-fechar-mais]')) fecharMais();
+});
+
 // ---------- eventos ----------
 document.getElementById('logo').innerHTML = ico('carteira');
 aplicarFundo();
 document.body.classList.toggle('menu-compacto', !menuAberto());
 document.getElementById('tema').addEventListener('click', e => trocarTema(e.currentTarget));
 document.getElementById('sino').addEventListener('click', () => { aba = 'visao'; cartaoSel = null; animarProx = true; render(); rolarTopo(); });
-document.getElementById('tabs').addEventListener('click', e => { if (e.target.closest('[data-menu-tog]')) return alternarMenu(!menuAberto()); const b = e.target.closest('[data-t]'); if (b) { aba = b.dataset.t; animarProx = true; render(); rolarTopo(); } });
+document.getElementById('tabs').addEventListener('click', e => { if (e.target.closest('[data-menu-tog]')) return alternarMenu(!menuAberto());
+  if (e.target.closest('[data-mais]')) return abrirMais();
+  if (e.target.closest('[data-novo]')) { aba = 'lanc'; render(); rolarTopo(); const c = document.querySelector('#f-lanc [name="desc"]') || document.querySelector('#f-lanc input'); if (c) c.focus(); return; } const b = e.target.closest('[data-t]'); if (b) { aba = b.dataset.t; animarProx = true; render(); rolarTopo(); } });
 document.getElementById('mes-pill').addEventListener('click', e => {
   const passo = e.target.closest('[data-mes-passo]'), m = e.target.closest('[data-mes]'), ano = e.target.closest('[data-ano]');
   if (passo) irMes(addMes(mesSel, +passo.dataset.mesPasso));
