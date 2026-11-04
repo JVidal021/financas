@@ -317,6 +317,8 @@ main { padding: 18px 24px 36px; }
 .ev-val { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ev-val b { display: block; font-size: 14px; }
 .ev-val small { font-size: 12px; color: var(--muted); }
+.ev-txt .pagar { padding: 0 6px; font-size: 12px; color: var(--accent); font-weight: 600; }
+.ev-txt .pagar:hover { color: var(--good); }
 
 /* formulários */
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
@@ -932,10 +934,10 @@ function projecao() {
     const m = addMes(mesAtual(), i), det = [];
     const ativos = S.fixos.filter(f => fixoAtivo(f, m));
     const semCartao = S.lanc.filter(l => !l.cartao && l.data.slice(0, 7) === m);
-    let r = ativos.filter(f => f.tipo === 'receita').reduce((a, f) => a + f.valor, 0) + semCartao.filter(l => l.tipo === 'receita').reduce((a, l) => a + l.valor, 0);
+    let r = ativos.filter(f => f.tipo === 'receita').reduce((a, f) => a + f.valor - valorPagoNoMes(f, m), 0) + semCartao.filter(l => l.tipo === 'receita').reduce((a, l) => a + l.valor, 0);
     let d = 0;
     const add = (txt, v) => { if (v) { d += v; det.push(`${txt}: ${fmt.format(v)}`); } };
-    add('Contas fixas', ativos.filter(f => f.tipo === 'despesa' && !f.cartao).reduce((a, f) => a + f.valor, 0));
+    add('Contas fixas', ativos.filter(f => f.tipo === 'despesa' && !f.cartao).reduce((a, f) => a + f.valor - valorPagoNoMes(f, m), 0));
     add('Planejados (Pix/débito)', semCartao.filter(l => l.tipo === 'despesa').reduce((a, l) => a + l.valor, 0));
     add('Pix/débito (média)', r2(media.semCartao * fator));
     for (const c of cartoesUsados()) {
@@ -1251,6 +1253,8 @@ ${camposLanc('f-lanc', dataPadrao, cartaoSel || SEM_CARTAO)}
   <div class="card"><h2>${ico('lista')} Lançamentos de ${nomeMes(mesSel)} ${cartaoSel !== null ? `<span class="sub">· ${esc(nomeCartao(cartaoSel))} · ${fmt.format(totais(doMes).d)}</span>` : ''}</h2>${tabelaItens(doMes)}</div>`;
 }
 
+// Próxima vez que o item fixo entra ou sai da conta (nos próximos 45 dias)
+const proximaOcorrencia = f => agenda(45).find(e => e.fixo === f.id);
 function telaFixos() {
   const lista = S.fixos.slice().sort((a, b) => a.tipo.localeCompare(b.tipo) || b.valor - a.valor);
   const ativos = totais(S.fixos.filter(f => fixoAtivo(f, mesAtual())));
@@ -1278,7 +1282,7 @@ function telaFixos() {
   ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Período</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
     lista.map(f => `<tr style="${fixoAtivo(f, mesAtual()) ? '' : 'opacity:.55'}"><td>${esc(f.desc)}${f.cartao ? ' ' + tagCartao(f.cartao) : ''}</td><td>${esc(f.cat)}</td><td>${nomeMes(f.inicio)} → ${f.fim ? nomeMes(f.fim) : 'sem fim'}${f.dias || f.uteis ? `<div class="hint" style="margin:0">${textoAgenda(f)}${f.uteis ? ` (este mês: ${f.uteis.map(n => (diaUtil(mesAtual(), n) || '').slice(8) + '/' + mesAtual().slice(5)).join(', ')})` : ''}</div>` : ''}</td>
       <td class="num ${f.tipo === 'receita' ? 'pos' : ''}">${f.tipo === 'receita' ? '+' : '−'} ${fmt.format(f.valor)}</td>
-      <td class="num">${!f.fim || f.fim >= mesAtual() ? `<button class="link" data-encerrar="${f.id}" title="Encerrar no mês atual">encerrar</button>` : ''}<button class="link" data-edit-fixo="${f.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-fixo="${f.id}" title="Excluir">✕</button></td></tr>`).join('') +
+      <td class="num">${(f.pagos || []).filter(pg => pg.data >= hoje()).map(pg => `<span class="tag t-bom" title="Previsto para ${ddmm(pg.data)}; já ${f.tipo === 'receita' ? 'recebido' : 'pago'}">${f.tipo === 'receita' ? 'recebido' : 'pago'} · ${ddmm(pg.data)}</span><button class="link" data-despagar="${f.id}|${pg.data}" title="Desfazer">✕</button>`).join('')}${!f.cartao && (f.dias || f.uteis) && !(f.pagos || []).some(pg => pg.data >= hoje()) && proximaOcorrencia(f) ? `<button class="link" data-pago="${f.id}|${proximaOcorrencia(f).data}|${Math.abs(proximaOcorrencia(f).valor)}" title="Marca a próxima ocorrência (${ddmm(proximaOcorrencia(f).data)}) como já ${f.tipo === 'receita' ? 'recebida' : 'paga'}">já ${f.tipo === 'receita' ? 'recebi' : 'paguei'}</button>` : ''}${!f.fim || f.fim >= mesAtual() ? `<button class="link" data-encerrar=""${f.id}" title="Encerrar no mês atual">encerrar</button>` : ''}<button class="link" data-edit-fixo="${f.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-fixo="${f.id}" title="Excluir">✕</button></td></tr>`).join('') +
     `</tbody></table></div>` : '<div class="empty">Cadastre seus gastos e receitas recorrentes.</div>'}
   </div>`;
 }
@@ -1971,6 +1975,9 @@ const fimDoMes = ym => dataDia(ym, 31);
 // Entradas e saídas com data entre `ini` (exclusive) e `fim`: salários e contas fixas nos dias
 // configurados, faturas no vencimento e lançamentos sem cartão (Pix/débito) planejados.
 // O que já passou (até hoje) está no saldo atual, por isso nunca entra aqui.
+// Conta fixa paga (ou receita recebida) antes do dia previsto: { data: dia previsto, valor }
+const pagoAntes = (f, data) => (f.pagos || []).some(p => p.data === data);
+const valorPagoNoMes = (f, m) => (f.pagos || []).filter(p => p.data.slice(0, 7) === m).reduce((a, p) => a + p.valor, 0);
 function eventos(ini, fim) {
   const dentro = d => d > ini && d <= fim;
   const ev = [];
@@ -1982,7 +1989,7 @@ function eventos(ini, fim) {
       const datas = [...(f.uteis || []).map(n => [diaUtil(m, n), fr['u' + n]]), ...(f.dias || []).map(d => [dataDia(m, d), fr['d' + d]])]
         .filter(([d]) => d).sort((a, b) => a[0].localeCompare(b[0]));
       datas.forEach(([data, parte]) => {
-        if (dentro(data) && parte > 0) ev.push({ data, desc: f.desc + (datas.length > 1 ? (f.valores && Object.values(f.valores).length ? '' : ` (${Math.round(parte * 100)}%)`) : ''), valor: (f.tipo === 'receita' ? 1 : -1) * r2(f.valor * parte), tag: f.tipo === 'receita' ? 'entrada' : 'conta fixa' });
+        if (dentro(data) && parte > 0 && !pagoAntes(f, data)) ev.push({ fixo: f.id, data, desc: f.desc + (datas.length > 1 ? (f.valores && Object.values(f.valores).length ? '' : ` (${Math.round(parte * 100)}%)`) : ''), valor: (f.tipo === 'receita' ? 1 : -1) * r2(f.valor * parte), tag: f.tipo === 'receita' ? 'entrada' : 'conta fixa' });
       });
     }
     for (const c of cartoesUsados()) {
@@ -2196,7 +2203,7 @@ function cardAtividade() {
     ${ev.length ? `<div class="feed">${ev.map(e => { const [ic, cor] = visual(e); return `<div class="ev${e === menor ? ' menor' : ''}">
       <span class="ev-ico" style="--c:${cor}">${ico(ic)}</span>
       <div class="ev-txt"><b title="${esc(e.desc)}">${esc(e.desc)}</b><small>${ddmm(e.data)} ${DIAS_SEM[new Date(e.data + 'T12:00').getDay()]}
-        ${e.cartao ? (e.estimado ? `<span class="tag t-aviso" title="A fatura ainda não fechou: inclui uma estimativa de compras novas pela média do cartão">≈ ${fmt.format(e.estimado)} estimado</span>` : e.previa ? '<span class="tag t-aviso" title="A fatura ainda não fechou: o valor pode crescer">parcial</span>' : '<span class="tag t-azul">fechada</span>') : `<span class="tag ${e.tag === 'entrada' ? 't-bom' : e.tag === 'planejado' ? 't-azul' : ''}">${e.tag}</span>`}
+        ${e.cartao ? (e.estimado ? `<span class="tag t-aviso" title="A fatura ainda não fechou: inclui uma estimativa de compras novas pela média do cartão">≈ ${fmt.format(e.estimado)} estimado</span>` : e.previa ? '<span class="tag t-aviso" title="A fatura ainda não fechou: o valor pode crescer">parcial</span>' : '<span class="tag t-azul">fechada</span>') : `<span class="tag ${e.tag === 'entrada' ? 't-bom' : e.tag === 'planejado' ? 't-azul' : ''}">${e.tag}</span>`}${e.fixo ? `<button class="link pagar" data-pago="${e.fixo}|${e.data}|${Math.abs(e.valor)}" title="Já ${e.valor > 0 ? 'recebeu' : 'pagou'} antes do dia: tira da previsão">✓ já ${e.valor > 0 ? 'recebi' : 'paguei'}</button>` : ''}
         ${e.outros ? `<span title="Fatura toda: ${fmt.format(-e.valor + e.outros)}">+ ${fmt.format(e.outros)} da ${NOME_OUTRO}</span>` : ''}${e === menor ? '<span class="tag t-aviso">dia mais apertado</span>' : ''}</small></div>
       <div class="ev-val"><b class="${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</b><small class="${e.saldo < 0 ? 'neg' : ''}">saldo ${fmt.format(e.saldo)}</small></div>
     </div>`; }).join('')}</div>` : '<div class="empty">Nada previsto para os próximos 30 dias.</div>'}
@@ -3030,6 +3037,16 @@ document.addEventListener('click', e => {
     SIM = SIM.filter(x => x !== it); gravarSim(); salvar(); return;
   }
   if (d.delLanc) { S.lanc = S.lanc.filter(l => l.id !== d.delLanc); salvar(); }
+  if (d.pago) {
+    const [id, data, valor] = d.pago.split('|'), f = S.fixos.find(x => x.id === id);
+    if (f) { f.pagos = (f.pagos || []).filter(p => p.data >= addMes(mesAtual(), -2) + '-01' && p.data !== data).concat([{ data, valor: +valor }]); salvar(); }
+    return;
+  }
+  if (d.despagar) {
+    const [id, data] = d.despagar.split('|'), f = S.fixos.find(x => x.id === id);
+    if (f) { f.pagos = (f.pagos || []).filter(p => p.data !== data); salvar(); }
+    return;
+  }
   if (d.delFixo && confirm('Excluir este item fixo de todos os meses?')) { S.fixos = S.fixos.filter(f => f.id !== d.delFixo); salvar(); }
   if (d.encerrar) { const f = S.fixos.find(f => f.id === d.encerrar); f.fim = mesAtual(); salvar(); }
   const ch = e.target.closest('[data-cartao]');
