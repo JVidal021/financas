@@ -887,16 +887,18 @@ async function lerNuvem() {
   syncSha = r.sha;
   return JSON.parse(b64dec(r.content));
 }
+// Momento da última alteração em milissegundos (aceita número ou data em texto, para nunca comparar texto com número).
+const quando = v => typeof v === 'number' ? v : (Date.parse(v) || +v || 0);
 // Fica com a versão mais recente: a da nuvem ou a deste aparelho.
 async function puxar() {
   if (!sync) return;
   statusSync('☁ sincronizando…');
   try {
     const remoto = await lerNuvem();
-    if (remoto && (remoto.atualizado || 0) > (S.atualizado || 0)) {
+    if (remoto && quando(remoto.atualizado) > quando(S.atualizado)) {
       S = normalizar(remoto);
       gravarLocal(); render();
-    } else if (!remoto || (S.atualizado || 0) > (remoto.atualizado || 0)) {
+    } else if (!remoto || quando(S.atualizado) > quando(remoto.atualizado)) {
       return enviar();
     }
     statusSync('☁ sincronizado');
