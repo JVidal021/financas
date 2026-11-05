@@ -1274,8 +1274,8 @@ function telaVisao() {
         <div><div class="nome">${esc(nomeCartao(c))}</div>${sub}</div>${valor}</div>`;
   const cardCartoes = faturasAgora && faturasAgora.length ? `
     <div class="card"><h2>${ico('cartao')} Faturas agora <span class="sub">· sua parte, sem estimativas</span></h2>
-      ${faturasAgora.map(x => linhaCartao(x.c, `<div class="amt">${fmt.format(r2(x.vFechada + x.vAberta))}<small>${x.maeF + x.maeA >= 0.01 ? `${NOME_OUTRO} ${fmt.format(r2(x.maeF + x.maeA))}` : 'no total'}</small></div>`,
-        `${x.fechada ? `<div class="hint" style="margin:2px 0 0">Fechada: <b>${fmt.format(x.vFechada)}</b> · vence ${ddmm(x.vencFechada)}</div>` : ''}<div class="hint" style="margin:2px 0 0">Aberta: <b>${fmt.format(x.vAberta)}</b> até hoje · fecha ${ddmm(x.aberta)}, vence ${ddmm(x.vencAberta)}</div>`)).join('')}
+      ${faturasAgora.map(x => linhaCartao(x.c, `<div class="amt">${fmt.format(r2(x.vFechada + x.vAberta))}<small>sua parte</small></div>`,
+        `${x.fechada ? `<div class="hint" style="margin:2px 0 0">Fechada: <b>${fmt.format(x.vFechada)}</b>${x.maeF >= 0.01 ? ` + ${NOME_OUTRO} ${fmt.format(x.maeF)} = ${fmt.format(r2(x.vFechada + x.maeF))}` : ''} · vence ${ddmm(x.vencFechada)}</div>` : ''}<div class="hint" style="margin:2px 0 0">Aberta: <b>${fmt.format(x.vAberta)}</b>${x.maeA >= 0.01 ? ` + ${NOME_OUTRO} ${fmt.format(x.maeA)}` : ''} até hoje · fecha ${ddmm(x.aberta)}, vence ${ddmm(x.vencAberta)}</div>`)).join('')}
       <p class="hint">A fatura aberta soma as parcelas que caem nela e as compras já feitas. O quanto ela ainda pode crescer fica na aba Previsão.</p>
     </div>` : cartoesUsados().length ? `
     <div class="card"><h2>${ico('cartao')} Por cartão <span class="sub">· sua parte em ${nomeMes(mesSel)}</span></h2>
