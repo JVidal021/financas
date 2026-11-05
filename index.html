@@ -1260,7 +1260,8 @@ function telaVisao() {
   // cartões: no mês atual, as faturas como estão agora no banco (fechada a pagar e aberta até hoje);
   // nos outros meses, quanto se comprou em cada um
   const faturasAgora = atual && cartaoSel === null ? cartoesUsados().filter(c => melhorDia(c) && diaVencimento(c)).map(c => {
-    const aberta = fechamentoDaCompra(c, hoje()), fechada = fechamentoAnterior(c, aberta), vf = vencimentoDe(c, fechada);
+    const aberta = fechamentoDaCompra(c, hoje()), fechada = fechamentoAnterior(c, aberta), vf0 = vencimentoDe(c, fechada);
+    const vf = (S.faturasPagas || {})[c + '|' + vf0] ? '' : vf0;   // fatura fechada já paga: não aparece como a pagar
     return { c, aberta, vAberta: valorFatura(c, aberta), vencAberta: vencimentoDe(c, aberta), maeA: parteOutros(c, aberta),
       fechada: vf >= hoje() ? fechada : null, vFechada: vf >= hoje() ? valorFatura(c, fechada) : 0, vencFechada: vf, maeF: vf >= hoje() ? parteOutros(c, fechada) : 0 };
   }) : null;
@@ -1833,6 +1834,20 @@ function marcarItens(itens, banco, fechamento) {
         && Math.abs(f.valor - it.valor) <= Math.max(1, f.valor * 0.05));
       if (fx) { fixosUsados.add(fx.id); it.fixo = fx.desc; it.escolha = 'nao'; it.cat = fx.cat; }
       else if (fixoEmDois.has(it)) { const f2 = fixoEmDois.get(it); it.fixo = f2.desc; it.escolha = 'nao'; it.cat = f2.cat; }
+    }
+  });
+  // estorno/cancelamento ainda sem lançamento: fica com o dono da compra de mesmo valor
+  // (nesta fatura ou já lançada neste cartão), em vez de cair na parte da mãe por não estar marcado
+  itens.filter(it => it.sec === 'credito' && !it.importado).forEach(it => {
+    const v = -it.valor;
+    const comp = itens.find(x => x.sec !== 'credito' && Math.abs(x.valor - v) < 0.01 && x.escolha);
+    const lc = comp ? null : S.lanc.find(l => l.cartao === banco && l.tipo === 'despesa' && l.valor > 0 && l.share && Math.abs(l.valor / l.share - v) < 0.01);
+    if (comp) {
+      it.escolha = comp.escolha; it.cat = comp.cat;
+      if (comp.escolha === 'div') { it.k = comp.k; it.n = comp.n; if (comp.meu != null) it.meu = -comp.meu; }
+    } else if (lc) {
+      it.escolha = lc.share === 1 ? 'meu' : lc.share === 0.5 ? 'metade' : 'div'; it.cat = lc.cat;
+      if (it.escolha === 'div') it.meu = r2(-lc.valor);
     }
   });
 }
@@ -2431,9 +2446,22 @@ function parteOutros(c, fech) {
   const venc = vencimentoDe(c, fech);
   let v = 0;
   for (const l of S.lanc) if (l.cartao === c && l.tipo === 'despesa' && l.share && l.share < 1 && vencDoLanc(l) === venc) v += l.valor / l.share - l.valor;
+  // contas fixas deste cartão (academia, assinaturas) já entram na sua parte: o item delas na fatura não é da mãe
+  const fixosCartao = S.fixos.filter(x => x.cartao === c && x.tipo === 'despesa' && fixoAtivo(x, fech.slice(0, 7)));
   for (const f of S.faturas) {
     if (f.banco !== c || (S.cartaoDiaUtil[c] ? proxDiaUtil(f.vencimento) : f.vencimento) !== venc) continue;
-    for (const it of f.itens) if (!S.lanc.some(l => l.key === it.key && !l.prevista)) v += it.valor;
+    const soltos = f.itens.filter(it => !S.lanc.some(l => l.key === it.key && !l.prevista));
+    const perto = (x, valor) => Math.abs(x.valor - valor) <= Math.max(1, x.valor * 0.05);
+    const doFixo = new Set();
+    for (const x of fixosCartao) {   // a conta fixa pode vir num item só ou dividida em dois (ex.: duas academias)
+      const um = soltos.find(it => !doFixo.has(it) && perto(x, it.valor));
+      if (um) { doFixo.add(um); continue; }
+      par: for (let a = 0; a < soltos.length; a++) for (let b = a + 1; b < soltos.length; b++) {
+        if (doFixo.has(soltos[a]) || doFixo.has(soltos[b]) || soltos[a].data !== soltos[b].data || soltos[a].sec !== 'despesa' || soltos[b].sec !== 'despesa' || !perto(x, soltos[a].valor + soltos[b].valor)) continue;
+        doFixo.add(soltos[a]); doFixo.add(soltos[b]); break par;
+      }
+    }
+    for (const it of soltos) if (!doFixo.has(it)) v += it.valor;
   }
   // próximas parcelas das compras parceladas que não são suas (vieram na fatura, marcadas "não é meu");
   // numa fatura já importada elas já estão nos itens dela
