@@ -323,6 +323,12 @@ main { padding: 18px 24px 36px; }
 .ev-val { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ev-val b { display: block; font-size: 14px; }
 .ev-val small { font-size: 12px; color: var(--muted); }
+.modo-prev { padding: 14px 16px; }
+.modo-prev .seg button { padding: 7px 14px; font-size: 13.5px; }
+.est { padding: 12px 0; border-top: 1px solid var(--grid); }
+.est-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.est-cab b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.est-cab b small { font-size: 12px; color: var(--muted); font-weight: 500; }
 .calc-res h3 { font-size: 14px; margin: 18px 0 6px; }
 .calc-big { padding: 16px 18px; border-radius: 16px; background: var(--accent-soft); margin-bottom: 12px; }
 .calc-big small { display: block; color: var(--text-2); font-size: 13px; font-weight: 600; }
@@ -992,6 +998,18 @@ function totais(itens) {
 }
 // Média mensal de compras novas (sem parcelas) dos últimos 3 meses com dados.
 // `filtro` escolhe os lançamentos: os de um cartão ou os sem cartão (Pix/débito).
+// Previsão com gastos estimados (média de uso do cartão e do Pix) ou só com o que já existe
+// (parcelas, contas fixas, compras já feitas e lançamentos planejados). Escolha guardada no aparelho.
+let prevModo = (() => { try { return localStorage.getItem('financas.prev') || 'estimado'; } catch (e) { return 'estimado'; } })();
+const comEstimativa = () => prevModo !== 'conhecido';
+function comModo(modo, fn) { const ant = prevModo; prevModo = modo; try { return fn(); } finally { prevModo = ant; } }
+// Meses usados na média e quanto foi gasto em cada um (compras novas, sem parcelas nem contas mensais)
+function detalheMedia(filtro) {
+  const ls = S.lanc.filter(l => l.tipo === 'despesa' && !l.parcela && !l.agregado && !l.prevista && !l.fixoRef && !l.pagamentoFatura && l.data <= hoje() && filtro(l));
+  const meses = [];
+  for (let i = 1; i <= 3; i++) { const m = addMes(mesAtual(), -i); if (ls.some(l => l.data.slice(0, 7) === m)) meses.push(m); }
+  return meses.reverse().map(m => { const x = ls.filter(l => l.data.slice(0, 7) === m); return { m, v: r2(x.reduce((a, l) => a + l.valor, 0)), n: x.length }; });
+}
 function mediaCompras(filtro) {
   const ls = S.lanc.filter(l => l.tipo === 'despesa' && !l.parcela && !l.agregado && !l.prevista && !l.fixoRef && !l.pagamentoFatura && l.data <= hoje() && filtro(l));
   const meses = [];
@@ -1006,7 +1024,7 @@ const diasEntre = (a, b) => (new Date(b) - new Date(a)) / 864e5;
 // Compras novas que ainda devem entrar na fatura que fecha em `fech`: a média do cartão
 // proporcional à parte do ciclo que ainda não aconteceu (zero se a fatura já fechou).
 function estimativaFatura(c, fech) {
-  if (!fech || fech <= hoje()) return 0;
+  if (!comEstimativa() || !fech || fech <= hoje()) return 0;
   const ant = fechamentoAnterior(c, fech), ini = ant > hoje() ? ant : hoje();
   const frac = Math.min(1, Math.max(0, diasEntre(ini, fech) / Math.max(1, diasEntre(ant, fech))));
   return r2(mediaCartao(c) * fatorAjuste() * frac);
@@ -1024,7 +1042,8 @@ function projecao() {
   const linhas = [];
   const resto = eventos(hoje(), fimDoMes(mesAtual()));
   const fracMes = diasEntre(hoje(), fimDoMes(mesAtual())) / +fimDoMes(mesAtual()).slice(8);
-  const pixResto = r2(media.semCartao * fator * fracMes);
+  const pixMedia = comEstimativa() ? media.semCartao : 0;
+  const pixResto = r2(pixMedia * fator * fracMes);
   const rr = r2(resto.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0)), rd = r2(-resto.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0) + pixResto);
   saldo += rr - rd;
   linhas.push({ m: mesAtual(), r: rr, d: rd, liq: rr - rd, saldo, resto: true, detalhe: resto.filter(e => e.valor < 0).map(e => `${e.desc}: ${fmt.format(-e.valor)}`).concat(pixResto ? [`Pix/débito (média): ${fmt.format(pixResto)}`] : []) });
@@ -1037,14 +1056,14 @@ function projecao() {
     const add = (txt, v) => { if (v) { d += v; det.push(`${txt}: ${fmt.format(v)}`); } };
     add('Contas fixas', ativos.filter(f => f.tipo === 'despesa' && !f.cartao).reduce((a, f) => a + f.valor - valorPagoNoMes(f, m) - difAjustes(f, m), 0));
     add('Planejados (Pix/débito)', semCartao.filter(l => l.tipo === 'despesa').reduce((a, l) => a + l.valor, 0));
-    add('Pix/débito (média)', r2(media.semCartao * fator));
+    add('Pix/débito (média)', r2(pixMedia * fator));
     for (const c of cartoesUsados()) {
       if (diaFechamento(c) && diaVencimento(c)) {
         for (const fech of faturasQueVencem(c, m)) add(`Fatura ${c} (vence ${ddmm(vencimentoDe(c, fech))})`, r2(valorFatura(c, fech) + estimativaFatura(c, fech)));
       } else {
         // sem dias do cartão: conta as compras no mês em que acontecem
         add(`${c} (sem dia de fechamento)`, r2(S.lanc.filter(l => l.cartao === c && l.tipo === 'despesa' && l.data.slice(0, 7) === m).reduce((a, l) => a + l.valor, 0)
-          + ativos.filter(f => f.cartao === c && f.tipo === 'despesa').reduce((a, f) => a + f.valor, 0) + media.porCartao[c] * fator));
+          + ativos.filter(f => f.cartao === c && f.tipo === 'despesa').reduce((a, f) => a + f.valor, 0) + (comEstimativa() ? media.porCartao[c] * fator : 0)));
       }
     }
     r = r2(r); d = r2(d);
@@ -1428,6 +1447,48 @@ function telaOrc() {
   </div>`;
 }
 
+function chaveModo() {
+  const fimA = comModo('estimado', () => projecao().linhas), fimB = comModo('conhecido', () => projecao().linhas);
+  const k = Math.min(5, fimA.length - 1);
+  return `<div class="card modo-prev"><div class="seg">
+      <button class="${comEstimativa() ? 'on' : ''}" data-prev-modo="estimado">Com gastos estimados</button>
+      <button class="${comEstimativa() ? '' : 'on'}" data-prev-modo="conhecido">Só o que já existe</button></div>
+    <p class="hint" style="margin:8px 0 0">${comEstimativa()
+      ? 'Inclui o que você costuma gastar: compras novas no cartão pela média de cada um e Pix/débito pela média. <a href="#estimados" data-ir-estimados>Veja de onde vêm esses valores.</a>'
+      : 'Só parcelas já compradas, contas fixas, compras já feitas e o que você lançou como planejado. Bom para ver o mínimo que já está comprometido.'}
+      Em ${nomeMes(fimA[k].m)}: <b>${fmt.format(fimA[k].saldo)}</b> com estimativas · <b>${fmt.format(fimB[k].saldo)}</b> só com o que existe.</p></div>`;
+}
+// De onde vêm os gastos estimados: a média de cada cartão e do Pix e quanto ela pesa em cada fatura
+function cardEstimados() {
+  const fator = fatorAjuste(), nomes = m => `${NOMES_MES[+m.slice(5) - 1]}/${m.slice(2, 4)}`;
+  const linhaMedia = det => det.length ? det.map(x => `${nomes(x.m)} ${fmt.format(x.v)}`).join(' · ') : 'sem histórico ainda';
+  const media = det => det.length ? r2(det.reduce((a, x) => a + x.v, 0) / det.length) : 0;
+  const cartoes = cartoesUsados().filter(c => melhorDia(c) && diaVencimento(c)).map(c => {
+    const det = detalheMedia(l => l.cartao === c), med = media(det);
+    const fats = [];
+    for (let i = 0; i <= 2; i++) for (const fech of faturasQueVencem(c, addMes(mesAtual(), i))) {
+      if (fech <= hoje()) continue;
+      const ant = fechamentoAnterior(c, fech), ini = ant > hoje() ? ant : hoje();
+      const frac = Math.min(1, Math.max(0, diasEntre(ini, fech) / Math.max(1, diasEntre(ant, fech))));
+      fats.push({ fech, venc: vencimentoDe(c, fech), frac, v: comModo('estimado', () => estimativaFatura(c, fech)) });
+    }
+    return { c, det, med, fats };
+  });
+  const detPix = detalheMedia(l => !l.cartao), medPix = media(detPix);
+  return `<div class="card" id="estimados"><h2>${ico('alvo')} Gastos estimados <span class="sub">· de onde vêm${comEstimativa() ? '' : ' (desligados agora)'}</span></h2>
+    <p class="hint" style="margin:0 0 12px">A média usa os últimos 3 meses com dados e só as compras novas: parcelas, contas mensais (como avó e assinaturas fixas) e pagamentos de fatura ficam de fora, porque já entram pelo valor certo.${fator !== 1 ? ` Ajuste dos gastos variáveis: ${S.ajuste > 0 ? '+' : ''}${S.ajuste}%.` : ''}</p>
+    ${cartoes.map(x => `<div class="est">
+      <div class="est-cab">${tagCartao(x.c)}<b>${fmt.format(r2(x.med * fator))}<small>/mês</small></b></div>
+      <div class="hint" style="margin:2px 0 6px">${linhaMedia(x.det)}</div>
+      ${x.fats.map(f => `<div class="cl"><span>Fatura que vence ${ddmm(f.venc)} · fecha ${ddmm(f.fech)} · falta ${Math.round(f.frac * 100)}% do ciclo</span><b>≈ ${fmt.format(f.v)}</b></div>`).join('')}
+    </div>`).join('')}
+    <div class="est">
+      <div class="est-cab"><span class="tag">Pix / débito</span><b>${fmt.format(r2(medPix * fator))}<small>/mês</small></b></div>
+      <div class="hint" style="margin:2px 0 0">${linhaMedia(detPix)}. Entra em cada mês da projeção (no mês atual, só a parte que falta).</div>
+    </div>
+  </div>`;
+}
+
 function telaProj() {
   const { linhas, media } = projecao();
   const fim = linhas[linhas.length - 1];
@@ -1440,7 +1501,7 @@ function telaProj() {
   const lv = livreParaGastar();
   const heroPrev = `<div class="hero">
     <div class="hero-ico">${ico('grafico')}</div>
-    <div class="lbl">Previsto na conta no fim de ${nomeMes(mesAtual())}</div>
+    <div class="lbl">Previsto na conta no fim de ${nomeMes(mesAtual())} · ${comEstimativa() ? 'com gastos estimados' : 'só o que já existe'}</div>
     <div class="big ${linhas[0].saldo < 0 ? 'neg' : ''}">${fmt.format(linhas[0].saldo)}</div>
     <div class="stats">
       <div class="stat" style="--c:var(--accent)">${ico('carteira')}<div><small>Saldo hoje</small><b>${fmt.format(S.saldoAtual)}</b></div></div>
@@ -1454,9 +1515,11 @@ function telaProj() {
       ${lv.valor > 0 ? `<div class="pill">≈ ${fmt.format(lv.porDia)} por dia · ${lv.dias} ${lv.dias === 1 ? 'dia' : 'dias'}</div>
       <div class="medidor"><i style="width:${Math.min(100, Math.max(2, S.saldoAtual > 0 ? lv.valor / S.saldoAtual * 100 : 100))}%"></i></div>` : ''}
     </div>`;
-  return `<div class="destaque">${heroPrev}${cardLivre}</div>
+  return `${chaveModo()}
+  <div class="destaque">${heroPrev}${cardLivre}</div>
   ${cardSaldoDia()}
   ${cardLinhaDoTempo()}
+  ${cardEstimados()}
   <div class="card"><h2>Premissas</h2>
     <div class="row">
       <label>Saldo na conta hoje (R$)<input id="saldo" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
@@ -3511,6 +3574,8 @@ document.addEventListener('click', e => {
     return;
   }
   if (d.tl) { tlDias = +d.tl; render(); return; }
+  if (d.prevModo) { prevModo = d.prevModo; try { localStorage.setItem('financas.prev', prevModo); } catch (err) {} render(); return; }
+  if (e.target.closest('[data-ir-estimados]')) { e.preventDefault(); document.getElementById('estimados').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (d.calcAba) { calcAba = d.calcAba; render(); return; }
   if (d.calcPessoa) { calcPessoa = d.calcPessoa; render(); return; }
   if (d.lancarCalc) { if (confirm('Lançar estes valores na previsão? (substitui um lançamento igual feito antes)')) lancarCalc(d.lancarCalc); return; }
