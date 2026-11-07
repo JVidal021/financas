@@ -1214,7 +1214,7 @@ function parcelaDe(l) {
 // (ou que já foram pagas), Pix/débito e compras no cartão pela data da compra. Compra parcelada conta
 // inteira no mês em que foi feita; as parcelas seguintes de compras antigas não são gasto novo.
 function itensReais(m) {
-  if (m > mesAtual()) return [];
+  if (m > mesAtual()) return itensPrevistos(m);
   const ate = m === mesAtual() ? hoje() : fimDoMes(m), out = [];
   for (const f of S.fixos) for (const o of ocorrencias(f, m))
     if (o.data <= ate || pagoAntes(f, o.data)) out.push({ ...f, fixo: true, data: o.data, valor: o.valor, quando: o.data > ate ? hoje() : o.data });
@@ -1228,11 +1228,36 @@ function itensReais(m) {
   }
   return out;
 }
+// Mês que ainda não começou: só o que já existe, sem estimativas (o mesmo que a Previsão em
+// "Só o que já existe"). Salários e contas fixas nos dias deles, Pix/débito planejado e, de cada
+// cartão, as compras e parcelas das faturas que vencem no mês, datadas no vencimento.
+function itensPrevistos(m) {
+  const out = [], prev = { previsto: true };
+  for (const f of S.fixos) {
+    if (f.cartao && f.tipo === 'despesa') continue;
+    for (const o of ocorrencias(f, m)) if (!pagoAntes(f, o.data)) out.push({ ...f, ...prev, fixo: true, data: o.data, valor: o.valor, quando: o.data });
+  }
+  for (const l of S.lanc) if (!l.cartao && !l.pagamentoFatura && l.data.slice(0, 7) === m) out.push({ ...l, ...prev, quando: l.data });
+  for (const c of cartoesUsados()) {
+    const fixosC = mes => S.fixos.filter(f => f.cartao === c && f.tipo === 'despesa' && fixoAtivo(f, mes));
+    if (diaFechamento(c) && diaVencimento(c)) {
+      for (const fech of faturasQueVencem(c, m)) {
+        const venc = vencimentoDe(c, fech);
+        for (const l of S.lanc) if (l.cartao === c && l.tipo === 'despesa' && vencDoLanc(l) === venc) out.push({ ...l, ...prev, quando: venc });
+        for (const f of fixosC(fech.slice(0, 7))) out.push({ ...f, ...prev, fixo: true, data: venc, quando: venc });
+      }
+    } else {
+      for (const l of S.lanc) if (l.cartao === c && l.tipo === 'despesa' && l.data.slice(0, 7) === m) out.push({ ...l, ...prev, quando: l.data });
+      for (const f of fixosC(m)) out.push({ ...f, ...prev, fixo: true, data: dataDia(m, 1), quando: dataDia(m, 1) });
+    }
+  }
+  return out;
+}
 // Mesmo período do mês anterior (até o mesmo dia), para comparar com o mês atual ainda em andamento
 const reaisAteODia = (m, dia) => itensReais(m).filter(i => i.quando.slice(8) <= dia);
 
 function telaVisao() {
-  const atual = mesSel === mesAtual();
+  const atual = mesSel === mesAtual(), futuro = mesSel > mesAtual();
   const todos = itensReais(mesSel), itens = filtraCartao(todos), t = totais(itens);
   const desp = itens.filter(i => i.tipo === 'despesa');
   const porCat = {};
@@ -1241,7 +1266,7 @@ function telaVisao() {
   const cats = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
   // mês anterior até o mesmo dia (só compara quando ele tem receitas: antes disso o histórico está incompleto)
   const mesAnt = addMes(mesSel, -1), todosAnt = atual ? reaisAteODia(mesAnt, hoje().slice(8)) : itensReais(mesAnt), tAnt = totais(filtraCartao(todosAnt));
-  const comparaAnt = totais(itensReais(mesAnt)).r > 0;
+  const comparaAnt = !futuro && totais(itensReais(mesAnt)).r > 0;
   const porCatAnt = {};
   if (comparaAnt) filtraCartao(todosAnt).filter(i => i.tipo === 'despesa').forEach(i => porCatAnt[i.cat] = (porCatAnt[i.cat] || 0) + i.valor);
   const maxG = Math.max(1, ...cats.map(([c, v]) => Math.max(v, cartaoSel === null ? S.orc[c] || 0 : 0)));
@@ -1288,11 +1313,11 @@ function telaVisao() {
   <div class="hero">
     <div class="hero-ico">${ico('carteira')}</div>
     ${atual ? `<div class="lbl">Saldo na conta${dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}</div>
-    <div class="big">${fmt.format(S.saldoAtual)}</div>` : `<div class="lbl">Resultado de ${nomeMes(mesSel)}</div>
+    <div class="big">${fmt.format(S.saldoAtual)}</div>` : `<div class="lbl">${futuro ? 'Previsto para' : 'Resultado de'} ${nomeMes(mesSel)}${futuro ? ' · só o que já existe' : ''}</div>
     <div class="big">${fmt.format(t.saldo)}</div>`}
     <div class="stats">
-      <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>Entrou ${atual ? 'até hoje' : 'no mês'}</small><b>${fmt.format(t.r)}</b></div></div>
-      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>Gastei ${atual ? 'até hoje' : 'no mês'}</small><b>${fmt.format(t.d)}</b></div></div>
+      <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>${futuro ? 'Vai entrar' : `Entrou ${atual ? 'até hoje' : 'no mês'}`}</small><b>${fmt.format(t.r)}</b></div></div>
+      <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>${futuro ? 'Vai sair' : `Gastei ${atual ? 'até hoje' : 'no mês'}`}</small><b>${fmt.format(t.d)}</b></div></div>
       ${atual ? `<div class="stat" style="--c:var(--accent)">${ico('grafico')}<div><small>Resultado até hoje</small><b class="${t.saldo < 0 ? 'neg' : ''}">${fmt.format(t.saldo)}</b></div></div>` : ''}
     </div>
     ${atual ? `<div style="margin-top:16px">${campoSaldo()}</div>` : ''}
@@ -1309,7 +1334,7 @@ function telaVisao() {
     </div>
   </div>`;
 
-  const cardCats = `<div class="card"><h2>${ico('pizza')} Onde o dinheiro foi <span class="sub">· ${nomeMes(mesSel)}${atual ? ' até hoje' : ''}</span></h2>
+  const cardCats = `<div class="card"><h2>${ico('pizza')} Onde o dinheiro ${futuro ? 'vai' : 'foi'} <span class="sub">· ${nomeMes(mesSel)}${atual ? ' até hoje' : ''}</span></h2>
       ${rosca(cats)}
       ${rows || '<div class="empty">Nenhum gasto neste mês ainda.</div>'}
       ${cartaoSel !== null ? '' : Object.keys(S.orc).length ? '<p class="hint">A linha vertical marca o limite do orçamento.</p>' : '<p class="hint">Defina limites na aba Orçamento para acompanhar cada categoria.</p>'}
@@ -1321,16 +1346,16 @@ function telaVisao() {
   const ultParcela = parcelasFuturas.reduce((m, l) => vencDoLanc(l) > m ? vencDoLanc(l) : m, '');
   const aPagar = faturasAgora ? r2(faturasAgora.reduce((a, x) => a + x.vFechada + x.vAberta, 0)) : 0;
   const kpis = cartaoSel === null ? `<div class="tiles">
-    ${tile(`Entrou em ${nomeMes(mesSel)}`, fmt.format(t.r), 'sobe', 'var(--good)', comparaAnt ? delta(t.r, tAnt.r, false, rot) : '')}
-    ${tile(`Gastei em ${nomeMes(mesSel)}`, fmt.format(t.d), 'desce', 'var(--violeta)', comparaAnt ? delta(t.d, tAnt.d, true, rot) : '')}
+    ${tile(`${futuro ? 'Vai entrar' : 'Entrou'} em ${nomeMes(mesSel)}`, fmt.format(t.r), 'sobe', 'var(--good)', comparaAnt ? delta(t.r, tAnt.r, false, rot) : '')}
+    ${tile(`${futuro ? 'Vai sair' : 'Gastei'} em ${nomeMes(mesSel)}`, fmt.format(t.d), 'desce', 'var(--violeta)', comparaAnt ? delta(t.d, tAnt.d, true, rot) : '')}
     ${faturasAgora ? tile('Cartões a pagar', fmt.format(aPagar), 'cartao', 'var(--accent)', `<div class="sub2">faturas fechadas + abertas até hoje</div>`) : ''}
     ${parcelasFuturas.length ? tile('Parcelas a vencer', fmt.format(r2(parcelasFuturas.reduce((a, l) => a + l.valor, 0))), 'repete', '#db2777', `<div class="sub2">já compradas · até ${nomeMes(ultParcela.slice(0, 7))}</div>`) : ''}
   </div>` : '';
   // últimas movimentações
   const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-  const ultimas = itens.slice().sort((a, b) => b.quando.localeCompare(a.quando)).slice(0, 9);
+  const ultimas = itens.slice().sort((a, b) => futuro ? a.quando.localeCompare(b.quando) : b.quando.localeCompare(a.quando)).slice(0, 9);
   const visual = i => i.tipo === 'receita' ? ['sobe', 'var(--good)'] : i.cartao ? ['cartao', corCartao(i.cartao)] : i.fixo ? ['repete', 'var(--warn)'] : ['pix', 'var(--accent)'];
-  const cardUltimas = `<div class="card"><h2>${ico('lista')} Últimas movimentações</h2>
+  const cardUltimas = `<div class="card"><h2>${ico('lista')} ${futuro ? 'Primeiras do mês' : 'Últimas movimentações'}</h2>
     ${ultimas.length ? `<div class="feed">${ultimas.map(i => { const [ic, cor] = visual(i); return `<div class="ev">
       <span class="ev-ico" style="--c:${cor}">${ico(ic)}</span>
       <div class="ev-txt"><b title="${esc(i.desc)}">${esc(i.desc)}</b><small>${ddmm(i.quando)} ${DIAS_SEM[new Date(i.quando + 'T12:00').getDay()]} · ${esc(i.cat)}${i.cartao ? ' · ' + esc(nomeCartao(i.cartao)) : ''}${i.parcInfo ? ` · ${i.parcInfo.N}x` : ''}</small></div>
@@ -1340,7 +1365,7 @@ function telaVisao() {
   <div class="g21">${cardCats}${cardCartoes || cardUltimas}</div>
   <div class="g21">${cardHist}${cardCartoes ? cardUltimas : ''}</div>
   <div class="card"><h2>${ico('lista')} Movimentações de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}${atual ? ' até hoje' : ''}</span></h2>${tabelaItens(itens, true)}</div>
-  ${mesSel > mesAtual() ? '<p class="hint">Este mês ainda não começou: veja o que está previsto na aba Previsão.</p>' : ''}`;
+  ${futuro ? '<p class="hint">Este mês ainda não começou: aqui está só o que já existe (salários, contas fixas, parcelas e compras que caem nas faturas dele). Os gastos estimados ficam na aba Previsão.</p>' : ''}`;
 }
 
 // Cor fixa por categoria (para o círculo com a inicial)
