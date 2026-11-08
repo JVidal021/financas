@@ -1258,7 +1258,10 @@ const reaisAteODia = (m, dia) => itensReais(m).filter(i => i.quando.slice(8) <= 
 
 function telaVisao() {
   const atual = mesSel === mesAtual(), futuro = mesSel > mesAtual();
-  const todos = itensReais(mesSel), itens = filtraCartao(todos), t = totais(itens);
+  // cartão selecionado no mês atual: as faturas que vencem nele (como nos meses futuros), não só as compras feitas até hoje
+  const viaFatura = atual && cartaoSel !== null && cartaoSel !== FIXAS && cartaoSel !== SEM_CARTAO;
+  const todos = viaFatura ? itensPrevistos(mesSel) : itensReais(mesSel), itens = filtraCartao(todos), t = totais(itens);
+  const vencSel = viaFatura ? [...new Set(itens.map(i => i.quando))].sort() : [];
   const desp = itens.filter(i => i.tipo === 'despesa');
   const porCat = {};
   desp.forEach(i => porCat[i.cat] = (porCat[i.cat] || 0) + i.valor);
@@ -1266,7 +1269,7 @@ function telaVisao() {
   const cats = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
   // mês anterior até o mesmo dia (só compara quando ele tem receitas: antes disso o histórico está incompleto)
   const mesAnt = addMes(mesSel, -1), todosAnt = atual ? reaisAteODia(mesAnt, hoje().slice(8)) : itensReais(mesAnt), tAnt = totais(filtraCartao(todosAnt));
-  const comparaAnt = !futuro && totais(itensReais(mesAnt)).r > 0;
+  const comparaAnt = !futuro && !viaFatura && totais(itensReais(mesAnt)).r > 0;
   const porCatAnt = {};
   if (comparaAnt) filtraCartao(todosAnt).filter(i => i.tipo === 'despesa').forEach(i => porCatAnt[i.cat] = (porCatAnt[i.cat] || 0) + i.valor);
   const maxG = Math.max(1, ...cats.map(([c, v]) => Math.max(v, cartaoSel === null ? S.orc[c] || 0 : 0)));
@@ -1308,6 +1311,17 @@ function telaVisao() {
       <p class="hint">Toque num cartão para ver só os gastos dele.</p>
     </div>` : '';
 
+  // mês atual: o que ainda entra e sai até o fim do mês (só o que já existe, sem estimativas)
+  const resto = atual && cartaoSel === null ? comModo('conhecido', () => eventos(hoje(), fimDoMes(mesAtual()))) : [];
+  const restoR = r2(resto.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0)), restoD = r2(-resto.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0));
+  const fimMes = r2(S.saldoAtual + restoR - restoD);
+  const cardResto = resto.length ? `<div class="card"><h2>${ico('repete')} Ainda em ${nomeMes(mesSel)} <span class="sub">· até o dia ${+fimDoMes(mesSel).slice(8)}, sem estimativas</span></h2>
+    <div class="feed">${resto.map(e => `<div class="ev">
+      <span class="ev-ico" style="--c:${e.valor > 0 ? 'var(--good)' : e.cartao ? corCartao(e.cartao) : 'var(--warn)'}">${ico(e.valor > 0 ? 'sobe' : e.cartao ? 'cartao' : 'repete')}</span>
+      <div class="ev-txt"><b title="${esc(e.desc)}">${esc(e.desc)}</b><small>${ddmm(e.data)}${e.cartao ? ' · sua parte' + (e.outros >= 0.01 ? ` (+ ${NOME_OUTRO} ${fmt.format(e.outros)})` : '') : e.tag ? ' · ' + esc(e.tag) : ''}</small></div>
+      <div class="ev-val"><b class="${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</b></div></div>`).join('')}</div>
+    <p class="hint">Vai entrar ${fmt.format(restoR)} e sair ${fmt.format(restoD)}. Com o saldo informado, a conta fecha ${nomeMes(mesSel)} em <b>${fmt.format(fimMes)}</b>, antes das compras novas que você ainda fizer.</p>
+  </div>` : '';
   const dias = S.saldoData ? Math.round((new Date(hoje()) - new Date(S.saldoData)) / 864e5) : null;
   const hero = cartaoSel === null ? `
   <div class="hero">
@@ -1318,14 +1332,15 @@ function telaVisao() {
     <div class="stats">
       <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>${futuro ? 'Vai entrar' : `Entrou ${atual ? 'até hoje' : 'no mês'}`}</small><b>${fmt.format(t.r)}</b></div></div>
       <div class="stat" style="--c:var(--crit)">${ico('desce')}<div><small>${futuro ? 'Vai sair' : `Gastei ${atual ? 'até hoje' : 'no mês'}`}</small><b>${fmt.format(t.d)}</b></div></div>
-      ${atual ? `<div class="stat" style="--c:var(--accent)">${ico('grafico')}<div><small>Resultado até hoje</small><b class="${t.saldo < 0 ? 'neg' : ''}">${fmt.format(t.saldo)}</b></div></div>` : ''}
+      ${atual && resto.length ? `<div class="stat" style="--c:var(--accent)">${ico('grafico')}<div><small>Fim do mês (previsto)</small><b class="${fimMes < 0 ? 'neg' : ''}">${fmt.format(fimMes)}</b></div></div>` : ''}
+      ${atual && !resto.length ? `<div class="stat" style="--c:var(--accent)">${ico('grafico')}<div><small>Resultado até hoje</small><b class="${t.saldo < 0 ? 'neg' : ''}">${fmt.format(t.saldo)}</b></div></div>` : ''}
     </div>
     ${atual ? `<div style="margin-top:16px">${campoSaldo()}</div>` : ''}
     ${orcTotal ? `<div class="orc">Orçamento: ${fmt.format(gastoOrcado)} de ${fmt.format(orcTotal)} (${Math.round(gastoOrcado / orcTotal * 100)}%)${gastoOrcado > orcTotal ? ' · ▲ acima do limite' : ''}
       <div class="bar"><i style="width:${Math.min(100, gastoOrcado / orcTotal * 100)}%"></i></div></div>` : ''}
   </div>` : `
   <div class="hero cor" style="background:linear-gradient(135deg, ${corCartao(cartaoSel)} 0%, color-mix(in srgb, ${corCartao(cartaoSel)} 55%, #1b1530) 100%)">
-    <div class="lbl">${esc(nomeCartao(cartaoSel))} · gasto em ${nomeMes(mesSel)}${atual ? ' até hoje' : ''}</div>
+    <div class="lbl">${esc(nomeCartao(cartaoSel))} · ${viaFatura ? `fatura de ${nomeMes(mesSel)}${vencSel.length ? ' · vence ' + vencSel.map(ddmm).join(' e ') : ''} · sua parte` : `gasto em ${nomeMes(mesSel)}${atual ? ' até hoje' : ''}`}</div>
     <div class="big">${fmt.format(t.d)}</div>
     <div class="stats">
       <div class="stat">${ico('lista')}<div><small>Lançamentos</small><b>${desp.length}</b></div></div>
@@ -1334,7 +1349,7 @@ function telaVisao() {
     </div>
   </div>`;
 
-  const cardCats = `<div class="card"><h2>${ico('pizza')} Onde o dinheiro ${futuro ? 'vai' : 'foi'} <span class="sub">· ${nomeMes(mesSel)}${atual ? ' até hoje' : ''}</span></h2>
+  const cardCats = `<div class="card"><h2>${ico('pizza')} Onde o dinheiro ${futuro || viaFatura ? 'vai' : 'foi'} <span class="sub">· ${nomeMes(mesSel)}${atual && !viaFatura ? ' até hoje' : ''}</span></h2>
       ${rosca(cats)}
       ${rows || '<div class="empty">Nenhum gasto neste mês ainda.</div>'}
       ${cartaoSel !== null ? '' : Object.keys(S.orc).length ? '<p class="hint">A linha vertical marca o limite do orçamento.</p>' : '<p class="hint">Defina limites na aba Orçamento para acompanhar cada categoria.</p>'}
@@ -1361,10 +1376,10 @@ function telaVisao() {
       <div class="ev-txt"><b title="${esc(i.desc)}">${esc(i.desc)}</b><small>${ddmm(i.quando)} ${DIAS_SEM[new Date(i.quando + 'T12:00').getDay()]} · ${esc(i.cat)}${i.cartao ? ' · ' + esc(nomeCartao(i.cartao)) : ''}${i.parcInfo ? ` · ${i.parcInfo.N}x` : ''}</small></div>
       <div class="ev-val"><b class="${i.tipo === 'receita' ? 'pos' : ''}">${i.tipo === 'receita' ? '+' : '−'} ${fmt.format(i.valor)}</b></div></div>`; }).join('')}</div>` : '<div class="empty">Nada neste mês ainda.</div>'}
   </div>`;
-  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${hero}${kpis}
+  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${hero}${kpis}${cardResto}
   <div class="g21">${cardCats}${cardCartoes || cardUltimas}</div>
   <div class="g21">${cardHist}${cardCartoes ? cardUltimas : ''}</div>
-  <div class="card"><h2>${ico('lista')} Movimentações de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}${atual ? ' até hoje' : ''}</span></h2>${tabelaItens(itens, true)}</div>
+  <div class="card"><h2>${ico('lista')} Movimentações de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}${atual && !viaFatura ? ' até hoje' : ''}</span></h2>${tabelaItens(itens, true)}</div>
   ${futuro ? '<p class="hint">Este mês ainda não começou: aqui está só o que já existe (salários, contas fixas, parcelas e compras que caem nas faturas dele). Os gastos estimados ficam na aba Previsão.</p>' : ''}`;
 }
 
