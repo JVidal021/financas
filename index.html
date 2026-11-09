@@ -1053,10 +1053,10 @@ function projecao() {
     const m = addMes(mesAtual(), i), det = [];
     const ativos = S.fixos.filter(f => fixoAtivo(f, m));
     const semCartao = S.lanc.filter(l => !l.cartao && l.data.slice(0, 7) === m);
-    let r = ativos.filter(f => f.tipo === 'receita').reduce((a, f) => a + f.valor - valorPagoNoMes(f, m) - difAjustes(f, m), 0) + semCartao.filter(l => l.tipo === 'receita').reduce((a, l) => a + l.valor, 0);
+    let r = ativos.filter(f => f.tipo === 'receita').reduce((a, f) => a + valorFixoMes(f, m), 0) + semCartao.filter(l => l.tipo === 'receita').reduce((a, l) => a + l.valor, 0);
     let d = 0;
     const add = (txt, v) => { if (v) { d += v; det.push(`${txt}: ${fmt.format(v)}`); } };
-    add('Contas fixas', ativos.filter(f => f.tipo === 'despesa' && !f.cartao).reduce((a, f) => a + f.valor - valorPagoNoMes(f, m) - difAjustes(f, m), 0));
+    add('Contas fixas', ativos.filter(f => f.tipo === 'despesa' && !f.cartao).reduce((a, f) => a + valorFixoMes(f, m), 0));
     add('Planejados (Pix/débito)', semCartao.filter(l => l.tipo === 'despesa').reduce((a, l) => a + l.valor, 0));
     add('Pix/débito (média)', r2(pixMedia * fator));
     for (const c of cartoesUsados()) {
@@ -1198,11 +1198,38 @@ function catsUsadas() {
 
 // ---------- dados reais: o que já aconteceu ----------
 // Vezes em que um item fixo entra ou sai no mês `m`, com o valor de cada uma
-function ocorrencias(f, m, semAjuste) {
+// Datas em que a regra do item cai no mês `m` (a data "original" de cada ocorrência) e a fração do valor
+function datasBase(f, m) {
   if (!fixoAtivo(f, m)) return [];
   const fr = fracoesAgenda(f);
   return [...(f.uteis || []).map(n => [diaUtil(m, n), fr['u' + n]]), ...(f.dias || []).map(d => [dataDia(m, d), fr['d' + d]])]
-    .filter(([d, p]) => d && p > 0).map(([data, p]) => ({ data, valor: semAjuste ? r2(f.valor * p) : valorNoDia(f, data, r2(f.valor * p)) }));
+    .filter(([d, p]) => d && p > 0).map(([orig, p]) => ({ orig, p }));
+}
+// Ocorrências que caem no mês `m`. Cada uma pode ser mudada só daquela vez (pela data original):
+// f.ajustes[orig] = outro valor (0 = não acontece) e f.movidos[orig] = outra data.
+// `semAjuste`: como a regra manda, sem as mudanças.
+function ocorrencias(f, m, semAjuste) {
+  if (semAjuste) return datasBase(f, m).map(({ orig, p }) => ({ data: orig, orig, parte: p, valor: r2(f.valor * p) }));
+  const mov = f.movidos || {}, out = [];
+  const meses = Object.keys(mov).length ? [-2, -1, 0, 1, 2].map(i => addMes(m, i)) : [m];
+  for (const mm of meses) for (const { orig, p } of datasBase(f, mm)) {
+    const data = mov[orig] || orig;
+    if (data.slice(0, 7) !== m) continue;
+    const valor = valorNoDia(f, orig, r2(f.valor * p));
+    if (valor > 0) out.push({ data, orig, parte: p, valor, movida: !!mov[orig], ajustada: !!(f.ajustes && f.ajustes[orig] != null) });
+  }
+  return out.sort((a, b) => a.data.localeCompare(b.data));
+}
+// Quanto o item fixo movimenta na conta no mês `m` (sem o que já foi pago ou recebido antes do dia)
+const valorFixoMes = (f, m) => f.dias || f.uteis ? r2(ocorrencias(f, m).filter(o => !pagoAntes(f, o.orig)).reduce((a, o) => a + o.valor, 0)) : f.valor;
+// Mudanças feitas só numa ocorrência, ainda por vir (para listar na aba Fixos)
+function mudancasPontuais(f) {
+  const origs = new Set([...Object.keys(f.ajustes || {}), ...Object.keys(f.movidos || {})]);
+  return [...origs].filter(o => o >= hoje() || ((f.movidos || {})[o] || '') >= hoje()).sort().map(orig => {
+    const v = (f.ajustes || {})[orig], d = (f.movidos || {})[orig];
+    const txt = v === 0 ? `${ddmm(orig)}: não acontece` : [d ? `${ddmm(orig)} → ${ddmm(d)}` : ddmm(orig), v != null ? fmt.format(v) : ''].filter(Boolean).join(': ');
+    return { orig, txt };
+  });
 }
 // Número da parcela (n de N) de um lançamento parcelado, ou null
 function parcelaDe(l) {
@@ -1217,7 +1244,7 @@ function itensReais(m) {
   if (m > mesAtual()) return itensPrevistos(m);
   const ate = m === mesAtual() ? hoje() : fimDoMes(m), out = [];
   for (const f of S.fixos) for (const o of ocorrencias(f, m))
-    if (o.data <= ate || pagoAntes(f, o.data)) out.push({ ...f, fixo: true, data: o.data, valor: o.valor, quando: o.data > ate ? hoje() : o.data });
+    if (o.data <= ate || pagoAntes(f, o.orig)) out.push({ ...f, fixo: true, data: o.data, orig: o.orig, valor: o.valor, quando: o.data > ate ? hoje() : o.data });
   for (const l of S.lanc) {
     if (l.prevista || l.pagamentoFatura) continue;
     const dc = dataDaCompra(l);
@@ -1235,7 +1262,7 @@ function itensPrevistos(m) {
   const out = [], prev = { previsto: true };
   for (const f of S.fixos) {
     if (f.cartao && f.tipo === 'despesa') continue;
-    for (const o of ocorrencias(f, m)) if (!pagoAntes(f, o.data)) out.push({ ...f, ...prev, fixo: true, data: o.data, valor: o.valor, quando: o.data });
+    for (const o of ocorrencias(f, m)) if (!pagoAntes(f, o.orig)) out.push({ ...f, ...prev, fixo: true, data: o.data, orig: o.orig, valor: o.valor, quando: o.data });
   }
   for (const l of S.lanc) if (!l.cartao && !l.pagamentoFatura && l.data.slice(0, 7) === m) out.push({ ...l, ...prev, quando: l.data });
   for (const c of cartoesUsados()) {
@@ -1318,7 +1345,7 @@ function telaVisao() {
   const cardResto = resto.length ? `<div class="card"><h2>${ico('repete')} Ainda em ${nomeMes(mesSel)} <span class="sub">· até o dia ${+fimDoMes(mesSel).slice(8)}, sem estimativas</span></h2>
     <div class="feed">${resto.map(e => `<div class="ev">
       <span class="ev-ico" style="--c:${e.valor > 0 ? 'var(--good)' : e.cartao ? corCartao(e.cartao) : 'var(--warn)'}">${ico(e.valor > 0 ? 'sobe' : e.cartao ? 'cartao' : 'repete')}</span>
-      <div class="ev-txt"><b title="${esc(e.desc)}">${esc(e.desc)}</b><small>${ddmm(e.data)}${e.cartao ? ' · sua parte' + (e.outros >= 0.01 ? ` (+ ${NOME_OUTRO} ${fmt.format(e.outros)})` : '') : e.tag ? ' · ' + esc(e.tag) : ''}</small></div>
+      <div class="ev-txt"><b title="${esc(e.desc)}">${esc(e.desc)}</b><small>${ddmm(e.data)}${e.cartao ? ' · sua parte' + (e.outros >= 0.01 ? ` (+ ${NOME_OUTRO} ${fmt.format(e.outros)})` : '') : e.tag ? ' · ' + esc(e.tag) : ''}${e.movido ? ` · era ${ddmm(e.movido)}` : ''}${e.ajustado ? ' · ajustado' : ''}${e.fixo ? `<button class="link pagar" data-oc="${e.fixo}|${e.orig}" title="Mudar só esta vez: valor, data ou não acontece">✎ esta vez</button>` : ''}</small></div>
       <div class="ev-val"><b class="${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</b></div></div>`).join('')}</div>
     <p class="hint">Vai entrar ${fmt.format(restoR)} e sair ${fmt.format(restoD)}. Com o saldo informado, a conta fecha ${nomeMes(mesSel)} em <b>${fmt.format(fimMes)}</b>, antes das compras novas que você ainda fizer.</p>
   </div>` : '';
@@ -1399,9 +1426,9 @@ function tabelaItens(itens, mostraFixo) {
   const dataItem = i => i.quando || (i.fixo ? i.data || '' : dataDaCompra(i));
   itens = itens.slice().sort((a, b) => dataItem(b).localeCompare(dataItem(a)));
   return `<div class="tbl-wrap"><table class="tabela-mov"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? (i.data ? dataBR(i.data) + ' ' : '') + '<span class="tag t-azul">fixo</span>' : dataBR(dataDaCompra(i))}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.parcInfo ? ` <span class="tag">${i.parcInfo.N}x de ${fmt.format(r2(i.valor / i.parcInfo.N))}</span>` : ''}${!i.fixo && !i.parcInfo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
+    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? (i.data ? dataBR(i.data) + ' ' : '') + '<span class="tag t-azul">fixo</span>' + (i.orig && i.orig !== i.data ? ` <span class="tag t-aviso" title="Data mudada só desta vez">era ${ddmm(i.orig)}</span>` : '') + (i.orig && i.ajustes && i.ajustes[i.orig] != null ? ' <span class="tag t-aviso" title="Valor diferente do normal só desta vez">ajustado</span>' : '') : dataBR(dataDaCompra(i))}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.parcInfo ? ` <span class="tag">${i.parcInfo.N}x de ${fmt.format(r2(i.valor / i.parcInfo.N))}</span>` : ''}${!i.fixo && !i.parcInfo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
-      <td class="num">${i.fixo ? '' : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
+      <td class="num">${i.fixo ? (i.orig && !i.cartao ? `<button class="link" data-oc="${i.id}|${i.orig}" title="Mudar só esta vez: valor, data ou não acontece">${ico('lapis')}</button>` : '') : `<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
 }
 
@@ -1464,9 +1491,9 @@ function telaFixos() {
   </div>
   <div class="card"><h2>Itens fixos</h2>
   ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Período</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    lista.map(f => `<tr style="${fixoAtivo(f, mesAtual()) ? '' : 'opacity:.55'}"><td>${esc(f.desc)}${f.cartao ? ' ' + tagCartao(f.cartao) : ''}</td><td>${esc(f.cat)}</td><td>${nomeMes(f.inicio)} → ${f.fim ? nomeMes(f.fim) : 'sem fim'}${Object.entries(f.ajustes || {}).filter(([d]) => d >= hoje()).map(([d, v]) => `<div class="hint" style="margin:0"><span class="tag t-aviso" title="Só nesse dia o valor muda">${ddmm(d)}: ${fmt.format(v)}</span><button class="link" data-desajustar="${f.id}|${d}" title="Voltar ao valor normal">✕</button></div>`).join('')}${f.dias || f.uteis ? `<div class="hint" style="margin:0">${textoAgenda(f)}${f.uteis ? ` (este mês: ${f.uteis.map(n => (diaUtil(mesAtual(), n) || '').slice(8) + '/' + mesAtual().slice(5)).join(', ')})` : ''}</div>` : ''}</td>
+    lista.map(f => `<tr style="${fixoAtivo(f, mesAtual()) ? '' : 'opacity:.55'}"><td>${esc(f.desc)}${f.cartao ? ' ' + tagCartao(f.cartao) : ''}</td><td>${esc(f.cat)}</td><td>${nomeMes(f.inicio)} → ${f.fim ? nomeMes(f.fim) : 'sem fim'}${mudancasPontuais(f).map(x => `<div class="hint" style="margin:0"><button class="link tag t-aviso" data-oc="${f.id}|${x.orig}" title="Só desta vez. Toque para mudar">${x.txt}</button><button class="link" data-desajustar="${f.id}|${x.orig}" title="Voltar ao normal">✕</button></div>`).join('')}${f.dias || f.uteis ? `<div class="hint" style="margin:0">${textoAgenda(f)}${f.uteis ? ` (este mês: ${f.uteis.map(n => (diaUtil(mesAtual(), n) || '').slice(8) + '/' + mesAtual().slice(5)).join(', ')})` : ''}</div>` : ''}</td>
       <td class="num ${f.tipo === 'receita' ? 'pos' : ''}">${f.tipo === 'receita' ? '+' : '−'} ${fmt.format(f.valor)}</td>
-      <td class="num">${(f.pagos || []).filter(pg => pg.data >= hoje()).map(pg => `<span class="tag t-bom" title="Previsto para ${ddmm(pg.data)}; já ${f.tipo === 'receita' ? 'recebido' : 'pago'}">${f.tipo === 'receita' ? 'recebido' : 'pago'} · ${ddmm(pg.data)}</span><button class="link" data-despagar="${f.id}|${pg.data}" title="Desfazer">✕</button>`).join('')}${!f.cartao && (f.dias || f.uteis) && !(f.pagos || []).some(pg => pg.data >= hoje()) && proximaOcorrencia(f) ? `<button class="link" data-pago="${f.id}|${proximaOcorrencia(f).data}|${Math.abs(proximaOcorrencia(f).valor)}" title="Marca a próxima ocorrência (${ddmm(proximaOcorrencia(f).data)}) como já ${f.tipo === 'receita' ? 'recebida' : 'paga'}">já ${f.tipo === 'receita' ? 'recebi' : 'paguei'}</button>` : ''}${!f.fim || f.fim >= mesAtual() ? `<button class="link" data-encerrar=""${f.id}" title="Encerrar no mês atual">encerrar</button>` : ''}<button class="link" data-edit-fixo="${f.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-fixo="${f.id}" title="Excluir">✕</button></td></tr>`).join('') +
+      <td class="num">${(f.pagos || []).filter(pg => pg.data >= hoje()).map(pg => `<span class="tag t-bom" title="Previsto para ${ddmm(pg.data)}; já ${f.tipo === 'receita' ? 'recebido' : 'pago'}">${f.tipo === 'receita' ? 'recebido' : 'pago'} · ${ddmm(pg.data)}</span><button class="link" data-despagar="${f.id}|${pg.data}" title="Desfazer">✕</button>`).join('')}${!f.cartao && (f.dias || f.uteis) && !(f.pagos || []).some(pg => pg.data >= hoje()) && proximaOcorrencia(f) ? `<button class="link" data-pago="${f.id}|${proximaOcorrencia(f).orig}|${Math.abs(proximaOcorrencia(f).valor)}" title="Marca a próxima ocorrência (${ddmm(proximaOcorrencia(f).data)}) como já ${f.tipo === 'receita' ? 'recebida' : 'paga'}">já ${f.tipo === 'receita' ? 'recebi' : 'paguei'}</button>` : ''}${!f.fim || f.fim >= mesAtual() ? `<button class="link" data-encerrar="${f.id}" title="Encerrar no mês atual">encerrar</button>` : ''}${!f.cartao && (f.dias || f.uteis) ? `<button class="link" data-oc="${f.id}|" title="Mudar uma ocorrência só (valor, data ou não acontece)">esta vez</button>` : ''}<button class="link" data-edit-fixo="${f.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-fixo="${f.id}" title="Excluir">✕</button></td></tr>`).join('') +
     `</tbody></table></div>` : '<div class="empty">Cadastre seus gastos e receitas recorrentes.</div>'}
   </div>`;
 }
@@ -1563,6 +1590,7 @@ function telaProj() {
   ${cardSaldoDia()}
   ${cardLinhaDoTempo()}
   ${cardEstimados()}
+  ${cardConferencias()}
   <div class="card"><h2>Premissas</h2>
     <div class="row">
       <label>Saldo na conta hoje (R$)<input id="saldo" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
@@ -2245,9 +2273,6 @@ const fimDoMes = ym => dataDia(ym, 31);
 const pagoAntes = (f, data) => (f.pagos || []).some(p => p.data === data);
 // Ajuste de uma data específica: { 'AAAA-MM-DD': valor } troca o valor normal só naquele dia
 const valorNoDia = (f, data, normal) => f.ajustes && f.ajustes[data] != null ? f.ajustes[data] : normal;
-// Diferença que os ajustes fazem no mês `m` (valor normal − valor ajustado)
-const difAjustes = (f, m) => f.ajustes ? r2(ocorrencias(f, m, true).reduce((a, o) => a + o.valor - valorNoDia(f, o.data, o.valor), 0)) : 0;
-const valorPagoNoMes = (f, m) => (f.pagos || []).filter(p => p.data.slice(0, 7) === m).reduce((a, p) => a + p.valor, 0);
 function eventos(ini, fim) {
   const dentro = d => d > ini && d <= fim;
   const ev = [];
@@ -2255,13 +2280,10 @@ function eventos(ini, fim) {
   while (meses[meses.length - 1] < fim.slice(0, 7)) meses.push(addMes(meses[meses.length - 1], 1));
   for (const m of meses) {
     for (const f of S.fixos) {
-      if (f.cartao || !(f.dias || f.uteis) || !fixoAtivo(f, m)) continue;
-      const fr = fracoesAgenda(f);
-      const datas = [...(f.uteis || []).map(n => [diaUtil(m, n), fr['u' + n]]), ...(f.dias || []).map(d => [dataDia(m, d), fr['d' + d]])]
-        .filter(([d]) => d).sort((a, b) => a[0].localeCompare(b[0]));
-      datas.forEach(([data, parte]) => {
-        if (dentro(data) && parte > 0 && !pagoAntes(f, data)) ev.push({ fixo: f.id, data, desc: f.desc + (datas.length > 1 ? (f.valores && Object.values(f.valores).length ? '' : ` (${Math.round(parte * 100)}%)`) : ''), valor: (f.tipo === 'receita' ? 1 : -1) * valorNoDia(f, data, r2(f.valor * parte)), tag: f.tipo === 'receita' ? 'entrada' : 'conta fixa', ajustado: f.ajustes && f.ajustes[data] != null });
-      });
+      if (f.cartao || !(f.dias || f.uteis)) continue;
+      const varias = (f.uteis || []).length + (f.dias || []).length > 1 && !(f.valores && Object.values(f.valores).length);
+      for (const o of ocorrencias(f, m)) if (dentro(o.data) && !pagoAntes(f, o.orig))
+        ev.push({ fixo: f.id, data: o.data, orig: o.orig, desc: f.desc + (varias ? ` (${Math.round(o.parte * 100)}%)` : ''), valor: (f.tipo === 'receita' ? 1 : -1) * o.valor, tag: f.tipo === 'receita' ? 'entrada' : 'conta fixa', ajustado: o.ajustada, movido: o.movida ? o.orig : null });
     }
     for (const c of cartoesUsados()) {
       if (!diaFechamento(c)) continue;
@@ -2271,7 +2293,7 @@ function eventos(ini, fim) {
       if (v) ev.push({ data: venc, desc: `Fatura ${c}`, valor: -v, cartao: c, previa: fech > hoje(), estimado: est, outros: parteOutros(c, fech) });
     }
   }
-  S.lanc.filter(l => !l.cartao && dentro(l.data)).forEach(l => ev.push({ data: l.data, desc: l.desc, valor: (l.tipo === 'receita' ? 1 : -1) * l.valor, tag: 'planejado' }));
+  S.lanc.filter(l => !l.cartao && dentro(l.data)).forEach(l => ev.push({ lanc: l.id, data: l.data, desc: l.desc, valor: (l.tipo === 'receita' ? 1 : -1) * l.valor, tag: 'planejado' }));
   return ev.sort((a, b) => a.data.localeCompare(b.data) || b.valor - a.valor);
 }
 // Livre pra gastar: o menor saldo previsto nos próximos 45 dias (contas, salários, faturas com a
@@ -2394,10 +2416,193 @@ function informarSaldo(novo) {
     const entradas = r2(ev.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0));
     const saidas = r2(-ev.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0));
     const esperado = r2(base.saldo + entradas - saidas);
-    S.conferencia = { de: base.data, ate: hoje(), anterior: base.saldo, entradas, saidas, esperado, informado: novo, diff: r2(novo - esperado) };
+    S.conferencia = { de: base.data, ate: hoje(), anterior: base.saldo, entradas, saidas, esperado, informado: novo, diff: r2(novo - esperado),
+      ev: ev.map(e => ({ data: e.data, orig: e.orig, desc: e.desc, valor: e.valor, fixo: e.fixo, lanc: e.lanc, cartao: e.cartao })) };
   }
   S.saldoAtual = novo; S.saldoData = hoje();
   salvar();
+}
+
+
+// ---------- uma ocorrência de um item fixo, só desta vez ----------
+// Ocorrências (pela data original) do mês passado até 4 meses à frente, para escolher
+function opcoesOcorrencia(f) {
+  const out = [];
+  for (let i = -1; i <= 4; i++) for (const o of datasBase(f, addMes(mesAtual(), i))) out.push(o.orig);
+  return out;
+}
+const valorNormal = (f, orig) => { const b = datasBase(f, orig.slice(0, 7)).find(o => o.orig === orig); return b ? r2(f.valor * b.p) : f.valor; };
+function abrirOcorrencia(id, orig) {
+  const f = S.fixos.find(x => x.id === id); if (!f) return;
+  const ops = opcoesOcorrencia(f);
+  if (!orig) orig = ops.find(o => ((f.movidos || {})[o] || o) >= hoje()) || ops[0];
+  if (!orig) return alert('Este item não tem dia definido no mês.');
+  if (!ops.includes(orig)) { ops.push(orig); ops.sort(); }
+  const normal = valorNormal(f, orig), aj = (f.ajustes || {})[orig], mov = (f.movidos || {})[orig], receita = f.tipo === 'receita';
+  const rot = o => `${dataBR(o)}${(f.movidos || {})[o] ? ' → ' + ddmm(f.movidos[o]) : ''}${(f.ajustes || {})[o] === 0 ? ' (não acontece)' : (f.ajustes || {})[o] != null ? ' · ' + fmt.format(f.ajustes[o]) : ''}${(f.pagos || []).some(p => p.data === o) ? (receita ? ' · já recebido' : ' · já pago') : ''}`;
+  const dlg = document.getElementById('dlg');
+  dlg.innerHTML = `<form id="f-oc" method="dialog">
+    <h2>${ico('lapis')} ${esc(f.desc)} · só esta vez</h2>
+    <div class="row">
+      <label style="flex-basis:100%">Qual vez<select name="orig" id="oc-orig" data-fixo="${f.id}">${ops.map(o => `<option value="${o}" ${o === orig ? 'selected' : ''}>${rot(o)}</option>`).join('')}</select></label>
+      <label>${receita ? 'Entra' : 'Sai'} em<input type="date" name="data" value="${mov || orig}"></label>
+      <label>Valor desta vez (R$)<input name="valor" inputmode="decimal" value="${String(aj > 0 ? aj : normal).replace('.', ',')}"></label>
+    </div>
+    <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" name="pular" ${aj === 0 ? 'checked' : ''}> Desta vez não acontece</label>
+    <p class="hint">O normal é ${fmt.format(normal)} em ${dataBR(orig)}. Só esta vez muda: os outros meses continuam iguais, e a previsão, a agenda e o fim do mês já usam o que você colocar aqui.</p>
+    <div class="row" style="justify-content:flex-end;margin-top:16px">
+      ${aj != null || mov ? `<button type="button" class="btn" data-oc-normal="${f.id}|${orig}">Voltar ao normal</button>` : ''}
+      <button type="button" class="btn" id="edit-cancelar">Cancelar</button>
+      <button class="btn primary" value="${f.id}">Salvar</button>
+    </div>
+  </form>`;
+  if (!dlg.open) dlg.showModal();
+}
+// Muda a ocorrência `orig` do item: valor (0 = não acontece) e data. Valor e data normais apagam a mudança.
+function mudarOcorrencia(f, orig, { valor, data, pular }) {
+  const normal = valorNormal(f, orig);
+  f.ajustes = { ...(f.ajustes || {}) }; f.movidos = { ...(f.movidos || {}) };
+  if (pular) f.ajustes[orig] = 0;
+  else if (valor != null && Math.abs(valor - normal) >= 0.01) f.ajustes[orig] = r2(valor);
+  else if (valor != null) delete f.ajustes[orig];
+  if (pular || !data || data === orig) delete f.movidos[orig]; else f.movidos[orig] = data;
+  if (!Object.keys(f.ajustes).length) delete f.ajustes;
+  if (!Object.keys(f.movidos).length) delete f.movidos;
+}
+function salvarOcorrencia(fd, id) {
+  const f = S.fixos.find(x => x.id === id), orig = fd.orig, v = num(fd.valor), data = fd.data || orig;
+  if (!fd.pular && !(v > 0)) return alert('Informe um valor maior que zero (ou marque "Desta vez não acontece").');
+  if (Math.abs(diasEntre(orig, data)) > 55) return alert('A nova data precisa ficar a até uns 55 dias da data normal.');
+  mudarOcorrencia(f, orig, { valor: v, data, pular: !!fd.pular });
+  document.getElementById('dlg').close();
+  salvar();
+}
+
+// ---------- conferência do saldo: explicar a diferença ----------
+// O que estava previsto no período da conferência (guardado na hora em que o saldo foi informado)
+const evConf = c => c.ev || eventos(c.de, c.ate).map(e => ({ data: e.data, orig: e.orig, desc: e.desc, valor: e.valor, fixo: e.fixo, lanc: e.lanc, cartao: e.cartao }));
+// Lançamentos sem cartão que se repetem nos últimos 4 meses: viram sugestões para explicar a diferença
+function sugestoesConf(tipo) {
+  const desde = addDia(hoje(), -120), grupos = {};
+  for (const l of S.lanc) {
+    if (l.cartao || l.tipo !== tipo || l.naoIdentificado || l.pagamentoFatura || l.data < desde || l.data > hoje()) continue;
+    const k = l.desc.trim().toLowerCase();
+    const g = grupos[k] = grupos[k] || { desc: l.desc.trim(), cat: l.cat, valor: l.valor, n: 0, ult: '' };
+    g.n++; if (l.data >= g.ult) { g.ult = l.data; g.valor = l.valor; g.cat = l.cat; }
+  }
+  return Object.values(grupos).sort((a, b) => b.n - a.n || b.ult.localeCompare(a.ult)).slice(0, 8);
+}
+let _sugConf = [];
+const linhaConf = (x = {}) => `<div class="cf-linha row" style="align-items:end;margin-top:6px">
+    <label style="flex:2 1 160px">Descrição<input class="cf-desc" value="${esc(x.desc || '')}" placeholder="Ex.: Uber, farmácia, Pix pra alguém"></label>
+    <label style="flex:1 1 100px">Valor (R$)<input class="cf-valor" inputmode="decimal" value="${x.valor ? String(x.valor).replace('.', ',') : ''}" placeholder="0,00"></label>
+    <label style="flex:1 1 110px">Categoria<input class="cf-cat" list="cats" value="${esc(x.cat || 'Outros')}"></label>
+    <label style="flex:1 1 130px">Data<input class="cf-data" type="date" value="${x.data || S.conferencia.ate}" min="${addDia(S.conferencia.de, 1)}" max="${S.conferencia.ate}"></label>
+    <label style="flex:0 1 110px">Tipo<select class="cf-tipo"><option value="despesa" ${x.tipo !== 'receita' ? 'selected' : ''}>Saiu</option><option value="receita" ${x.tipo === 'receita' ? 'selected' : ''}>Entrou</option></select></label>
+    <button type="button" class="link" data-cf-del title="Tirar">✕</button>
+  </div>`;
+function abrirConferencia() {
+  const c = S.conferencia, ev = evConf(c), saiu = c.diff < 0;
+  _sugConf = sugestoesConf(saiu ? 'despesa' : 'receita');
+  const opcoes = e => e.cartao ? [['ok', 'Paguei'], ['depois', 'Ainda não paguei']]
+    : [['ok', 'Aconteceu'], ['valor', 'Valor diferente'], ['depois', 'Ainda não aconteceu'], ['nao', 'Não vai acontecer']];
+  const dlg = document.getElementById('dlg');
+  dlg.innerHTML = `<form id="f-conf" method="dialog" style="max-width:760px">
+    <h2>${ico('lista')} Explicar a diferença</h2>
+    <p class="hint" style="margin-top:0">Entre ${ddmm(c.de)} e ${ddmm(c.ate)} ${saiu ? 'saiu' : 'entrou'} <b>${fmt.format(Math.abs(c.diff))}</b> a mais do que o previsto. Confira o que estava previsto e adicione o que faltou no app.</p>
+    <h3 style="margin:16px 0 6px">1. O que estava previsto</h3>
+    ${ev.length ? ev.map((e, k) => `<div class="cf-prev" data-k="${k}" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--grid)">
+      <div><b>${esc(e.desc)}</b><div class="hint" style="margin:0">${ddmm(e.data)} · <span class="${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</span></div></div>
+      <select name="p${k}" style="max-width:44vw">${opcoes(e).map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
+      <div class="cf-extra row" style="grid-column:1/-1;display:none;margin:0">
+        <label class="cf-v" style="flex:0 1 160px">Valor de verdade (R$)<input name="pv${k}" inputmode="decimal" value="${String(Math.abs(e.valor)).replace('.', ',')}"></label>
+        <label class="cf-d" style="flex:0 1 180px">Quando vai ${e.valor > 0 ? 'entrar' : 'sair'}<input name="pd${k}" type="date" min="${addDia(hoje(), 1)}" value="${addDia(hoje(), 1)}"></label>
+      </div>
+    </div>`).join('') : '<div class="empty">Nada estava previsto nesse período.</div>'}
+    <h3 style="margin:18px 0 6px">2. O que não estava no app</h3>
+    ${_sugConf.length ? `<div class="chips" style="margin:0 0 6px">${_sugConf.map((x, i) => `<button type="button" class="chip" data-cf-sug="${i}" title="Último: ${fmt.format(x.valor)}">+ ${esc(x.desc)}</button>`).join('')}</div>` : ''}
+    <div id="cf-linhas">${linhaConf({ tipo: saiu ? 'despesa' : 'receita' })}</div>
+    <button type="button" class="link" data-cf-add style="margin-top:8px">+ Adicionar outro</button>
+    <div id="cf-resumo" style="margin-top:16px"></div>
+    <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" name="resto" checked> Registrar o que faltar como não identificado (entra na média de Pix/débito da previsão)</label>
+    <div class="row" style="justify-content:flex-end;margin-top:16px">
+      <button type="button" class="btn" id="edit-cancelar">Cancelar</button>
+      <button class="btn primary">Salvar</button>
+    </div>
+  </form>`;
+  dlg.showModal();
+  resumoConf();
+}
+function linhasConf() {
+  return [...document.querySelectorAll('#f-conf .cf-linha')].map(el => ({
+    desc: el.querySelector('.cf-desc').value.trim(), valor: num(el.querySelector('.cf-valor').value), cat: el.querySelector('.cf-cat').value.trim() || 'Outros',
+    data: el.querySelector('.cf-data').value || S.conferencia.ate, tipo: el.querySelector('.cf-tipo').value })).filter(x => x.valor > 0 || x.desc);
+}
+// diff = informado − esperado. Corrigir a previsão muda o esperado; o que é lançado agora também. O resto continua sem explicação.
+function contaConf(form) {
+  const c = S.conferencia, ev = evConf(c);
+  let previsao = 0, lancado = 0;
+  ev.forEach((e, k) => {
+    const op = form.elements['p' + k] ? form.elements['p' + k].value : 'ok';
+    if (op === 'valor') previsao += Math.sign(e.valor) * num(form.elements['pv' + k].value) - e.valor;
+    else if (op === 'depois' || op === 'nao') previsao -= e.valor;
+  });
+  for (const x of linhasConf()) if (x.valor > 0) lancado += (x.tipo === 'receita' ? 1 : -1) * x.valor;
+  return { previsao: r2(previsao), lancado: r2(lancado), falta: r2(c.diff - previsao - lancado) };
+}
+function resumoConf() {
+  const form = document.getElementById('f-conf'); if (!form) return;
+  form.querySelectorAll('.cf-prev').forEach(el => {
+    const op = el.querySelector('select').value, ex = el.querySelector('.cf-extra');
+    ex.style.display = op === 'valor' || op === 'depois' ? 'flex' : 'none';
+    ex.querySelector('.cf-v').style.display = op === 'valor' ? '' : 'none';
+    ex.querySelector('.cf-d').style.display = op === 'depois' ? '' : 'none';
+  });
+  const c = S.conferencia, r = contaConf(form), ok = Math.abs(r.falta) < 1;
+  const L = (t, v) => `<div class="cl"><span>${t}</span><b>${v}</b></div>`;
+  document.getElementById('cf-resumo').innerHTML = `<div class="cl-grupo">
+    ${L('Diferença', `${c.diff < 0 ? '−' : '+'} ${fmt.format(Math.abs(c.diff))}`)}
+    ${r.previsao ? L('Previsão corrigida', `${r.previsao > 0 ? '+' : '−'} ${fmt.format(Math.abs(r.previsao))}`) : ''}
+    ${r.lancado ? L('Lançado agora', `${r.lancado > 0 ? '+' : '−'} ${fmt.format(Math.abs(r.lancado))}`) : ''}
+    <div class="cl"><span><b>${ok ? 'Fechou' : 'Falta explicar'}</b></span><b class="${ok ? 'pos' : r.falta < 0 ? 'neg' : ''}">${ok ? '✓' : `${r.falta < 0 ? 'saiu' : 'entrou'} ${fmt.format(Math.abs(r.falta))}`}</b></div>
+  </div>`;
+}
+function registrarConferencia(c, info) {
+  S.conferencias = (S.conferencias || []).concat([{ data: hoje(), de: c.de, ate: c.ate, diff: c.diff, ...info }]).slice(-60);
+  c.resolvida = true;
+}
+function salvarConferencia(form) {
+  const c = S.conferencia, ev = evConf(c), r = contaConf(form), linhas = linhasConf();
+  if (linhas.some(x => !(x.valor > 0) || !x.desc)) return alert('Cada linha do passo 2 precisa de descrição e valor (ou tire a linha com ✕).');
+  for (let k = 0; k < ev.length; k++) {
+    const e = ev[k], op = form.elements['p' + k].value;
+    if (op === 'ok') continue;
+    const valor = num(form.elements['pv' + k].value), data = form.elements['pd' + k].value;
+    if (op === 'depois' && !(data > hoje())) return alert(`"${e.desc}": informe uma data depois de hoje.`);
+    if (op === 'valor' && !(valor >= 0)) return alert(`"${e.desc}": informe o valor.`);
+    const f = e.fixo && S.fixos.find(x => x.id === e.fixo), l = e.lanc && S.lanc.find(x => x.id === e.lanc);
+    if (f) mudarOcorrencia(f, e.orig || e.data, op === 'valor' ? { valor, data: (f.movidos || {})[e.orig] } : op === 'depois' ? { data } : { pular: true });
+    else if (l) { if (op === 'valor') l.valor = r2(valor); else if (op === 'depois') l.data = data; else S.lanc = S.lanc.filter(x => x !== l); }
+    else if (e.cartao && op === 'depois') S.lanc.push({ id: uid(), tipo: 'despesa', data, desc: `Fatura ${e.cartao} (venceu ${ddmm(e.data)})`, cat: 'Cartão', valor: Math.abs(e.valor), pagamentoFatura: true });
+  }
+  for (const x of linhas) S.lanc.push({ id: uid(), tipo: x.tipo, data: x.data, desc: x.desc, cat: x.cat, valor: r2(x.valor), share: 1, daConferencia: true });
+  const resto = form.elements.resto.checked && Math.abs(r.falta) >= 1;
+  if (resto) S.lanc.push({ id: uid(), tipo: r.falta < 0 ? 'despesa' : 'receita', data: c.ate, desc: `Não identificado (${ddmm(c.de)} a ${ddmm(c.ate)})`, cat: 'Outros', valor: Math.abs(r.falta), naoIdentificado: true });
+  registrarConferencia(c, { previsao: r.previsao, lancado: r.lancado, naoIdent: resto ? r.falta : 0, ignorado: resto ? 0 : r.falta });
+  document.getElementById('dlg').close();
+  salvar();
+}
+// Histórico das conferências, na Previsão
+function cardConferencias() {
+  const hs = (S.conferencias || []).slice().reverse();
+  if (!hs.length) return '';
+  const desde = addDia(hoje(), -90);
+  const escapou = r2(S.lanc.filter(l => l.naoIdentificado && l.tipo === 'despesa' && l.data >= desde).reduce((a, l) => a + l.valor, 0));
+  const sinal = v => `${v < 0 ? '−' : '+'} ${fmt.format(Math.abs(v))}`;
+  return `<div class="card"><h2>${ico('lista')} Conferências do saldo <span class="sub">· o que bateu e o que escapou</span></h2>
+    ${escapou ? `<p class="hint" style="margin:0 0 10px">Nos últimos 3 meses saíram <b>${fmt.format(escapou)}</b> sem explicação (≈ ${fmt.format(r2(escapou / 3))} por mês). Isso já entra na média de Pix/débito da previsão com gastos estimados.</p>` : ''}
+    <div class="cl-grupo">${hs.slice(0, 8).map(h => `<div class="cl"><span>${ddmm(h.de)} a ${ddmm(h.ate)} · diferença ${sinal(h.diff)}${h.previsao ? ` · previsão corrigida ${sinal(h.previsao)}` : ''}${h.lancado ? ` · lançado ${sinal(h.lancado)}` : ''}</span><b class="${Math.abs((h.naoIdent || 0) + (h.ignorado || 0)) < 1 ? 'pos' : ''}">${Math.abs(h.naoIdent || 0) >= 1 ? `não identificado ${fmt.format(Math.abs(h.naoIdent))}` : Math.abs(h.ignorado || 0) >= 1 ? `ignorado ${fmt.format(Math.abs(h.ignorado))}` : '✓ fechou'}</b></div>`).join('')}</div>
+  </div>`;
 }
 
 function campoSaldo() {
@@ -2407,9 +2612,10 @@ function campoSaldo() {
     <div class="card" style="box-shadow:none;background:var(--surface-2);margin:0 0 12px;padding:14px 16px;border-color:${c.diff < 0 ? 'var(--warn)' : 'var(--border)'}">
       <b>${c.diff < 0 ? '▲' : '●'} ${c.diff < 0 ? 'Saiu' : 'Entrou'} ${fmt.format(Math.abs(c.diff))} sem registro entre ${ddmm(c.de)} e ${ddmm(c.ate)}</b>
       <div class="hint">Esperado: ${fmt.format(c.anterior)} + ${fmt.format(c.entradas)} de entradas − ${fmt.format(c.saidas)} de saídas previstas = ${fmt.format(c.esperado)}. Você informou ${fmt.format(c.informado)}.
-        ${c.diff < 0 ? 'Provavelmente Pix, débito ou boletos que não estão no app.' : 'Pode ser uma entrada que não estava cadastrada.'}</div>
+        ${c.diff < 0 ? 'Pode ser Pix, débito ou boleto que não está no app, ou algo previsto que veio diferente.' : 'Pode ser uma entrada que não estava cadastrada, ou algo previsto que ainda não saiu.'} Em "Explicar" você diz o que foi e o app corrige a previsão.</div>
       <div class="row" style="margin-top:10px">
-        <button class="btn primary" data-conf="registrar">Registrar como ${c.diff < 0 ? 'gasto' : 'entrada'} não identificado</button>
+        <button class="btn primary" data-conf="explicar">Explicar a diferença</button>
+        <button class="btn" data-conf="registrar">Tudo como não identificado</button>
         <button class="btn" data-conf="ignorar">Ignorar</button>
       </div>
     </div>` : '';
@@ -2473,7 +2679,7 @@ function cardAtividade() {
     ${ev.length ? `<div class="feed">${ev.map(e => { const [ic, cor] = visual(e); return `<div class="ev${e === menor ? ' menor' : ''}">
       <span class="ev-ico" style="--c:${cor}">${ico(ic)}</span>
       <div class="ev-txt"><b title="${esc(e.desc)}">${esc(e.desc)}</b><small>${ddmm(e.data)} ${DIAS_SEM[new Date(e.data + 'T12:00').getDay()]}
-        ${e.cartao ? (e.estimado ? `<span class="tag t-aviso" title="A fatura ainda não fechou: inclui uma estimativa de compras novas pela média do cartão">≈ ${fmt.format(e.estimado)} estimado</span>` : e.previa ? '<span class="tag t-aviso" title="A fatura ainda não fechou: o valor pode crescer">parcial</span>' : '<span class="tag t-azul">fechada</span>') : `<span class="tag ${e.tag === 'entrada' ? 't-bom' : e.tag === 'planejado' ? 't-azul' : ''}">${e.tag}</span>`}${e.ajustado ? '<span class="tag t-aviso" title="Valor diferente do normal só nesse dia">ajustado</span>' : ''}${e.cartao ? `<button class="link pagar" data-fat-paga="${esc(e.cartao)}|${e.data}" title="Já pagou esta fatura: tira da previsão">✓ já paguei</button>` : ''}${e.fixo ? `<button class="link pagar" data-pago="${e.fixo}|${e.data}|${Math.abs(e.valor)}" title="Já ${e.valor > 0 ? 'recebeu' : 'pagou'} antes do dia: tira da previsão">✓ já ${e.valor > 0 ? 'recebi' : 'paguei'}</button>` : ''}
+        ${e.cartao ? (e.estimado ? `<span class="tag t-aviso" title="A fatura ainda não fechou: inclui uma estimativa de compras novas pela média do cartão">≈ ${fmt.format(e.estimado)} estimado</span>` : e.previa ? '<span class="tag t-aviso" title="A fatura ainda não fechou: o valor pode crescer">parcial</span>' : '<span class="tag t-azul">fechada</span>') : `<span class="tag ${e.tag === 'entrada' ? 't-bom' : e.tag === 'planejado' ? 't-azul' : ''}">${e.tag}</span>`}${e.ajustado ? '<span class="tag t-aviso" title="Valor diferente do normal só nesse dia">ajustado</span>' : ''}${e.movido ? `<span class="tag t-aviso" title="Data mudada só desta vez">era ${ddmm(e.movido)}</span>` : ''}${e.cartao ? `<button class="link pagar" data-fat-paga="${esc(e.cartao)}|${e.data}" title="Já pagou esta fatura: tira da previsão">✓ já paguei</button>` : ''}${e.fixo ? `<button class="link pagar" data-pago="${e.fixo}|${e.orig}|${Math.abs(e.valor)}" title="Já ${e.valor > 0 ? 'recebeu' : 'pagou'} antes do dia: tira da previsão">✓ já ${e.valor > 0 ? 'recebi' : 'paguei'}</button><button class="link pagar" data-oc="${e.fixo}|${e.orig}" title="Mudar só esta vez: valor, data ou não acontece">✎ esta vez</button>` : ''}
         ${e.outros ? `<span title="Fatura toda: ${fmt.format(-e.valor + e.outros)}">+ ${fmt.format(e.outros)} da ${NOME_OUTRO}</span>` : ''}${e === menor ? '<span class="tag t-aviso">dia mais apertado</span>' : ''}</small></div>
       <div class="ev-val"><b class="${e.valor > 0 ? 'pos' : ''}">${e.valor > 0 ? '+' : '−'} ${fmt.format(Math.abs(e.valor))}</b><small class="${e.saldo < 0 ? 'neg' : ''}">saldo ${fmt.format(e.saldo)}</small></div>
     </div>`; }).join('')}</div>` : '<div class="empty">Nada previsto para os próximos 30 dias.</div>'}
@@ -3596,6 +3802,10 @@ document.addEventListener('submit', e => {
     S.fixos.push({ id: uid(), tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null, ...(f.cartao ? { cartao: f.cartao } : {}), ...(dias.length ? { dias } : {}), ...(uteis.length ? { uteis } : {}), ...(Object.keys(pct).length ? { pct } : {}), ...(Object.keys(valores).length ? { valores } : {}) });
   } else if (e.target.id === 'f-edit') {
     return salvarEdicao(f, e.submitter.value);
+  } else if (e.target.id === 'f-oc') {
+    return salvarOcorrencia(f, e.submitter.value);
+  } else if (e.target.id === 'f-conf') {
+    return salvarConferencia(e.target);
   } else if (e.target.id === 'f-info-fatura') {
     return salvarInfoFatura(f, e.submitter.value);
   } else if (e.target.id === 'f-edit-fixo') {
@@ -3654,7 +3864,7 @@ document.addEventListener('click', e => {
   if (d.fatPaga) { S.faturasPagas = { ...(S.faturasPagas || {}), [d.fatPaga]: true }; salvar(); return; }
   if (d.desajustar) {
     const [id, data] = d.desajustar.split('|'), f = S.fixos.find(x => x.id === id);
-    if (f && f.ajustes) { delete f.ajustes[data]; salvar(); }
+    if (f) { if (f.ajustes) delete f.ajustes[data]; if (f.movidos) delete f.movidos[data]; salvar(); }
     return;
   }
   if (d.despagar) {
@@ -3680,12 +3890,30 @@ document.addEventListener('click', e => {
   if (d.revisar) { reabrirFatura(d.revisar); animarProx = true; render(); rolarTopo(); }
   if (d.desfazer && confirm('Desfazer esta importação? Todos os lançamentos desta fatura (e as parcelas planejadas dela) serão apagados.')) desfazerFatura(d.desfazer);
   if (e.target.closest('[data-conf-saldo]')) informarSaldo(num(document.getElementById('saldo').value));
+  if (d.conf === 'explicar') { abrirConferencia(); return; }
   if (d.conf === 'registrar') {
     const c = S.conferencia;
-    S.lanc.push({ id: uid(), tipo: c.diff < 0 ? 'despesa' : 'receita', data: c.ate, desc: `Não registrado (${ddmm(c.de)} a ${ddmm(c.ate)})`, cat: 'Outros', valor: Math.abs(c.diff), naoIdentificado: true });
-    c.resolvida = true; salvar();
+    S.lanc.push({ id: uid(), tipo: c.diff < 0 ? 'despesa' : 'receita', data: c.ate, desc: `Não identificado (${ddmm(c.de)} a ${ddmm(c.ate)})`, cat: 'Outros', valor: Math.abs(c.diff), naoIdentificado: true });
+    registrarConferencia(c, { previsao: 0, lancado: 0, naoIdent: c.diff, ignorado: 0 }); salvar();
   }
-  if (d.conf === 'ignorar') { S.conferencia.resolvida = true; salvar(); }
+  if (d.conf === 'ignorar') { registrarConferencia(S.conferencia, { previsao: 0, lancado: 0, naoIdent: 0, ignorado: S.conferencia.diff }); salvar(); }
+  if (e.target.closest('[data-cf-add]')) { document.getElementById('cf-linhas').insertAdjacentHTML('beforeend', linhaConf({ tipo: S.conferencia.diff < 0 ? 'despesa' : 'receita' })); resumoConf(); return; }
+  if (e.target.closest('[data-cf-del]')) { e.target.closest('.cf-linha').remove(); resumoConf(); return; }
+  const sug = e.target.closest('[data-cf-sug]');
+  if (sug) {
+    const x = _sugConf[+sug.dataset.cfSug], vazia = [...document.querySelectorAll('#f-conf .cf-linha')].find(el => !el.querySelector('.cf-desc').value.trim() && !el.querySelector('.cf-valor').value.trim());
+    if (vazia) vazia.remove();
+    document.getElementById('cf-linhas').insertAdjacentHTML('beforeend', linhaConf({ desc: x.desc, valor: x.valor, cat: x.cat, tipo: S.conferencia.diff < 0 ? 'despesa' : 'receita' }));
+    resumoConf(); return;
+  }
+  const oc = e.target.closest('[data-oc]');
+  if (oc) { const [id, orig] = oc.dataset.oc.split('|'); abrirOcorrencia(id, orig || null); return; }
+  const ocN = e.target.closest('[data-oc-normal]');
+  if (ocN) {
+    const [id, orig] = ocN.dataset.ocNormal.split('|'), f = S.fixos.find(x => x.id === id);
+    if (f) { if (f.ajustes) delete f.ajustes[orig]; if (f.movidos) delete f.movidos[orig]; }
+    document.getElementById('dlg').close(); salvar(); return;
+  }
   if (d.ignorarPend === 'semReceita') { S.semReceitaOk = true; salvar(); }
   if (d.inicioOk) { S.fixos.find(f => f.id === d.inicioOk).inicioOk = true; salvar(); }
   if (d.ir === 'saldo') { aba = 'visao'; mesSel = mesAtual(); cartaoSel = null; render(); const i = document.getElementById('saldo'); i.scrollIntoView({ block: 'center' }); i.focus(); }
@@ -3727,6 +3955,8 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.id === 'oc-orig') { abrirOcorrencia(e.target.dataset.fixo, e.target.value); return; }
+  if (e.target.closest && e.target.closest('#f-conf')) { resumoConf(); return; }
   if (e.target.dataset && e.target.dataset.pessoa) {
     const [id, campo] = e.target.dataset.pessoa.split('|'), x = pessoas().find(q => q.id === id);
     if (x) { x[campo] = e.target.type === 'checkbox' ? e.target.checked : ['bruto', 'adicionais', 'descontos', 'adiant'].includes(campo) ? num(e.target.value) || 0 : campo === 'dep' ? +e.target.value || 0 : e.target.value; salvar(); }
@@ -3788,6 +4018,7 @@ document.addEventListener('change', e => {
   }
 });
 document.addEventListener('input', e => {
+  if (e.target.closest && e.target.closest('#f-conf')) { resumoConf(); return; }
   if (e.target.dataset && e.target.dataset.calc) {
     calcF[e.target.dataset.calc] = e.target.type === 'checkbox' ? e.target.checked : e.target.value.replace(',', '.');
     document.getElementById('calc-res').innerHTML = resultadoCalc();
