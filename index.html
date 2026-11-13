@@ -1893,8 +1893,9 @@ function marcarItens(itens, banco, fechamento) {
     it.importado = !!(ja && !ja.prevista && !ja.provisorio);
     it.escolha = ja ? (ja.share === 1 ? 'meu' : ja.share === 0.5 ? 'metade' : 'div')
       : regra ? regra.escolha : null;
-    // já tinha sido importada e este item não virou lançamento: foi marcado "não é meu"
-    if (!ja && !regra && S.faturas.some(f => f.itens.some(x => x.key === it.key))) it.escolha = 'nao';
+    // já tinha sido importada e este item não virou lançamento: foi marcado "não é meu". Vale mesmo com regra da
+    // loja, porque a regra é pelo nome e lojas com várias compras na fatura (ex.: duas do ISAAC) podem ter donos diferentes
+    if (!ja && S.faturas.some(f => f.itens.some(x => x.key === it.key))) it.escolha = 'nao';
     if (it.escolha === 'div') { const fr = ja ? lerFracao(fracaoTxt(ja.share)) : { k: regra.k, n: regra.n }; if (fr) Object.assign(it, fr); else it.meu = r2(Math.abs(ja.valor)); }
     it.cat = ja ? ja.cat : regra && regra.cat ? regra.cat : palpiteCat(it.desc);
     // cobrança que já está em Fixos neste cartão (assinatura): não conta de novo
@@ -1989,6 +1990,9 @@ function telaFatura() {
 
   const pend = imp.itens.filter(i => !i.escolha).length;
   const minha = r2(imp.itens.reduce((a, i) => a + i.valor * fracao(i), 0));
+  // contas fixas no cartão (academia, assinaturas) ficam como "Não é meu" para não contar duas vezes, mas são suas
+  const doFixo = imp.itens.filter(i => i.fixo), totalFixo = r2(doFixo.reduce((a, i) => a + i.valor, 0));
+  const nomesFixo = [...new Set(doFixo.map(i => i.fixo))].join(', ');
   const meuTotal = r2(imp.itens.filter(i => i.escolha === 'meu').reduce((a, i) => a + i.valor, 0));
   const metadeTotal = r2(imp.itens.filter(i => i.escolha === 'metade').reduce((a, i) => a + i.valor, 0));
   const divididos = imp.itens.filter(i => i.escolha === 'div');
@@ -2046,7 +2050,7 @@ function telaFatura() {
     <p class="hint">Parcelas e juros sempre entram na data de fechamento. "Metade" lança 50% do valor como gasto seu.</p>
   </div>
   <div class="barra-imp">
-    <div><div class="hint" style="margin:0">Sua parte desta fatura</div><div class="tot">${fmt.format(minha)}</div></div>
+    <div><div class="hint" style="margin:0">Sua parte desta fatura</div><div class="tot">${fmt.format(r2(minha + totalFixo))}</div>${totalFixo ? `<div class="hint" style="margin:0">${fmt.format(minha)} marcados + ${fmt.format(totalFixo)} de ${esc(nomesFixo)} (Fixos)</div>` : ''}</div>
     <div class="hint" style="margin:0;flex:1">Seus: ${fmt.format(meuTotal)} · Metade: ${fmt.format(metadeTotal)} → ${fmt.format(r2(metadeTotal / 2))}${divididos.length ? ` · Divididos: ${fmt.format(r2(divididos.reduce((a, i) => a + i.valor, 0)))} → ${fmt.format(r2(divididos.reduce((a, i) => a + i.valor * fracao(i), 0)))}` : ''}</div>
     <button class="btn" id="imp-cancelar">Cancelar</button>
     <button class="btn primary" id="imp-ok" ${pend ? `title="Ainda faltam ${pend} itens; eles não serão importados"` : ''}>${imp.revisao ? 'Salvar alterações' : imp.aberta ? 'Lançar fatura aberta' : 'Importar'}</button>
@@ -2055,7 +2059,9 @@ function telaFatura() {
 
 function telaHistoricoFaturas() {
   const lista = S.faturas.slice().sort((a, b) => b.fechamento.localeCompare(a.fechamento));
-  const minhaParte = f => { const keys = new Set(f.itens.map(i => i.key)); return S.lanc.filter(l => !l.prevista && keys.has(l.key)).reduce((a, l) => a + l.valor, 0); };
+  // lançamentos seus da fatura + contas fixas no cartão (que na fatura ficam como "Não é meu" para não contar duas vezes)
+  const minhaParte = f => { const keys = new Set(f.itens.map(i => i.key)); return S.lanc.filter(l => !l.prevista && keys.has(l.key)).reduce((a, l) => a + l.valor, 0)
+    + S.fixos.filter(x => x.cartao === f.banco && x.tipo === 'despesa' && fixoAtivo(x, f.fechamento.slice(0, 7))).reduce((a, x) => a + x.valor, 0); };
   return `<div class="card"><h2>${ico('lista')} Faturas importadas</h2>
     ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Cartão</th><th>Vencimento</th><th class="num">Total da fatura</th><th class="num">Sua parte</th><th></th></tr></thead><tbody>
       ${lista.map(f => `<tr><td>${tagCartao(f.banco)}${f.aberta ? ' <span class="tag t-aviso">em aberto</span>' : ''}</td><td>${f.vencimento.split('-').reverse().join('/')}</td>
