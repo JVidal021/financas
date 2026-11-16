@@ -999,7 +999,7 @@ function aplicarPluggy(d) {
       if (fechamento > ultFech) ultFech = fechamento;
       if (ultVenc && f.vence <= addDia(ultVenc, 7)) continue;   // já importada: a fatura fechada não muda
       const itens = c.transacoes.filter(t => t.fatura === f.id).map(itemPluggy).filter(Boolean);
-      if (itens.length) novas.push({ id: `pluggy|${banco}|${f.vence}`, banco, fechamento, vencimento: f.vence, itens, total: f.total ?? null, origem: 'Open Finance (Pluggy)' });
+      if (itens.length) novas.push({ id: `pluggy|${banco}|${c.id}|${f.vence}`, banco, fechamento, vencimento: f.vence, itens, total: f.total ?? null, origem: 'Open Finance (Pluggy)' });
     }
     // fatura em aberto: o que não pertence a nenhuma fatura fechada e foi lançado depois do último fechamento
     const abertos = c.transacoes.filter(t => !(t.fatura && ids.has(t.fatura)) && (!ultFech || t.data > ultFech)).map(itemPluggy).filter(Boolean);
@@ -1007,7 +1007,7 @@ function aplicarPluggy(d) {
       // tudo isso já foi lançado como fatura aberta: não pede para revisar de novo
       const ja = new Set(S.faturas.filter(f => f.banco === banco && f.aberta).flatMap(f => f.itens.map(i => i.key)));
       if (!abertos.every(x => ja.has(chavePendente(x))))
-        novas.push({ id: `pluggy|${banco}|aberta`, banco, aberta: true, itens: abertos, total: c.saldo ?? null, origem: 'Open Finance (Pluggy), fatura em aberto' });
+        novas.push({ id: `pluggy|${banco}|${c.id}|aberta`, banco, aberta: true, itens: abertos, total: c.saldo ?? null, origem: 'Open Finance (Pluggy), fatura em aberto' });
     }
   }
   S.faturasPendentes = (S.faturasPendentes || []).filter(p => !String(p.id).startsWith('pluggy|')).concat(novas);
