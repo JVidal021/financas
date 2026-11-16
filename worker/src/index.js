@@ -70,6 +70,9 @@ async function dados(env, de, ate) {
   if (!itens.length) throw new Erro(500, 'ITEM_IDS não configurado no Worker');
   const contas = [];
   for (const itemId of itens) {
+    // quando o Meu Pluggy buscou no banco pela última vez (o saldo e as faturas são dessa hora)
+    const item = await pluggy(env, `/items/${itemId}`).catch(() => null);
+    const atualizado = item ? item.lastUpdatedAt || item.statusDetail?.updatedAt || null : null;
     for (const a of await paginas(env, `/accounts?itemId=${itemId}`)) {
       const cartao = a.type === 'CREDIT';
       const [ts, bills] = await Promise.all([
@@ -78,7 +81,7 @@ async function dados(env, de, ate) {
       ]);
       contas.push({
         id: a.id, itemId, tipo: cartao ? 'cartao' : 'conta', subtipo: a.subtype,
-        nome: a.marketingName || a.name, nomeBanco: a.name, numero: a.number, saldo: a.balance,
+        nome: a.marketingName || a.name, nomeBanco: a.name, numero: a.number, saldo: a.balance, atualizado, statusItem: item ? item.status : null,
         ...(cartao ? { credito: { vence: dia(a.creditData?.balanceDueDate), fecha: dia(a.creditData?.balanceCloseDate),
           limite: a.creditData?.creditLimit ?? null, disponivel: a.creditData?.availableCreditLimit ?? null } } : {}),
         faturas: bills.map(b => ({ id: b.id, vence: dia(b.dueDate), fecha: dia(b.billClosingDate), total: b.totalAmount })),

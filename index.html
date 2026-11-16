@@ -260,6 +260,8 @@ main { padding: 18px 24px 36px; }
 .tile .lbl { color: var(--text-2); font-size: 13px; font-weight: 550; }
 .tile .val { font-size: 25px; font-weight: 750; margin-top: 4px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .tile .sub2 { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.tile .medidor-lim { height: 6px; border-radius: 99px; background: var(--grid); margin-top: 8px; overflow: hidden; }
+.tile .medidor-lim i { display: block; height: 100%; border-radius: 99px; background: var(--c); }
 .delta { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; margin-top: 6px; }
 .delta span { font-weight: 500; color: var(--muted); }
 .delta.bom { color: var(--good); }
@@ -993,10 +995,35 @@ function fechamentoPluggy(banco, f) {
   }
   return addDia(f.vence, -7);
 }
-// Transforma o que o Worker mandou em faturas para revisar. Devolve quantas ficaram para revisar.
+// Liga/desliga o que o app faz sozinho com os dados dos bancos (padrão: ligado)
+const ofAuto = k => (S.ofAuto || {})[k] !== false;
+// contas que entram no "saldo na conta": conta corrente sim, poupança/investimento só se você marcar
+const contaNoSaldo = c => { const m = (S.ofSaldo || {})[c.id]; return m != null ? m : c.tipo === 'conta' && !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`); };
+const isoLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const quandoBanco = ts => { const d = new Date(ts); if (!ts || isNaN(d)) return ''; const iso = isoLocal(d); return (iso === hoje() ? 'hoje' : iso === addDia(hoje(), -1) ? 'ontem' : ddmm(iso)) + ' às ' + d.toTimeString().slice(0, 5); };
+// Fatura que chegou do banco: se todas as compras já são conhecidas (lançamento, regra da loja, fixo ou
+// "não é meu" de antes), lança sozinha, como se você tivesse aberto e confirmado. Loja nova → fica para revisar.
+// Devolve quantas compras suas entraram, ou null se ficou para revisar.
+function reconhecerFatura(pd) {
+  const f = faturaDePendente(pd);
+  const sem = f.itens.filter(i => !i.escolha);
+  pd.semMarca = sem.length;
+  if (sem.length || !ofAuto('compras') || imp || !f.fechamento || !f.vencimento) return null;
+  // fatura fechada com total diferente da soma das compras: falta alguma coisa, melhor você olhar
+  if (!pd.aberta && pd.total != null && Math.abs(pd.total - f.soma) >= 0.01) { pd.naoBate = true; return null; }
+  const novas = f.itens.filter(i => !i.importado && i.escolha !== 'nao').length;
+  const m = impModo, fu = impFuturas;
+  impModo = 'compra'; impFuturas = true; imp = f;
+  try { confirmarImportacao(true); } finally { impModo = m; impFuturas = fu; imp = null; }
+  return novas;
+}
+// Transforma o que o Worker mandou em faturas (lançadas sozinhas ou para revisar) e no saldo da conta.
 function aplicarPluggy(d) {
   const novas = [];
-  pluggy.contas = d.contas.map(c => ({ id: c.id, tipo: c.tipo, nome: c.nome, nomeBanco: c.nomeBanco, numero: c.numero, saldo: c.saldo }));
+  const ultBill = c => (c.faturas || []).filter(f => f.vence && f.total != null).sort((a, b) => b.vence.localeCompare(a.vence))[0] || null;
+  S.bancos = { ts: d.gerado || new Date().toISOString(), contas: d.contas.map(c => ({ id: c.id, tipo: c.tipo, subtipo: c.subtipo || '', nome: c.nome, nomeBanco: c.nomeBanco || '', numero: c.numero || '',
+    saldo: +c.saldo || 0, atualizado: c.atualizado || null,
+    ...(c.tipo === 'cartao' ? { banco: bancoDaConta(c), credito: c.credito || null, fatura: ultBill(c) } : {}) })) };
   for (const c of d.contas.filter(c => c.tipo === 'cartao')) {
     const banco = bancoDaConta(c);
     const fechadas = S.faturas.filter(f => f.banco === banco && !f.aberta);
@@ -1022,24 +1049,47 @@ function aplicarPluggy(d) {
     }
   }
   S.faturasPendentes = (S.faturasPendentes || []).filter(p => !String(p.id).startsWith('pluggy|')).concat(novas);
-  return novas.length;
+  const r = { compras: 0, lancadas: [], revisar: 0, saldo: null };
+  for (const pd of novas) {   // fechadas antes da aberta (já estão em ordem de vencimento por cartão)
+    const n = reconhecerFatura(pd);
+    if (n == null) r.revisar++;
+    else { r.compras += n; if (!r.lancadas.includes(pd.banco)) r.lancadas.push(pd.banco); }
+  }
+  // saldo: soma das contas marcadas; só substitui o seu se o banco tiver dado mais novo que o último informado
+  const contas = S.bancos.contas.filter(contaNoSaldo);
+  if (ofAuto('saldo') && contas.length) {
+    const soma = r2(contas.reduce((a, c) => a + c.saldo, 0));
+    const ts = Math.max(...contas.map(c => Date.parse(c.atualizado || S.bancos.ts) || 0));
+    const desde = S.saldoTs || (S.saldoData ? Date.parse(S.saldoData + 'T00:00') : 0);
+    if (ts > desde && (Math.abs(soma - S.saldoAtual) >= 0.01 || S.saldoData !== hoje())) { informarSaldo(soma, ts); r.saldo = soma; }
+  }
+  if (r.compras || r.saldo != null) S.ofLog = [{ ts: Date.now(), compras: r.compras, lancadas: r.lancadas, saldo: r.saldo }].concat(S.ofLog || []).slice(0, 10);
+  return r;
 }
+let buscandoBancos = false;
 async function buscarBancos() {
-  if (!pluggy) return;
+  if (!pluggy || buscandoBancos) return;
+  buscandoBancos = true;
   pluggyStatus = 'buscando nos bancos…'; if (aba === 'dados') render();
   try {
     const r = await fetch(pluggy.url.replace(/\/+$/, '') + '/dados', { headers: { Authorization: 'Bearer ' + pluggy.token }, cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(r.status === 401 ? 'o token do app não confere com o do Worker' : d.erro || 'erro ' + r.status);
-    const n = aplicarPluggy(d);
-    pluggy.ultima = hoje(); gravarPluggy();
-    pluggyStatus = `atualizado às ${new Date().toTimeString().slice(0, 5)} · ${n ? `${n} ${n === 1 ? 'fatura' : 'faturas'} para revisar em Importar fatura` : 'nenhuma fatura nova'}`;
+    const res = aplicarPluggy(d);
+    pluggy.ultima = hoje(); pluggy.ultimaTs = Date.now(); gravarPluggy();
+    pluggyStatus = `atualizado às ${new Date().toTimeString().slice(0, 5)} · ` + ([
+      res.saldo != null && `saldo atualizado para ${fmt.format(res.saldo)}`,
+      res.compras && `${res.compras} ${res.compras === 1 ? 'compra lançada' : 'compras lançadas'} sozinhas no ${res.lancadas.join(' e ')}`,
+      res.revisar && `${res.revisar} ${res.revisar === 1 ? 'fatura' : 'faturas'} para revisar em Importar fatura`,
+    ].filter(Boolean).join(' · ') || 'nada novo');
     salvar();
   } catch (e) {
     pluggyStatus = 'não consegui buscar: ' + (e.message === 'Failed to fetch' ? 'o Worker não respondeu (endereço errado, ou este site não está em ALLOWED_ORIGINS)' : e.message);
     render();
-  }
+  } finally { buscandoBancos = false; }
 }
+// os bancos atualizam no Meu Pluggy uma vez por dia; buscar de novo depois de 4 h pega a atualização do dia
+const bancosVelhos = () => pluggy && Date.now() - (pluggy.ultimaTs || 0) > 4 * 3600e3;
 function cardBancos() {
   if (!pluggy) return `
   <div class="card"><h2>Bancos (Open Finance)</h2>
@@ -1052,20 +1102,24 @@ function cardBancos() {
     <p class="hint">O token fica salvo só neste navegador. O Client Secret da Pluggy nunca passa por aqui.</p>
   </div>`;
   const cartoes = [...new Set([...cartoesUsados(), ...Object.keys(LEITORES)])];
-  const linhas = (pluggy.contas || []).map(c => {
-    const b = c.tipo === 'cartao' ? bancoDaConta(c) : '';
+  const linhas = ((S.bancos || {}).contas || pluggy.contas || []).map(c => {
+    const b = c.tipo === 'cartao' ? bancoDaConta(c) : '', cr = c.credito || {};
     return `<div class="row" style="align-items:center;justify-content:space-between;padding:6px 0">
     <div><b>${esc(c.nome)}</b>${c.numero ? ` <span class="hint" style="margin:0">· ${esc(String(c.numero).slice(-4))}</span>` : ''}
-      <div class="hint" style="margin:0">${c.tipo === 'cartao' ? `cartão · limite usado ${fmt.format(c.saldo || 0)}` : `conta · saldo ${fmt.format(c.saldo || 0)}`}</div></div>
+      <div class="hint" style="margin:0">${c.tipo === 'cartao' ? `cartão · limite usado ${fmt.format(c.saldo || 0)}${cr.limite != null ? ` de ${fmt.format(cr.limite)}` : ''}` : `conta · saldo ${fmt.format(c.saldo || 0)}`}${c.atualizado ? ` · banco atualizou ${quandoBanco(c.atualizado)}` : ''}</div></div>
     ${c.tipo === 'cartao'
       ? `<label class="hint" style="margin:0;flex:0 0 auto">no app é o cartão <select data-pluggy-banco="${esc(c.id)}">${cartoes.map(x => `<option ${x === b ? 'selected' : ''}>${esc(x)}</option>`).join('')}${cartoes.includes(b) ? '' : `<option selected>${esc(b)}</option>`}</select></label>`
-      : `<button class="btn" style="flex:0 0 auto" data-pluggy-saldo="${c.saldo}">Usar como saldo de hoje</button>`}
+      : `<label class="hint" style="margin:0;flex:0 0 auto"><input type="checkbox" data-of-conta="${esc(c.id)}" ${contaNoSaldo(c) ? 'checked' : ''}> entra no saldo</label>`}
   </div>`;
   }).join('');
   return `
   <div class="card"><h2>Bancos (Open Finance)</h2>
-    <p class="hint" style="margin:0 0 8px">Conectado ao Worker <b>${esc(pluggy.url.replace(/^https?:\/\//, ''))}</b>. O app busca uma vez por dia ao abrir (os bancos atualizam a cada 24 h). As faturas chegam em <b>Importar fatura → Faturas para revisar</b>; fatura que você já importou não volta.</p>
+    <p class="hint" style="margin:0 0 8px">Conectado ao Worker <b>${esc(pluggy.url.replace(/^https?:\/\//, ''))}</b>. O app busca ao abrir e de novo quando passa de 4 h (os bancos atualizam no Meu Pluggy uma vez por dia). Fatura que você já importou não volta.</p>
     ${linhas || '<p class="hint">Clique em "Buscar agora" para ver as contas.</p>'}
+    <div style="margin-top:10px;display:grid;gap:6px">
+      <label class="hint" style="margin:0"><input type="checkbox" data-of-auto="saldo" ${ofAuto('saldo') ? 'checked' : ''}> <b>Atualizar o saldo sozinho</b>: a soma das contas marcadas vira o saldo de hoje quando o banco tem dado mais novo que o último que você informou. A conferência continua mostrando o que saiu ou entrou sem registro.</label>
+      <label class="hint" style="margin:0"><input type="checkbox" data-of-auto="compras" ${ofAuto('compras') ? 'checked' : ''}> <b>Lançar sozinho as compras conhecidas</b>: se todas as compras novas de uma fatura são de lojas que você já marcou (Meu / Metade / Não é meu), ela entra sem pedir revisão. Com loja nova, a fatura vai para <b>Importar fatura → Faturas para revisar</b>, já com as conhecidas marcadas.</label>
+    </div>
     <div class="row" style="margin-top:8px"><button class="btn primary" id="pluggy-agora">Buscar agora</button><button class="btn" id="pluggy-sair">Desconectar</button></div>
     <p class="hint">${esc(pluggyStatus || (pluggy.ultima ? 'última busca: ' + ddmm(pluggy.ultima) : ''))}</p>
   </div>`;
@@ -1403,6 +1457,32 @@ function itensPrevistos(m) {
 // Mesmo período do mês anterior (até o mesmo dia), para comparar com o mês atual ainda em andamento
 const reaisAteODia = (m, dia) => itensReais(m).filter(i => i.quando.slice(8) <= dia);
 
+// Tela inicial: o que os bancos dizem agora (saldo real, limite de cada cartão, fatura fechada)
+function cardBancosAgora() {
+  const b = S.bancos;
+  if (!b || !(b.contas || []).length) return '';
+  const contas = b.contas.filter(contaNoSaldo), cartoes = b.contas.filter(c => c.tipo === 'cartao');
+  const tiles = [];
+  if (contas.length) {
+    const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
+    const dif = Math.abs(soma - S.saldoAtual) >= 0.01;
+    tiles.push(tile('Saldo no banco', fmt.format(soma), 'carteira', 'var(--good)', `<div class="sub2">${contas.length > 1 ? esc(contas.map(c => c.nome).join(' + ')) + ' · ' : ''}${quandoBanco(ts)}</div>
+      ${dif ? `<div class="sub2">no app: ${fmt.format(S.saldoAtual)} · <button class="link" data-pluggy-saldo="${soma}">usar o do banco</button></div>` : '<div class="sub2">✓ igual ao saldo do app</div>'}`));
+  }
+  for (const c of cartoes) {
+    const cr = c.credito || {}, lim = cr.limite != null ? +cr.limite : null;
+    const disp = cr.disponivel != null ? +cr.disponivel : lim != null ? r2(lim - c.saldo) : null;
+    const usado = lim != null && disp != null ? r2(lim - disp) : c.saldo, pct = lim ? Math.max(0, Math.min(100, usado / lim * 100)) : 0;
+    const f = c.fatura, aPagar = f && f.vence >= hoje() && !(S.faturasPagas || {})[c.banco + '|' + f.vence];
+    tiles.push(tile(`Limite livre · ${esc(c.banco)}`, disp != null ? fmt.format(disp) : '—', 'cartao', corCartao(c.banco), `
+      ${lim ? `<div class="medidor-lim" style="--c:${corCartao(c.banco)}"><i style="width:${pct}%"></i></div><div class="sub2">usado ${fmt.format(usado)} de ${fmt.format(lim)} (${Math.round(pct)}%)</div>` : `<div class="sub2">usado ${fmt.format(usado)}</div>`}
+      ${aPagar ? `<div class="sub2">fatura fechada: <b>${fmt.format(f.total)}</b> · vence ${ddmm(f.vence)}</div>` : cr.vence && cr.vence >= hoje() ? `<div class="sub2">próximo vencimento ${ddmm(cr.vence)}</div>` : ''}`));
+  }
+  const log = (S.ofLog || [])[0], recente = log && Date.now() - log.ts < 36 * 3600e3;
+  const msg = recente ? [log.saldo != null && `saldo atualizado para ${fmt.format(log.saldo)}`, log.compras && `${log.compras} ${log.compras === 1 ? 'compra lançada' : 'compras lançadas'} sozinhas no ${esc(log.lancadas.join(' e '))}`].filter(Boolean).join(' · ') : '';
+  return `<div class="tiles">${tiles.join('')}</div>
+  ${msg ? `<div class="card" style="padding:10px 16px;margin:-4px 0 16px;font-size:13px;color:var(--text-2)"><b>Open Finance ${quandoBanco(log.ts)}:</b> ${msg}.</div>` : ''}`;
+}
 function telaVisao() {
   const atual = mesSel === mesAtual(), futuro = mesSel > mesAtual();
   // cartão selecionado no mês atual: as faturas que vencem nele (como nos meses futuros), não só as compras feitas até hoje
@@ -1473,7 +1553,7 @@ function telaVisao() {
   const hero = cartaoSel === null ? `
   <div class="hero">
     <div class="hero-ico">${ico('carteira')}</div>
-    ${atual ? `<div class="lbl">Saldo na conta${dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}</div>
+    ${atual ? `<div class="lbl">Saldo na conta${S.saldoBanco && S.saldoTs ? ` · do banco, ${quandoBanco(S.saldoTs)}` : dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}</div>
     <div class="big">${fmt.format(S.saldoAtual)}</div>` : `<div class="lbl">${futuro ? 'Previsto para' : 'Resultado de'} ${nomeMes(mesSel)}${futuro ? ' · só o que já existe' : ''}</div>
     <div class="big">${fmt.format(t.saldo)}</div>`}
     <div class="stats">
@@ -1493,6 +1573,9 @@ function telaVisao() {
       <div class="stat">${ico('lista')}<div><small>Lançamentos</small><b>${desp.length}</b></div></div>
       ${cats[0] ? `<div class="stat">${ico('pizza')}<div><small>Maior categoria</small><b>${esc(cats[0][0])}</b></div></div>` : ''}
       ${t.d ? `<div class="stat">${ico('carteira')}<div><small>Do total do mês</small><b>${Math.round(t.d / Math.max(1, totais(todos).d) * 100)}%</b></div></div>` : ''}
+      ${(() => { const c = ((S.bancos || {}).contas || []).find(x => x.tipo === 'cartao' && x.banco === cartaoSel), cr = c && c.credito; if (!cr || cr.limite == null) return '';
+        const disp = cr.disponivel != null ? +cr.disponivel : r2(cr.limite - c.saldo);
+        return `<div class="stat">${ico('cartao')}<div><small>Limite livre (banco)</small><b>${fmt.format(disp)}</b></div></div>`; })()}
     </div>
   </div>`;
 
@@ -1523,7 +1606,7 @@ function telaVisao() {
       <div class="ev-txt"><b title="${esc(i.desc + (i.obs ? ' · ' + i.obs : ''))}">${esc(i.desc)}</b>${i.obs ? `<span class="obs">${esc(i.obs)}</span>` : ''}<small>${ddmm(i.quando)} ${DIAS_SEM[new Date(i.quando + 'T12:00').getDay()]} · ${esc(i.cat)}${i.cartao ? ' · ' + esc(nomeCartao(i.cartao)) : ''}${i.parcInfo ? ` · ${i.parcInfo.N}x` : ''}</small></div>
       <div class="ev-val"><b class="${i.tipo === 'receita' ? 'pos' : ''}">${i.tipo === 'receita' ? '+' : '−'} ${fmt.format(i.valor)}</b></div></div>`; }).join('')}</div>` : '<div class="empty">Nada neste mês ainda.</div>'}
   </div>`;
-  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${hero}${kpis}${cardResto}
+  return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${hero}${atual && cartaoSel === null ? cardBancosAgora() : ''}${kpis}${cardResto}
   <div class="g21">${cardCats}${cardCartoes || cardUltimas}</div>
   <div class="g21">${cardHist}${cardCartoes ? cardUltimas : ''}</div>
   <div class="card"><h2>${ico('lista')} Movimentações de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}${atual && !viaFatura ? ' até hoje' : ''}</span></h2>${tabelaItens(itens, true)}</div>
@@ -2062,7 +2145,7 @@ function telaFaturasPendentes() {
   if (!ps.length) return '';
   return `<div class="card aviso"><h2>${ico('envia')} Faturas para revisar <span class="sub">· enviadas sem PDF</span></h2>
     ${ps.map(pd => { const soma = r2(pd.itens.reduce((a, i) => a + i.valor, 0)); return `<div class="row" style="align-items:center;justify-content:space-between;padding:6px 0">
-      <div><b>${esc(pd.banco)}${pd.aberta ? ' · fatura em aberto' : ''}</b><div class="hint" style="margin:0">${esc(pd.origem || '')} · ${pd.itens.length} itens · ${fmt.format(soma)}${pd.total != null && Math.abs(pd.total - soma) >= .01 ? ` de ${fmt.format(pd.total)} <span class="neg">(faltam ${fmt.format(r2(pd.total - soma))})</span>` : ''}</div></div>
+      <div><b>${esc(pd.banco)}${pd.aberta ? ' · fatura em aberto' : ''}</b><div class="hint" style="margin:0">${esc(pd.origem || '')} · ${pd.itens.length} itens${pd.semMarca ? ` · <b>${pd.semMarca} ${pd.semMarca === 1 ? 'compra nova' : 'compras novas'} para marcar</b>` : ''}${pd.naoBate ? ' · <b>o total do banco não bate com as compras</b>' : ''} · ${fmt.format(soma)}${pd.total != null && Math.abs(pd.total - soma) >= .01 ? ` de ${fmt.format(pd.total)} <span class="neg">(faltam ${fmt.format(r2(pd.total - soma))})</span>` : ''}</div></div>
       <button class="btn primary" data-pendente="${esc(pd.id)}" style="flex:0 0 auto">Revisar e marcar</button></div>`; }).join('')}
   </div>`;
 }
@@ -2568,7 +2651,7 @@ const ddmm = d => d.split('-').reverse().slice(0, 2).join('/');
 // Ao informar o saldo de hoje, compara com o esperado: saldo anterior + o que estava previsto
 // entre as duas datas (salários, contas, faturas, Pix planejados). A diferença é o que entrou
 // ou saiu sem estar registrado.
-function informarSaldo(novo) {
+function informarSaldo(novo, doBanco) {
   const c = S.conferencia;
   // corrigindo no mesmo dia: compara de novo a partir da mesma base
   const base = c && c.ate === hoje() ? { saldo: c.anterior, data: c.de }
@@ -2582,6 +2665,9 @@ function informarSaldo(novo) {
       ev: ev.map(e => ({ data: e.data, orig: e.orig, desc: e.desc, valor: e.valor, fixo: e.fixo, lanc: e.lanc, cartao: e.cartao })) };
   }
   S.saldoAtual = novo; S.saldoData = hoje();
+  S.saldoTs = doBanco || Date.now();   // hora do dado: do banco, ou agora quando é você que informa
+  if (doBanco) { S.saldoBanco = true; return; }   // quem chamou salva
+  delete S.saldoBanco;
   salvar();
 }
 
@@ -2922,7 +3008,7 @@ function telaFaturasAbertas() {
   </div>`;
 }
 
-function confirmarImportacao() {
+function confirmarImportacao(silencioso) {
   let novos = 0, futuras = 0;
   for (const it of imp.itens) {
     // valor em reais vale só para esta compra: não vira regra da loja
@@ -2973,7 +3059,9 @@ function confirmarImportacao() {
   });
   if (imp.pendente) S.faturasPendentes = (S.faturasPendentes || []).filter(x => x.id !== imp.pendente);
   const mes = imp.fechamento.slice(0, 7), revisao = imp.revisao;
-  imp = null; aba = 'visao'; mesSel = mes;
+  imp = null;
+  if (silencioso) return novos;
+  aba = 'visao'; mesSel = mes;
   salvar();
   alert(revisao ? `Fatura corrigida: ${novos} lançamentos seus nesta fatura.` : `${novos} lançamentos importados` + (futuras ? ` e ${futuras} parcelas futuras planejadas.` : '.'));
 }
@@ -4139,6 +4227,8 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.ofAuto) { S.ofAuto = { ...(S.ofAuto || {}), [e.target.dataset.ofAuto]: e.target.checked }; salvar(); if (e.target.checked) buscarBancos(); return; }
+  if (e.target.dataset && e.target.dataset.ofConta) { S.ofSaldo = { ...(S.ofSaldo || {}), [e.target.dataset.ofConta]: e.target.checked }; salvar(); return; }
   if (e.target.dataset && e.target.dataset.pluggyBanco) { pluggy.bancos = { ...(pluggy.bancos || {}), [e.target.dataset.pluggyBanco]: e.target.value }; gravarPluggy(); buscarBancos(); return; }
   if (e.target.id === 'oc-orig') { abrirOcorrencia(e.target.dataset.fixo, e.target.value); return; }
   if (e.target.closest && e.target.closest('#f-conf')) { resumoConf(); return; }
@@ -4220,7 +4310,7 @@ window.addEventListener('resize', () => {
   larguraAnt = innerWidth; clearTimeout(rz); rz = setTimeout(desenharGraficos, 150);
 });
 // ao voltar para o app (ex.: depois de usar no celular), busca o que mudou
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) puxar(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) Promise.resolve(puxar()).finally(() => { if (bancosVelhos()) buscarBancos(); }); });
 window.addEventListener('beforeunload', e => { if (timerEnvio) { enviar(); e.preventDefault(); } });
 
 function exemplo() {
@@ -4249,8 +4339,8 @@ function exemplo() {
 }
 
 render();
-// depois de sincronizar, busca nos bancos uma vez por dia
-Promise.resolve(puxar()).finally(() => { if (pluggy && pluggy.ultima !== hoje()) buscarBancos(); });
+// depois de sincronizar, busca nos bancos (se a última busca tem mais de 4 h)
+Promise.resolve(puxar()).finally(() => { if (bancosVelhos()) buscarBancos(); });
 </script>
 </body>
 </html>

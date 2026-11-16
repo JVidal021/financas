@@ -2,7 +2,13 @@
 
 Ponte entre o app e a API da Pluggy (Meu Pluggy, grátis para uso pessoal). O Client Secret da Pluggy fica guardado só no Cloudflare. O app usa um token próprio, que você mesmo cria.
 
-O app busca nos bancos uma vez por dia, ao abrir. As faturas dos cartões chegam em **Importar fatura → Faturas para revisar**, no mesmo fluxo de marcar Meu / Metade / Não é meu. Uma fatura fechada que você já importou (pelo PDF ou por aqui) não volta. A fatura em aberto vem como "aberta". O saldo da conta corrente aparece em **Dados → Bancos**, com o botão "Usar como saldo de hoje".
+O app busca nos bancos ao abrir e de novo quando passa de 4 h (o Meu Pluggy atualiza os bancos uma vez por dia). Com os dados ele:
+
+- **atualiza o saldo sozinho**: a soma das contas marcadas em **Dados → Bancos** vira o saldo de hoje quando o banco tem dado mais novo que o último que você informou. A conferência continua mostrando o que saiu ou entrou sem registro;
+- **lança sozinho as compras conhecidas**: se todas as compras novas de uma fatura são de lojas que você já marcou (Meu / Metade / Não é meu), a fatura entra sem revisão. Com loja nova, ela vai para **Importar fatura → Faturas para revisar**, já com as conhecidas marcadas. Fatura fechada cujo total não bate com as compras também vai para revisar;
+- **mostra na tela inicial** o saldo no banco, o limite livre de cada cartão e a fatura fechada a pagar.
+
+As duas automações podem ser desligadas em **Dados → Bancos**. Uma fatura fechada que você já importou (pelo PDF ou por aqui) não volta.
 
 ## 1. Pluggy (uma vez)
 
