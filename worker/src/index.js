@@ -118,7 +118,7 @@ export default {
     if (!mesmoToken(token, env.APP_TOKEN)) return json({ erro: 'token inválido' }, 401);
     const ate = new Date().toISOString().slice(0, 10);
     const de = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('desde') || '') ? url.searchParams.get('desde')
-      : new Date(Date.now() - 100 * 864e5).toISOString().slice(0, 10);
+      : new Date(Date.now() - 370 * 864e5).toISOString().slice(0, 10);
     try { return json(await dados(env, de, ate)); }
     catch (e) { return json({ erro: e.message }, e.status || 500); }
   },

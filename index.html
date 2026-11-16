@@ -971,9 +971,18 @@ function itemPluggy(t) {
   const valor = r2(+t.valor);
   const bruto = String(t.desc || '').replace(/\s+/g, ' ').trim().toUpperCase();
   if (!valor || !bruto || (valor < 0 && /PAGAMENTO|PAGTO|PAG FATURA|PGTO/.test(bruto))) return null;
-  const { desc, parc } = separarParcela(bruto);
-  const p = t.N > 1 && t.n ? { n: t.n, N: t.N } : parc ? { n: parc.n, N: parc.N } : null;
-  return { data: t.compra || t.data, desc: desc.toUpperCase(), valor, parc: p };
+  const sp = separarParcela(bruto);
+  const p = t.N > 1 && t.n ? { n: t.n, N: t.N } : sp.parc ? { n: sp.parc.n, N: sp.parc.N } : null;
+  return { data: t.compra || t.data, desc: nomeLoja(sp.desc), valor, parc: p };
+}
+// O Open Finance manda a loja com a cidade e o país colados ("UBER * PENDINGSAO PAULOBR").
+// Tira o país e as cidades comuns; se o começo bate com uma loja que você já marcou (regra), usa o nome dela.
+const CIDADES = /\s*(SAO PAULO|S PAULO|SAO P|RIO DE JANEI?R?O?|RIO DE JAN|ITABORAI|NITEROI|SAO GONCALO|MARICA|OSASCO|BARUERI|CURITIBA|BELO HORIZONT?E?|BRASILIA)$/;
+function nomeLoja(d) {
+  let x = d.replace(/\s+/g, ' ').trim();
+  if (x.length > 12) x = x.replace(/(?<=[A-Z0-9*.])(BR|US)$/, '').replace(CIDADES, '').trim() || x;
+  const regra = Object.keys(S.regras).filter(k => k.length >= 5 && (x === k || x.startsWith(k))).sort((a, b) => b.length - a.length)[0];
+  return regra || x;
 }
 // fechamento de uma fatura fechada que veio só com o vencimento: pelos dias do cartão, senão o que a Pluggy mandou, senão 7 dias antes
 function fechamentoPluggy(banco, f) {
@@ -1001,13 +1010,15 @@ function aplicarPluggy(d) {
       const itens = c.transacoes.filter(t => t.fatura === f.id).map(itemPluggy).filter(Boolean);
       if (itens.length) novas.push({ id: `pluggy|${banco}|${c.id}|${f.vence}`, banco, fechamento, vencimento: f.vence, itens, total: f.total ?? null, origem: 'Open Finance (Pluggy)' });
     }
-    // fatura em aberto: o que não pertence a nenhuma fatura fechada e foi lançado depois do último fechamento
-    const abertos = c.transacoes.filter(t => !(t.fatura && ids.has(t.fatura)) && (!ultFech || t.data > ultFech)).map(itemPluggy).filter(Boolean);
+    // fatura em aberto: o que não pertence a nenhuma fatura fechada (pendente no banco ou lançado depois do último fechamento;
+    // compras de antes do fechamento podem estar nela, quando você antecipa a virada)
+    const abertos = c.transacoes.filter(t => !(t.fatura && ids.has(t.fatura)) && (t.status === 'PENDING' || !ultFech || t.data > ultFech)).map(itemPluggy).filter(Boolean);
     if (abertos.length) {
       // tudo isso já foi lançado como fatura aberta: não pede para revisar de novo
       const ja = new Set(S.faturas.filter(f => f.banco === banco && f.aberta).flatMap(f => f.itens.map(i => i.key)));
       if (!abertos.every(x => ja.has(chavePendente(x))))
-        novas.push({ id: `pluggy|${banco}|${c.id}|aberta`, banco, aberta: true, itens: abertos, total: c.saldo ?? null, origem: 'Open Finance (Pluggy), fatura em aberto' });
+        novas.push({ id: `pluggy|${banco}|${c.id}|aberta`, banco, aberta: true, itens: abertos, total: null,   // o saldo do cartão é o limite usado (inclui parcelas futuras), não a fatura
+        origem: 'Open Finance (Pluggy), fatura em aberto' });
     }
   }
   S.faturasPendentes = (S.faturasPendentes || []).filter(p => !String(p.id).startsWith('pluggy|')).concat(novas);
@@ -1045,7 +1056,7 @@ function cardBancos() {
     const b = c.tipo === 'cartao' ? bancoDaConta(c) : '';
     return `<div class="row" style="align-items:center;justify-content:space-between;padding:6px 0">
     <div><b>${esc(c.nome)}</b>${c.numero ? ` <span class="hint" style="margin:0">· ${esc(String(c.numero).slice(-4))}</span>` : ''}
-      <div class="hint" style="margin:0">${c.tipo === 'cartao' ? `cartão · fatura em aberto ${fmt.format(c.saldo || 0)}` : `conta · saldo ${fmt.format(c.saldo || 0)}`}</div></div>
+      <div class="hint" style="margin:0">${c.tipo === 'cartao' ? `cartão · limite usado ${fmt.format(c.saldo || 0)}` : `conta · saldo ${fmt.format(c.saldo || 0)}`}</div></div>
     ${c.tipo === 'cartao'
       ? `<label class="hint" style="margin:0;flex:0 0 auto">no app é o cartão <select data-pluggy-banco="${esc(c.id)}">${cartoes.map(x => `<option ${x === b ? 'selected' : ''}>${esc(x)}</option>`).join('')}${cartoes.includes(b) ? '' : `<option selected>${esc(b)}</option>`}</select></label>`
       : `<button class="btn" style="flex:0 0 auto" data-pluggy-saldo="${c.saldo}">Usar como saldo de hoje</button>`}
