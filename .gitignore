@@ -1,3 +1,8 @@
 # nunca subir faturas nem backups com dados pessoais
 *.pdf
 *.json
+
+# Worker do Cloudflare: arquivos locais e segredos de teste
+worker/.wrangler/
+worker/.dev.vars
+worker/node_modules/

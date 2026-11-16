@@ -8,6 +8,7 @@ App pessoal para controlar gastos, definir orçamento por categoria e projetar o
 - Projeção de saldo com simulação de corte nos gastos variáveis
 - Importação de fatura em PDF do Itaú, Santander, Bradesco e Nubank, com marcação de Meu / Metade / Não é meu
 - Visão separada por cartão (Itaú, Santander, Pix/débito…)
+- Faturas e saldo direto dos bancos via Open Finance (Meu Pluggy + um Worker do Cloudflare; veja [worker/LEIA-ME.md](worker/LEIA-ME.md))
 - Sincronização entre aparelhos via um repositório privado do GitHub (aba Dados)
 
 Os dados nunca ficam neste repositório: eles ficam no navegador e, se a sincronização estiver ligada, no repositório privado de dados.

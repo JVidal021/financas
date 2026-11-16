@@ -954,6 +954,112 @@ async function conectarSync(token, repo) {
   render();
 }
 
+// ---------- bancos via Open Finance (Meu Pluggy, pelo Worker do Cloudflare em worker/) ----------
+// O Worker guarda o Client Secret da Pluggy; este aparelho guarda só o endereço dele e um token próprio.
+// As faturas que chegam viram "Faturas para revisar" (o mesmo caminho das faturas enviadas sem PDF):
+// fatura fechada que você já importou (PDF ou revisão) não volta; a fatura em aberto vem como "aberta".
+const PLUGGY_KEY = 'financas.pluggy';
+let pluggy = (() => { try { return JSON.parse(localStorage.getItem(PLUGGY_KEY)); } catch (e) { return null; } })();
+let pluggyStatus = '';
+const gravarPluggy = () => { try { if (pluggy) localStorage.setItem(PLUGGY_KEY, JSON.stringify(pluggy)); else localStorage.removeItem(PLUGGY_KEY); } catch (e) {} };
+const NOMES_BANCO = [[/ita[uú]|itaucard/i, 'Itaú'], [/santander/i, 'Santander'], [/nubank|nu pagamentos/i, 'Nubank'], [/bradesco/i, 'Bradesco']];
+const bancoDaConta = c => (pluggy.bancos || {})[c.id] || (NOMES_BANCO.find(([re]) => re.test(`${c.nome} ${c.nomeBanco || ''}`)) || [, c.nome])[1];
+const chavePendente = x => `${x.desc}|${r2(x.valor)}|${x.data}|${x.parc ? x.parc.N : ''}|${x.parc ? x.parc.n : ''}`;
+
+// transação do cartão → item de fatura (compra positiva, estorno negativo; pagamento da fatura fica de fora)
+function itemPluggy(t) {
+  const valor = r2(+t.valor);
+  const bruto = String(t.desc || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  if (!valor || !bruto || (valor < 0 && /PAGAMENTO|PAGTO|PAG FATURA|PGTO/.test(bruto))) return null;
+  const { desc, parc } = separarParcela(bruto);
+  const p = t.N > 1 && t.n ? { n: t.n, N: t.N } : parc ? { n: parc.n, N: parc.N } : null;
+  return { data: t.compra || t.data, desc: desc.toUpperCase(), valor, parc: p };
+}
+// fechamento de uma fatura fechada que veio só com o vencimento: pelos dias do cartão, senão o que a Pluggy mandou, senão 7 dias antes
+function fechamentoPluggy(banco, f) {
+  if (f.fecha) return f.fecha;
+  for (const k of [-1, 0]) {
+    const fe = fechamentoEm(banco, addMes(f.vence.slice(0, 7), k)), v = fe && vencimentoDe(banco, fe);
+    if (v && Math.abs(diasEntre(v, f.vence)) <= 5) return fe;
+  }
+  return addDia(f.vence, -7);
+}
+// Transforma o que o Worker mandou em faturas para revisar. Devolve quantas ficaram para revisar.
+function aplicarPluggy(d) {
+  const novas = [];
+  pluggy.contas = d.contas.map(c => ({ id: c.id, tipo: c.tipo, nome: c.nome, nomeBanco: c.nomeBanco, numero: c.numero, saldo: c.saldo }));
+  for (const c of d.contas.filter(c => c.tipo === 'cartao')) {
+    const banco = bancoDaConta(c);
+    const fechadas = S.faturas.filter(f => f.banco === banco && !f.aberta);
+    const ultVenc = fechadas.reduce((m, f) => f.vencimento > m ? f.vencimento : m, '');
+    let ultFech = fechadas.reduce((m, f) => f.fechamento > m ? f.fechamento : m, '');
+    const ids = new Set(c.faturas.map(f => f.id));
+    for (const f of c.faturas.filter(f => f.vence).sort((a, b) => a.vence.localeCompare(b.vence))) {
+      const fechamento = fechamentoPluggy(banco, f);
+      if (fechamento > ultFech) ultFech = fechamento;
+      if (ultVenc && f.vence <= addDia(ultVenc, 7)) continue;   // já importada: a fatura fechada não muda
+      const itens = c.transacoes.filter(t => t.fatura === f.id).map(itemPluggy).filter(Boolean);
+      if (itens.length) novas.push({ id: `pluggy|${banco}|${f.vence}`, banco, fechamento, vencimento: f.vence, itens, total: f.total ?? null, origem: 'Open Finance (Pluggy)' });
+    }
+    // fatura em aberto: o que não pertence a nenhuma fatura fechada e foi lançado depois do último fechamento
+    const abertos = c.transacoes.filter(t => !(t.fatura && ids.has(t.fatura)) && (!ultFech || t.data > ultFech)).map(itemPluggy).filter(Boolean);
+    if (abertos.length) {
+      // tudo isso já foi lançado como fatura aberta: não pede para revisar de novo
+      const ja = new Set(S.faturas.filter(f => f.banco === banco && f.aberta).flatMap(f => f.itens.map(i => i.key)));
+      if (!abertos.every(x => ja.has(chavePendente(x))))
+        novas.push({ id: `pluggy|${banco}|aberta`, banco, aberta: true, itens: abertos, total: c.saldo ?? null, origem: 'Open Finance (Pluggy), fatura em aberto' });
+    }
+  }
+  S.faturasPendentes = (S.faturasPendentes || []).filter(p => !String(p.id).startsWith('pluggy|')).concat(novas);
+  return novas.length;
+}
+async function buscarBancos() {
+  if (!pluggy) return;
+  pluggyStatus = 'buscando nos bancos…'; if (aba === 'dados') render();
+  try {
+    const r = await fetch(pluggy.url.replace(/\/+$/, '') + '/dados', { headers: { Authorization: 'Bearer ' + pluggy.token }, cache: 'no-store' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(r.status === 401 ? 'o token do app não confere com o do Worker' : d.erro || 'erro ' + r.status);
+    const n = aplicarPluggy(d);
+    pluggy.ultima = hoje(); gravarPluggy();
+    pluggyStatus = `atualizado às ${new Date().toTimeString().slice(0, 5)} · ${n ? `${n} ${n === 1 ? 'fatura' : 'faturas'} para revisar em Importar fatura` : 'nenhuma fatura nova'}`;
+    salvar();
+  } catch (e) {
+    pluggyStatus = 'não consegui buscar: ' + (e.message === 'Failed to fetch' ? 'o Worker não respondeu (endereço errado, ou este site não está em ALLOWED_ORIGINS)' : e.message);
+    render();
+  }
+}
+function cardBancos() {
+  if (!pluggy) return `
+  <div class="card"><h2>Bancos (Open Finance)</h2>
+    <p class="hint" style="margin:0 0 12px">Puxa as faturas dos cartões e o saldo da conta direto dos bancos, pelo <b>Meu Pluggy</b> (grátis para uso pessoal). Precisa do Worker do Cloudflare configurado: o passo a passo está em <a href="https://github.com/JVidal021/financas/blob/main/worker/LEIA-ME.md" target="_blank" rel="noopener">worker/LEIA-ME.md</a>.</p>
+    <form id="f-pluggy" class="row">
+      <label style="flex:2 1 260px">Endereço do Worker<input name="url" type="url" required placeholder="https://financas-pluggy.….workers.dev"></label>
+      <label>Token do app<input name="token" type="password" autocomplete="off" required></label>
+      <button class="btn primary">Conectar</button>
+    </form>
+    <p class="hint">O token fica salvo só neste navegador. O Client Secret da Pluggy nunca passa por aqui.</p>
+  </div>`;
+  const cartoes = [...new Set([...cartoesUsados(), ...Object.keys(LEITORES)])];
+  const linhas = (pluggy.contas || []).map(c => {
+    const b = c.tipo === 'cartao' ? bancoDaConta(c) : '';
+    return `<div class="row" style="align-items:center;justify-content:space-between;padding:6px 0">
+    <div><b>${esc(c.nome)}</b>${c.numero ? ` <span class="hint" style="margin:0">· ${esc(String(c.numero).slice(-4))}</span>` : ''}
+      <div class="hint" style="margin:0">${c.tipo === 'cartao' ? `cartão · fatura em aberto ${fmt.format(c.saldo || 0)}` : `conta · saldo ${fmt.format(c.saldo || 0)}`}</div></div>
+    ${c.tipo === 'cartao'
+      ? `<label class="hint" style="margin:0;flex:0 0 auto">no app é o cartão <select data-pluggy-banco="${esc(c.id)}">${cartoes.map(x => `<option ${x === b ? 'selected' : ''}>${esc(x)}</option>`).join('')}${cartoes.includes(b) ? '' : `<option selected>${esc(b)}</option>`}</select></label>`
+      : `<button class="btn" style="flex:0 0 auto" data-pluggy-saldo="${c.saldo}">Usar como saldo de hoje</button>`}
+  </div>`;
+  }).join('');
+  return `
+  <div class="card"><h2>Bancos (Open Finance)</h2>
+    <p class="hint" style="margin:0 0 8px">Conectado ao Worker <b>${esc(pluggy.url.replace(/^https?:\/\//, ''))}</b>. O app busca uma vez por dia ao abrir (os bancos atualizam a cada 24 h). As faturas chegam em <b>Importar fatura → Faturas para revisar</b>; fatura que você já importou não volta.</p>
+    ${linhas || '<p class="hint">Clique em "Buscar agora" para ver as contas.</p>'}
+    <div class="row" style="margin-top:8px"><button class="btn primary" id="pluggy-agora">Buscar agora</button><button class="btn" id="pluggy-sair">Desconectar</button></div>
+    <p class="hint">${esc(pluggyStatus || (pluggy.ultima ? 'última busca: ' + ddmm(pluggy.ultima) : ''))}</p>
+  </div>`;
+}
+
 // ---------- cálculos ----------
 const fixoAtivo = (f, m) => f.inicio <= m && (!f.fim || m <= f.fim);
 
@@ -1635,7 +1741,7 @@ function telaDados() {
     </form>
     <p class="hint">O token fica salvo só neste navegador e dá acesso apenas a esse repositório.</p>
   </div>`;
-  return cardAparencia() + cardSync + `
+  return cardAparencia() + cardSync + cardBancos() + `
   <div class="card"><h2>Backup</h2>
     <p class="hint" style="margin:0 0 12px">Os dados ficam só neste navegador. Exporte de vez em quando para não perder nada (ou para levar para outro computador).</p>
     <div class="row"><button class="btn" id="exportar">Exportar JSON</button>
@@ -2693,6 +2799,8 @@ function pendencias() {
   const meses = [...new Set(S.lanc.map(l => l.data.slice(0, 7)))].filter(m => m <= mesAtual()).sort();
   const semReceita = meses.filter(m => { const t = totais(itensDoMes(m)); return t.d > 0 && t.r === 0; });
   if (semReceita.length && !S.semReceitaOk) p.push({ ignorar: 'semReceita', txt: `${semReceita.map(nomeMes).join(', ')} ${semReceita.length === 1 ? 'tem' : 'têm'} gastos mas nenhuma receita, por isso a sobra aparece negativa. Se o salário já existia, ajuste o "Começa em" dele para ${nomeMes(semReceita[0])}.`, acao: 'fixos', botao: 'Ver fixos' });
+  const fp = (S.faturasPendentes || []).length;
+  if (fp) p.push({ txt: `${fp} ${fp === 1 ? 'fatura chegou' : 'faturas chegaram'} para revisar e marcar o que é seu.`, acao: 'fatura', botao: 'Revisar' });
   return p;
 }
 function telaPendencias() {
@@ -3870,6 +3978,10 @@ document.addEventListener('submit', e => {
     if (Object.keys(pct).length) x.pct = pct; else delete x.pct;
     if (Object.keys(valores).length) x.valores = valores; else delete x.valores;
     document.getElementById('dlg').close();
+  } else if (e.target.id === 'f-pluggy') {
+    pluggy = { url: f.url.trim(), token: f.token.trim(), bancos: {} }; gravarPluggy();
+    buscarBancos();
+    return;
   } else if (e.target.id === 'f-sync') {
     conectarSync(f.token.trim(), f.repo.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/$/, ''));
     return;
@@ -3997,6 +4109,10 @@ document.addEventListener('click', e => {
     if (!pend || confirm(`${pend} itens ainda não foram marcados e não serão importados. Continuar?`)) confirmarImportacao();
   }
   if (e.target.id === 'sync-agora') puxar();
+  if (e.target.id === 'pluggy-agora') buscarBancos();
+  if (e.target.id === 'pluggy-sair' && confirm('Desconectar os bancos deste aparelho? Nada do que já foi lançado é apagado.')) { pluggy = null; pluggyStatus = ''; gravarPluggy(); render(); }
+  const psal = e.target.closest('[data-pluggy-saldo]');
+  if (psal && confirm(`Usar ${fmt.format(+psal.dataset.pluggySaldo)} (saldo que o banco informou) como o saldo de hoje?`)) { informarSaldo(+psal.dataset.pluggySaldo); return; }
   if (e.target.id === 'sync-sair' && confirm('Desconectar este aparelho? Os dados continuam salvos aqui e na nuvem.')) {
     sync = null; statusSync('');
     try { localStorage.removeItem(SYNC_KEY); } catch (err) {}
@@ -4012,6 +4128,7 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.pluggyBanco) { pluggy.bancos = { ...(pluggy.bancos || {}), [e.target.dataset.pluggyBanco]: e.target.value }; gravarPluggy(); buscarBancos(); return; }
   if (e.target.id === 'oc-orig') { abrirOcorrencia(e.target.dataset.fixo, e.target.value); return; }
   if (e.target.closest && e.target.closest('#f-conf')) { resumoConf(); return; }
   if (e.target.dataset && e.target.dataset.pessoa) {
@@ -4121,7 +4238,8 @@ function exemplo() {
 }
 
 render();
-puxar();
+// depois de sincronizar, busca nos bancos uma vez por dia
+Promise.resolve(puxar()).finally(() => { if (pluggy && pluggy.ultima !== hoje()) buscarBancos(); });
 </script>
 </body>
 </html>

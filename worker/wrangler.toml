@@ -1,0 +1,10 @@
+name = "financas-pluggy"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# sites que podem chamar o Worker (o app publicado e o teste local)
+ALLOWED_ORIGINS = "https://jvidal021.github.io,http://localhost:8080"
+
+# Secrets (não ficam neste arquivo; configure com `npx wrangler secret put NOME`):
+#   PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, APP_TOKEN, ITEM_IDS
