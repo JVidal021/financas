@@ -386,6 +386,8 @@ tbody tr:hover { background: var(--surface-2); }
 td.num, th.num { text-align: right; white-space: nowrap; }
 .tbl-wrap { overflow-x: auto; margin: 0 -10px; }
 .it { display: flex; gap: 10px; align-items: center; }
+.obs { display: block; font-size: 12px; color: var(--muted); font-style: italic; margin-top: 2px; white-space: normal; }
+.obs-it { width: 100%; margin-top: 4px; font-size: 12px; padding: 4px 8px; }
 .av-cat { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
 .pos { color: var(--good); }
 .neg { color: var(--crit); }
@@ -1401,7 +1403,7 @@ function telaVisao() {
   const cardUltimas = `<div class="card"><h2>${ico('lista')} ${futuro ? 'Primeiras do mês' : 'Últimas movimentações'}</h2>
     ${ultimas.length ? `<div class="feed">${ultimas.map(i => { const [ic, cor] = visual(i); return `<div class="ev">
       <span class="ev-ico" style="--c:${cor}">${ico(ic)}</span>
-      <div class="ev-txt"><b title="${esc(i.desc)}">${esc(i.desc)}</b><small>${ddmm(i.quando)} ${DIAS_SEM[new Date(i.quando + 'T12:00').getDay()]} · ${esc(i.cat)}${i.cartao ? ' · ' + esc(nomeCartao(i.cartao)) : ''}${i.parcInfo ? ` · ${i.parcInfo.N}x` : ''}</small></div>
+      <div class="ev-txt"><b title="${esc(i.desc + (i.obs ? ' · ' + i.obs : ''))}">${esc(i.desc)}</b>${i.obs ? `<span class="obs">${esc(i.obs)}</span>` : ''}<small>${ddmm(i.quando)} ${DIAS_SEM[new Date(i.quando + 'T12:00').getDay()]} · ${esc(i.cat)}${i.cartao ? ' · ' + esc(nomeCartao(i.cartao)) : ''}${i.parcInfo ? ` · ${i.parcInfo.N}x` : ''}</small></div>
       <div class="ev-val"><b class="${i.tipo === 'receita' ? 'pos' : ''}">${i.tipo === 'receita' ? '+' : '−'} ${fmt.format(i.valor)}</b></div></div>`; }).join('')}</div>` : '<div class="empty">Nada neste mês ainda.</div>'}
   </div>`;
   return `${chipsCartao()}${cartaoSel === null ? telaPendencias() : ''}${hero}${kpis}${cardResto}
@@ -1427,7 +1429,7 @@ function tabelaItens(itens, mostraFixo) {
   const dataItem = i => i.quando || (i.fixo ? i.data || '' : dataDaCompra(i));
   itens = itens.slice().sort((a, b) => dataItem(b).localeCompare(dataItem(a)));
   return `<div class="tbl-wrap"><table class="tabela-mov"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? (i.data ? dataBR(i.data) + ' ' : '') + '<span class="tag t-azul">fixo</span>' + (i.orig && i.orig !== i.data ? ` <span class="tag t-aviso" title="Data mudada só desta vez">era ${ddmm(i.orig)}</span>` : '') + (i.orig && i.ajustes && i.ajustes[i.orig] != null ? ' <span class="tag t-aviso" title="Valor diferente do normal só desta vez">ajustado</span>' : '') : dataBR(dataDaCompra(i))}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.parcInfo ? ` <span class="tag">${i.parcInfo.N}x de ${fmt.format(r2(i.valor / i.parcInfo.N))}</span>` : ''}${!i.fixo && !i.parcInfo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}</div></div></td><td>${esc(i.cat)}</td>
+    itens.map(i => `<tr><td style="white-space:nowrap">${i.fixo ? (i.data ? dataBR(i.data) + ' ' : '') + '<span class="tag t-azul">fixo</span>' + (i.orig && i.orig !== i.data ? ` <span class="tag t-aviso" title="Data mudada só desta vez">era ${ddmm(i.orig)}</span>` : '') + (i.orig && i.ajustes && i.ajustes[i.orig] != null ? ' <span class="tag t-aviso" title="Valor diferente do normal só desta vez">ajustado</span>' : '') : dataBR(dataDaCompra(i))}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.parcInfo ? ` <span class="tag">${i.parcInfo.N}x de ${fmt.format(r2(i.valor / i.parcInfo.N))}</span>` : ''}${!i.fixo && !i.parcInfo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}${i.obs ? `<span class="obs">${esc(i.obs)}</span>` : ''}</div></div></td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? (i.orig && !i.cartao ? `<button class="link" data-oc="${i.id}|${i.orig}" title="Mudar só esta vez: valor, data ou não acontece">${ico('lapis')}</button>` : '') : `${!i.cartao && i.data > hoje() && !i.parcela ? `<button class="link" data-ja-lanc="${i.id}" title="Já ${i.tipo === 'receita' ? 'recebeu' : 'pagou'}: passa para hoje e sai da previsão">✓ já ${i.tipo === 'receita' ? 'recebi' : 'paguei'}</button>` : ''}<button class="link" data-edit-lanc="${i.id}" title="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
@@ -1898,6 +1900,7 @@ function marcarItens(itens, banco, fechamento) {
     if (!ja && S.faturas.some(f => f.itens.some(x => x.key === it.key))) it.escolha = 'nao';
     if (it.escolha === 'div') { const fr = ja ? lerFracao(fracaoTxt(ja.share)) : { k: regra.k, n: regra.n }; if (fr) Object.assign(it, fr); else it.meu = r2(Math.abs(ja.valor)); }
     it.cat = ja ? ja.cat : regra && regra.cat ? regra.cat : palpiteCat(it.desc);
+    if (ja && ja.obs && !it.obs) it.obs = ja.obs;
     // cobrança que já está em Fixos neste cartão (assinatura): não conta de novo
     if (!ja && banco && fechamento && it.sec === 'despesa') {
       const fx = S.fixos.find(f => !fixosUsados.has(f.id) && f.cartao === banco && f.tipo === 'despesa' && fixoAtivo(f, fechamento.slice(0, 7))
@@ -2005,7 +2008,7 @@ function telaFatura() {
     corpo += `<tr class="sec-title"><td colspan="6">${nomes[sec]} · ${lista.length} itens · ${fmt.format(lista.reduce((a, i) => a + i.valor, 0))}</td></tr>`;
     corpo += lista.map(it => `<tr class="${!it.escolha ? 'pendente' : it.escolha === 'nao' ? 'ignorado' : ''}">
       <td>${it.data.slice(8)}/${it.data.slice(5, 7)}</td>
-      <td>${esc(it.desc)}${it.parc ? ` <span class="tag">${it.parc.n}/${it.parc.N}</span>` : ''}${it.manual ? ` <span class="tag" title="${esc(S.lanc.find(l => l.id === it.manual)?.desc || '')}">✓ ${S.lanc.find(l => l.id === it.manual)?.aberta ? 'da fatura aberta' : 'lançada à mão'}</span>` : ''}${it.prevista ? ' <span class="tag" title="Parcela que o app já previa de uma fatura anterior">✓ parcela prevista</span>' : ''}${it.fixo ? ` <span class="tag" title="Já conta pelo item fixo; marcado como Não é meu para não contar duas vezes">✓ já está em Fixos: ${esc(it.fixo)}</span>` : ''}</td>
+      <td>${esc(it.desc)}${it.parc ? ` <span class="tag">${it.parc.n}/${it.parc.N}</span>` : ''}${it.manual ? ` <span class="tag" title="${esc(S.lanc.find(l => l.id === it.manual)?.desc || '')}">✓ ${S.lanc.find(l => l.id === it.manual)?.aberta ? 'da fatura aberta' : 'lançada à mão'}</span>` : ''}${it.prevista ? ' <span class="tag" title="Parcela que o app já previa de uma fatura anterior">✓ parcela prevista</span>' : ''}${it.fixo ? ` <span class="tag" title="Já conta pelo item fixo; marcado como Não é meu para não contar duas vezes">✓ já está em Fixos: ${esc(it.fixo)}</span>` : ''}<input class="obs-it" data-obs-it="${it.id}" value="${esc(it.obs || '')}" placeholder="observação (opcional)" autocomplete="off"></td>
       <td class="num">${fmt.format(it.valor)}</td>
       <td><span class="seg">${btn(it, 'meu', 'Meu')}${btn(it, 'metade', 'Metade')}${btn(it, 'div', it.escolha === 'div' ? (it.meu != null ? `${fmt.format(it.meu)} seu` : `${it.k}/${it.n} seu`) : 'Dividir…')}${btn(it, 'nao', 'Não é meu')}</span></td>
       <td><input list="cats" data-cat-it="${it.id}" value="${esc(it.cat)}" style="width:130px" ${it.escolha === 'nao' ? 'disabled' : ''}></td>
@@ -2140,7 +2143,7 @@ function lancarCompraCartao(f, valor, share, destino = S.lanc) {
     // à vista fica na data da compra; parcelas, no fechamento de cada fatura (como na importação)
     const data = N === 1 ? f.data : fech1 ? fechamentoEm(f.cartao, addMes(fech1.slice(0, 7), k - 1)) : addMes(f.data.slice(0, 7), k - 1) + f.data.slice(7);
     destino.push({ id: uid(), tipo: 'despesa', data, desc: f.desc.trim() + (N > 1 ? ` (${k}/${N})` : '') + rotuloFracao(share), cat: f.cat.trim(),
-      valor: r2(vParc * share), share, cartao: f.cartao, parcela: N > 1, provisorio: true, compra: { ...compra, n: k } });
+      valor: r2(vParc * share), share, cartao: f.cartao, parcela: N > 1, provisorio: true, compra: { ...compra, n: k }, ...(f.obs && f.obs.trim() ? { obs: f.obs.trim() } : {}) });
   }
   return destino;
 }
@@ -2821,13 +2824,13 @@ function confirmarImportacao() {
     const data = it.sec === 'despesa' && impModo === 'compra' ? it.data : imp.fechamento;
     const desc = it.desc + (it.parc ? ` (${it.parc.n}/${it.parc.N})` : '') + rotuloFracao(share);
     S.lanc = S.lanc.filter(l => l.key !== it.key && !(l.prevista && l.key && it.parc && mesmaParcela(l, { cartao: imp.banco, key: it.key })));
-    S.lanc.push({ id: uid(), tipo: 'despesa', data, desc, cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key: it.key, origem: 'fatura', cartao: imp.banco, parcela: !!it.parc, ...(imp.aberta ? { aberta: imp.banco + '|' + imp.fechamento } : {}) });
+    S.lanc.push({ id: uid(), tipo: 'despesa', data, desc, cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key: it.key, origem: 'fatura', cartao: imp.banco, parcela: !!it.parc, ...(it.obs ? { obs: it.obs } : {}), ...(imp.aberta ? { aberta: imp.banco + '|' + imp.fechamento } : {}) });
     novos++;
     if (it.parc && impFuturas) {
       for (let k = it.parc.n + 1; k <= it.parc.N; k++) {
         const key = it.base + '|' + k;
         S.lanc = S.lanc.filter(l => l.key !== key && !parcelaPrevistaIgual(l, { desc: it.desc, valor: it.valor, data: it.data, parc: { n: k, N: it.parc.N } }, imp.banco));
-        S.lanc.push({ id: uid(), tipo: 'despesa', data: fechamentoEm(imp.banco, addMes(imp.fechamento.slice(0, 7), k - it.parc.n)) || addMes(imp.fechamento.slice(0, 7), k - it.parc.n) + '-' + imp.fechamento.slice(8), desc: `${it.desc} (${k}/${it.parc.N})` + rotuloFracao(share), cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key, origem: 'fatura', cartao: imp.banco, parcela: true, prevista: true });
+        S.lanc.push({ id: uid(), tipo: 'despesa', data: fechamentoEm(imp.banco, addMes(imp.fechamento.slice(0, 7), k - it.parc.n)) || addMes(imp.fechamento.slice(0, 7), k - it.parc.n) + '-' + imp.fechamento.slice(8), desc: `${it.desc} (${k}/${it.parc.N})` + rotuloFracao(share), cat: it.cat || 'Outros', valor: r2(it.valor * share), share, key, origem: 'fatura', cartao: imp.banco, parcela: true, prevista: true, ...(it.obs ? { obs: it.obs } : {}) });
         futuras++;
       }
     }
@@ -2847,7 +2850,7 @@ function confirmarImportacao() {
   }
   S.faturas = S.faturas.filter(f => f.id !== id).concat({
     id, banco: imp.banco, fechamento: imp.fechamento, vencimento: imp.vencimento, ...(imp.aberta ? { aberta: true, total: imp.totalFatura } : {}),
-    itens: imp.itens.map(({ sec, data, desc, parc, valor, base, key }) => ({ sec, data, desc, parc, valor, base, key })),
+    itens: imp.itens.map(({ sec, data, desc, parc, valor, base, key, obs }) => ({ sec, data, desc, parc, valor, base, key, ...(obs ? { obs } : {}) })),
   });
   if (imp.pendente) S.faturasPendentes = (S.faturasPendentes || []).filter(x => x.id !== imp.pendente);
   const mes = imp.fechamento.slice(0, 7), revisao = imp.revisao;
@@ -2884,6 +2887,7 @@ function abrirEdicao(id) {
       <label>Valor total${irmas.length > 1 ? ' da parcela' : ''} (R$)<input name="valor" inputmode="decimal" value="${String(r2(Math.abs(l.valor) / share)).replace('.', ',')}" required></label>
       <label>Sua parte<select name="parte">${opcoes.map(([v, t]) => `<option value="${v}" ${Math.abs(v - share) < 0.001 ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>ou quanto é seu (R$)<input name="parteValor" inputmode="decimal" placeholder="usar a fração"></label>
+      <label style="flex-basis:100%">Observação<input name="obs" value="${esc(l.obs || '')}" autocomplete="off" placeholder="Para lembrar depois: o que foi, para quem…"></label>
     </div>
     <p class="hint">Sua parte: <b id="edit-parte">${fmt.format(Math.abs(l.valor))}</b></p>
     ${irmas.length > 1 ? `<label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" name="todas" checked> Aplicar a todas as ${irmas.length} parcelas desta compra (a data de cada uma não muda)</label>` : ''}
@@ -2907,6 +2911,7 @@ function salvarEdicao(f, id) {
     Object.assign(x, { tipo: f.tipo, cat: f.cat.trim(), share, valor: sinal * r2(total * share), desc: base + sufixoParcela(x.desc) + rotuloFracao(share) });
     if (f.cartao) x.cartao = f.cartao; else delete x.cartao;
     if (x.compra) x.compra.valor = total;
+    if (f.obs && f.obs.trim()) x.obs = f.obs.trim(); else delete x.obs;
   }
   l.data = f.data;   // a data só muda no lançamento aberto
   document.getElementById('dlg').close();
@@ -2993,7 +2998,7 @@ function shareDoForm(f, valor) {
 function lancsDoForm(f, destino = []) {
   const valor = num(f.valor), share = shareDoForm(f, valor) ?? 1;
   if (f.cartao && f.tipo === 'despesa') return lancarCompraCartao(f, valor, share, destino);
-  destino.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}) });
+  destino.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}), ...(f.obs && f.obs.trim() ? { obs: f.obs.trim() } : {}) });
   return destino;
 }
 // Roda `fn` como se os itens simulados já estivessem lançados. Pix/débito com data até hoje sai do
@@ -3049,7 +3054,8 @@ const camposLanc = (id, dataPadrao, cartao) => `
       <label>Parcelas<select name="parcelas">${Array.from({ length: 24 }, (_, i) => `<option value="${i + 1}">${i + 1}x</option>`).join('')}</select></label>
       <label>O valor é<select name="valorDe"><option value="total">Total da compra</option><option value="parcela">De cada parcela</option></select></label>
       <label>Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option><option value="valor">Valor em R$…</option></select></label>
-      <label class="parte-valor" hidden>Quanto é seu (R$)<input name="parteValor" inputmode="decimal" placeholder="0,00"></label>`;
+      <label class="parte-valor" hidden>Quanto é seu (R$)<input name="parteValor" inputmode="decimal" placeholder="0,00"></label>
+      <label style="flex:3 1 260px">Observação<input name="obs" autocomplete="off" placeholder="Para lembrar depois: o que foi, para quem…"></label>`;
 // diferença entre os cenários; `subirEhRuim` para valores de fatura
 const difTxt = (a, b, subirEhRuim) => { const d = r2(b - a); return Math.abs(d) < .01 ? '<span class="sim-dif">sem mudança</span>' : `<span class="sim-dif ${(d < 0) !== !!subirEhRuim ? 'neg' : 'pos'}">${d < 0 ? '−' : '+'} ${fmt.format(Math.abs(d))}</span>`; };
 
@@ -3235,7 +3241,7 @@ function desenharGraficos() {
 const semAcento = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 let _indice = null;
 function indiceBusca() {
-  if (!_indice) _indice = S.lanc.map(l => ({ l, t: semAcento([l.desc, l.cat, l.cartao || 'pix debito', dataBR(dataDaCompra(l)), fmt.format(l.valor), l.tipo].join(' ')) }));
+  if (!_indice) _indice = S.lanc.map(l => ({ l, t: semAcento([l.desc, l.obs || '', l.cat, l.cartao || 'pix debito', dataBR(dataDaCompra(l)), fmt.format(l.valor), l.tipo].join(' ')) }));
   return _indice;
 }
 const ATALHOS = [['Novo lançamento', 'lanc', 'lista', 'adicionar despesa receita compra'], ['Importar fatura', 'fatura', 'envia', 'pdf cartao'],
@@ -3839,7 +3845,7 @@ document.addEventListener('submit', e => {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
     const share = shareDoForm(f, valor); if (share == null) return alert('Em "Quanto é seu", informe um valor maior que zero e até o valor da compra.');
     if (f.cartao && f.tipo === 'despesa') { lancarCompraCartao(f, valor, share); mesSel = f.data.slice(0, 7); salvar(); return; }
-    S.lanc.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}) });
+    S.lanc.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}), ...(f.obs && f.obs.trim() ? { obs: f.obs.trim() } : {}) });
     mesSel = f.data.slice(0, 7);
   } else if (e.target.id === 'f-fixo') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
@@ -4030,6 +4036,7 @@ document.addEventListener('change', e => {
     salvar();
   }
   if (e.target.dataset && e.target.dataset.catIt !== undefined) imp.itens[e.target.dataset.catIt].cat = e.target.value.trim();
+  if (e.target.dataset && e.target.dataset.obsIt !== undefined) { const it = imp.itens[e.target.dataset.obsIt], v = e.target.value.trim(); if (v) it.obs = v; else delete it.obs; }
   if (e.target.id === 'imp-modo') impModo = e.target.value;
   if (e.target.id === 'imp-futuras') impFuturas = e.target.checked;
   if (e.target.id === 'pdf-fatura' && e.target.files[0]) {
