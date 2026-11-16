@@ -692,6 +692,13 @@ td .sim-dif { display: block; font-size: 12px; font-weight: 600; }
   .tabela-mov td:nth-child(5) { grid-column: 2; grid-row: 2; }
   .tabela-mov .tag { font-size: 11px; }
   .tile .delta { flex-wrap: wrap; row-gap: 0; }
+  /* formulários: campos curtos lado a lado, em vez de um por linha */
+  .row label { flex: 1 1 calc(50% - 5px); min-width: 0; }
+  .row label input, .row label select { min-width: 0; width: 100%; }
+  /* editar e excluir com área de toque de dedo, e afastados um do outro */
+  .tabela-mov td:nth-child(5) { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+  .tabela-mov button.link { min-width: 40px; min-height: 40px; display: inline-grid; place-items: center; }
+  dialog#dlg { padding: 18px; max-height: calc(100dvh - 24px); overflow-y: auto; }
 }
 </style>
 </head>
@@ -813,7 +820,15 @@ const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + String
 const mesAtual = () => hoje().slice(0, 7);
 const addMes = (ym, n) => { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
 const nomeMes = ym => { const [y, m] = ym.split('-'); return NOMES_MES[m - 1] + '/' + y.slice(2); };
-const num = v => { const n = parseFloat(String(v).replace(/\./g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
+// Valor digitado: aceita "1.234,56", "1234,56", "12.50" e "R$ 12,50". Sem vírgula, o ponto só é
+// separador de milhar quando separa grupos de 3 dígitos ("1.234"); senão é o decimal ("12.5").
+const num = v => {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  let s = String(v ?? '').replace(/[^\d,.\-]/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  const n = parseFloat(s); return isFinite(n) ? n : 0;
+};
 
 // ---------- estado ----------
 function novoEstado() {
@@ -1170,7 +1185,8 @@ function itensDoMes(m) {
 function totais(itens) {
   let r = 0, d = 0;
   for (const i of itens) i.tipo === 'receita' ? r += i.valor : d += i.valor;
-  return { r, d, saldo: r - d };
+  r = r2(r); d = r2(d);
+  return { r, d, saldo: r2(r - d) };
 }
 // Média mensal de compras novas (sem parcelas) dos últimos 3 meses com dados.
 // `filtro` escolhe os lançamentos: os de um cartão ou os sem cartão (Pix/débito).
@@ -1187,14 +1203,20 @@ function detalheMedia(filtro) {
   return meses.reverse().map(m => { const x = ls.filter(l => l.data.slice(0, 7) === m); return { m, v: r2(x.reduce((a, l) => a + l.valor, 0)), n: x.length }; });
 }
 function mediaCompras(filtro) {
-  const ls = S.lanc.filter(l => l.tipo === 'despesa' && !l.parcela && !l.agregado && !l.prevista && !l.fixoRef && !l.pagamentoFatura && l.data <= hoje() && filtro(l));
-  const meses = [];
-  for (let i = 1; i <= 3; i++) { const m = addMes(mesAtual(), -i); if (ls.some(l => l.data.slice(0, 7) === m)) meses.push(m); }
-  if (!meses.length) return 0;
-  return r2(ls.filter(l => meses.includes(l.data.slice(0, 7))).reduce((a, l) => a + l.valor, 0) / meses.length);
+  const meses = detalheMedia(filtro);
+  return meses.length ? r2(meses.reduce((a, x) => a + x.v, 0) / meses.length) : 0;
 }
-const mediaCartao = c => mediaCompras(l => l.cartao === c);
-const mediaSemCartao = () => mediaCompras(l => !l.cartao);
+// A média é pedida várias vezes por tela (cada fatura de cada mês da previsão): guarda por cartão
+// até a próxima tela ou até a lista de lançamentos ser trocada (simulação).
+const _media = new Map();
+let _mediaDe = null;
+function mediaGuardada(chave, filtro) {
+  if (_mediaDe !== S.lanc) { _media.clear(); _mediaDe = S.lanc; }
+  if (!_media.has(chave)) _media.set(chave, mediaCompras(filtro));
+  return _media.get(chave);
+}
+const mediaCartao = c => mediaGuardada('c|' + c, l => l.cartao === c);
+const mediaSemCartao = () => mediaGuardada('pix', l => !l.cartao);
 const fatorAjuste = () => 1 + S.ajuste / 100;
 const diasEntre = (a, b) => (new Date(b) - new Date(a)) / 864e5;
 // Compras novas que ainda devem entrar na fatura que fecha em `fech`: a média do cartão
@@ -2177,7 +2199,7 @@ function lerFracao(txt) {
   const m = String(txt || '').trim().match(/^(\d+)\s*\/\s*(\d+)$/);
   return m && +m[1] >= 1 && +m[1] < +m[2] && +m[2] <= 12 ? { k: +m[1], n: +m[2] } : null;
 }
-const r2 = v => Math.round(v * 100) / 100;
+const r2 = v => Math.sign(v) * Math.round(Math.abs(v) * 100 + 1e-7) / 100 || 0;
 
 function telaFatura() {
   if (!imp) return `
@@ -3109,7 +3131,10 @@ function abrirEdicao(id) {
 
 function salvarEdicao(f, id) {
   const l = S.lanc.find(l => l.id === id), total = num(f.valor), meu = f.parteValor.trim() ? num(f.parteValor) : null;
+  if (!l) return document.getElementById('dlg').close();
   if (!(total > 0)) return alert('Informe um valor maior que zero.');
+  if (!f.desc.trim() || !f.cat.trim()) return alert('Preencha a descrição e a categoria.');
+  if (!/^\d{4}-\d\d-\d\d$/.test(f.data)) return alert('Informe uma data válida.');
   if (meu != null && !(meu > 0 && meu <= total)) return alert('"Quanto é seu" precisa ser maior que zero e até o valor total.');
   const share = meu != null ? meu / total : +f.parte;
   const sinal = l.valor < 0 ? -1 : 1, base = f.desc.trim();
@@ -3120,7 +3145,9 @@ function salvarEdicao(f, id) {
     if (x.compra) x.compra.valor = total;
     if (f.obs && f.obs.trim()) x.obs = f.obs.trim(); else delete x.obs;
   }
-  l.data = f.data;   // a data só muda no lançamento aberto
+  // a data só muda no lançamento aberto; compra à vista lançada à mão guarda também a data da compra
+  if (l.compra && l.compra.data && !(l.compra.N > 1) && l.data !== f.data) l.compra.data = f.data;
+  l.data = f.data;
   document.getElementById('dlg').close();
   salvar();
 }
@@ -3362,7 +3389,7 @@ function desenharMeses() {
 
 let animarProx = false;   // a próxima tela entra animada (troca de aba, mês ou cartão), não a cada salvamento
 function render() {
-  _venc.clear(); _vencImportado = null; _indice = null;   // dias do cartão ou faturas importadas podem ter mudado
+  _venc.clear(); _vencImportado = null; _indice = null; _media.clear();   // dias do cartão ou faturas importadas podem ter mudado
   document.getElementById('mes-nome').innerHTML = `${nomeMes(mesSel)}${mesSel === mesAtual() ? '<small>atual</small>' : ''}`;
   if (!document.getElementById('mes-pop').hidden) desenharMeses();
   document.getElementById('mes-pill').style.visibility = ['proj', 'sim', 'dados', 'fixos', 'fatura', 'calc'].includes(aba) ? 'hidden' : '';
@@ -4051,9 +4078,11 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'f-lanc') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
     const share = shareDoForm(f, valor); if (share == null) return alert('Em "Quanto é seu", informe um valor maior que zero e até o valor da compra.');
-    if (f.cartao && f.tipo === 'despesa') { lancarCompraCartao(f, valor, share); mesSel = f.data.slice(0, 7); salvar(); return; }
-    S.lanc.push({ id: uid(), tipo: f.tipo, data: f.data, desc: f.desc.trim() + rotuloFracao(share), cat: f.cat.trim(), valor: r2(valor * share), share, ...(f.cartao ? { cartao: f.cartao } : {}), ...(f.obs && f.obs.trim() ? { obs: f.obs.trim() } : {}) });
-    mesSel = f.data.slice(0, 7);
+    if (!f.desc.trim() || !f.cat.trim()) return alert('Preencha a descrição e a categoria.');
+    if (!/^\d{4}-\d\d-\d\d$/.test(f.data)) return alert('Informe uma data válida.');
+    const novos = lancsDoForm(f, S.lanc);
+    // mostra o mês em que o lançamento aparece na lista (compra no cartão: o do vencimento da fatura)
+    mesSel = mesDoLanc(novos[novos.length - (f.cartao && f.tipo === 'despesa' ? +f.parcelas || 1 : 1)]);
   } else if (e.target.id === 'f-fixo') {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
     const { dias, uteis, pct, valores } = lerAgenda(f.dias);
@@ -4109,7 +4138,11 @@ document.addEventListener('click', e => {
     lancsDoForm(it.f, S.lanc);
     SIM = SIM.filter(x => x !== it); gravarSim(); salvar(); return;
   }
-  if (d.delLanc) { S.lanc = S.lanc.filter(l => l.id !== d.delLanc); salvar(); }
+  if (d.delLanc) {
+    const l = S.lanc.find(l => l.id === d.delLanc);
+    if (l && confirm(`Excluir "${l.desc}" (${fmt.format(Math.abs(l.valor))})?${parcelasIrmas(l).length > 1 ? ' Só esta parcela é excluída; as outras continuam.' : ''}`)) { S.lanc = S.lanc.filter(x => x !== l); salvar(); }
+    return;
+  }
   if (d.pago) {
     const [id, data, valor] = d.pago.split('|'), f = S.fixos.find(x => x.id === id);
     if (f) { f.pagos = (f.pagos || []).filter(p => p.data >= addMes(mesAtual(), -2) + '-01' && p.data !== data).concat([{ data, valor: +valor }]); salvar(); }
