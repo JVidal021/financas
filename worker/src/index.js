@@ -11,9 +11,12 @@ async function apiKey(env) {
   if (chave && Date.now() < chaveAte) return chave;
   const r = await fetch(API + '/auth', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId: env.PLUGGY_CLIENT_ID, clientSecret: env.PLUGGY_CLIENT_SECRET }),
+    body: JSON.stringify({ clientId: String(env.PLUGGY_CLIENT_ID || '').trim(), clientSecret: String(env.PLUGGY_CLIENT_SECRET || '').trim() }),
   });
-  if (!r.ok) throw new Erro(502, 'Pluggy recusou o Client ID/Secret (' + r.status + ')');
+  if (!r.ok) {
+    const corpo = await r.json().catch(() => ({}));
+    throw new Erro(502, `Pluggy recusou o Client ID/Secret (${r.status}${corpo.codeDescription ? ' ' + corpo.codeDescription : ''}${corpo.message ? ': ' + String(corpo.message).slice(0, 160) : ''})`);
+  }
   chave = (await r.json()).apiKey;
   chaveAte = Date.now() + 100 * 60 * 1000;
   return chave;
@@ -63,7 +66,7 @@ async function transacoes(env, accountId, de, ate) {
 const dia = d => d ? String(d).slice(0, 10) : null;
 
 async function dados(env, de, ate) {
-  const itens = String(env.ITEM_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const itens = String(env.ITEM_IDS || '').split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
   if (!itens.length) throw new Erro(500, 'ITEM_IDS não configurado no Worker');
   const contas = [];
   for (const itemId of itens) {
