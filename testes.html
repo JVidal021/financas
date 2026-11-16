@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testes · Minhas Finanças</title>
+<style>body { font: 15px system-ui, sans-serif; margin: 20px; } .ok { color: #1a7f4b; } .erro { color: #c62828; font-weight: 700; } iframe { display: none; }</style>
+<h1>Testes dos cálculos</h1>
+<p>Abre o app num quadro escondido e confere funções de cálculo. Só lê: não grava nem altera nenhum dado.</p>
+<ul id="saida"></ul>
+<p id="resumo"></p>
+<iframe id="app" src="index.html"></iframe>
+<script>
+document.getElementById('app').addEventListener('load', e => {
+  const app = e.target.contentWindow, v = cod => app.eval(cod);
+  const casos = [
+    // valores digitados
+    ['num("12,50")', 12.5], ['num("12.50")', 12.5], ['num("1.234,56")', 1234.56], ['num("1.234")', 1234], ['num("1234.56")', 1234.56],
+    ['num("R$ 1.000,00")', 1000], ['num("1.5")', 1.5], ['num("")', 0], ['num("abc")', 0], ['num(12.5)', 12.5], ['num("1.234.567")', 1234567],
+    // centavos
+    ['r2(1.005)', 1.01], ['r2(2.675)', 2.68], ['r2(-1.005)', -1.01], ['r2(0.1 + 0.2)', 0.3], ['r2(33.333)', 33.33],
+    ['JSON.stringify(totais([{ tipo: "receita", valor: 0.1 }, { tipo: "receita", valor: 0.2 }, { tipo: "despesa", valor: 0.1 }]))', '{"r":0.3,"d":0.1,"saldo":0.2}'],
+    // datas
+    ['addMes("2026-12", 1)', '2027-01'], ['addMes("2026-01", -1)', '2025-12'], ['dataDia("2026-02", 31)', '2026-02-28'], ['dataDia("2028-02", 31)', '2028-02-29'],
+    ['addDia("2026-12-31", 1)', '2027-01-01'], ['proxDiaUtil("2026-11-14")', '2026-11-16'], ['fimDoMes("2026-11")', '2026-11-30'],
+    // frações e parcelas
+    ['JSON.stringify(lerFracao("2/3"))', '{"k":2,"n":3}'], ['descBase("Loja (2/6) · metade")', 'Loja'], ['sufixoParcela("Loja (2/6) · metade")', ' (2/6)'],
+    ['JSON.stringify(parcelaDe({ compra: { n: 2, N: 6 } }))', '{"n":2,"N":6}'],
+    // a projeção fecha: o saldo de cada mês é o anterior mais o que entra menos o que sai
+    ['(() => { const p = projecao(); let s = S.saldoAtual; return p.linhas.every(l => { s = r2(s + l.r - l.d); return Math.abs(s - l.saldo) < 0.011; }); })()', true],
+  ];
+  let falhas = 0;
+  const saida = document.getElementById('saida');
+  for (const [cod, esperado] of casos) {
+    let obtido; try { obtido = v(cod); } catch (err) { obtido = 'ERRO: ' + err.message; }
+    const ok = obtido === esperado; if (!ok) falhas++;
+    const li = document.createElement('li'); li.className = ok ? 'ok' : 'erro';
+    li.textContent = (ok ? '✓ ' : '✗ ') + cod + (ok ? '' : ' → veio ' + JSON.stringify(obtido) + ', esperado ' + JSON.stringify(esperado));
+    saida.appendChild(li);
+  }
+  const r = document.getElementById('resumo'); r.className = falhas ? 'erro' : 'ok';
+  r.textContent = falhas ? `${falhas} de ${casos.length} falharam` : `Todos os ${casos.length} testes passaram`;
+  window.resultadoTestes = { total: casos.length, falhas };
+});
+</script>
+</html>

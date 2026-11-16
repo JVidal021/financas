@@ -189,6 +189,7 @@ header h1 .app-nome { display: none; }
 .busca-vazia { padding: 18px; text-align: center; color: var(--muted); font-size: 14px; }
 mark { background: color-mix(in srgb, var(--accent) 18%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
 .so-cel { display: none; }
+.mais-campos { display: none; }
 header { position: relative; }
 .mes-pill { position: relative; display: flex; align-items: center; height: 40px; padding: 0 3px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); color: var(--muted); }
 .mes-seta { width: 32px; height: 32px; border-radius: 50%; border: 0; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; transition: background .15s, color .15s, transform .15s var(--mola); }
@@ -695,6 +696,9 @@ td .sim-dif { display: block; font-size: 12px; font-weight: 600; }
   /* formulários: campos curtos lado a lado, em vez de um por linha */
   .row label { flex: 1 1 calc(50% - 5px); min-width: 0; }
   .row label input, .row label select { min-width: 0; width: 100%; }
+  /* novo lançamento: parcelas, sua parte e observação só aparecem ao pedir (ou ao escolher um cartão) */
+  body:not(.campos-av) form.row label.av { display: none; }
+  body:not(.campos-av) .mais-campos { display: block; flex: 1 1 100%; text-align: left; color: var(--accent); min-height: 40px; }
   /* editar e excluir com área de toque de dedo, e afastados um do outro */
   .tabela-mov td:nth-child(5) { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
   .tabela-mov button.link { min-width: 40px; min-height: 40px; display: inline-grid; place-items: center; }
@@ -1178,7 +1182,8 @@ function vencDoLanc(l) {
 // Mês em que o lançamento pesa na conta: compra no cartão no mês do vencimento da fatura
 const mesDoLanc = l => (vencDoLanc(l) || l.data).slice(0, 7);
 function itensDoMes(m) {
-  const fx = S.fixos.filter(f => fixoAtivo(f, m)).map(f => ({ ...f, fixo: true }));
+  // item fixo com dias marcados vale o que de fato cai no mês: com valor mudado, data movida ou "não acontece" só daquela vez
+  const fx = S.fixos.filter(f => fixoAtivo(f, m)).map(f => ({ ...f, fixo: true, valor: f.dias || f.uteis ? r2(ocorrencias(f, m).reduce((a, o) => a + o.valor, 0)) : f.valor }));
   const lc = S.lanc.filter(l => mesDoLanc(l) === m);
   return fx.concat(lc);
 }
@@ -3276,6 +3281,7 @@ function aplicarSugestao(form) {
   if (s.cat && !form.cat.value) form.cat.value = s.cat;
   if (s.parte && !form.parte.dataset.mexeu && [...form.parte.options].some(o => o.value === s.parte)) form.parte.value = s.parte;
   if (s.cartao && !form.cartao.dataset.mexeu && [...form.cartao.options].some(o => o.value === s.cartao)) form.cartao.value = s.cartao;
+  if (form.parte.value !== '1' || form.cartao.value) document.body.classList.add('campos-av');   // não esconde o que a sugestão preencheu
   if (dica) dica.innerHTML = `${ico('lapis')} Preenchido pela ${s.origem}: ${esc(s.cat || '')}${s.parte && s.parte !== '1' ? ` · sua parte ${s.parte}` : ''}${s.cartao ? ` · ${esc(nomeCartao(s.cartao))}` : ''}${s.nao ? ' · <b>nas faturas você marca essa loja como "não é meu"</b>' : ''}`;
 }
 const camposLanc = (id, dataPadrao, cartao) => `
@@ -3285,11 +3291,12 @@ const camposLanc = (id, dataPadrao, cartao) => `
       <label>Categoria<input name="cat" list="cats" required placeholder="Alimentação"></label>
       <label>Valor (R$)<input name="valor" inputmode="decimal" required placeholder="0,00"></label>
       <label>Cartão<select name="cartao">${opcoesCartao(cartao)}</select></label>
-      <label>Parcelas<select name="parcelas">${Array.from({ length: 24 }, (_, i) => `<option value="${i + 1}">${i + 1}x</option>`).join('')}</select></label>
-      <label>O valor é<select name="valorDe"><option value="total">Total da compra</option><option value="parcela">De cada parcela</option></select></label>
-      <label>Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option><option value="valor">Valor em R$…</option></select></label>
-      <label class="parte-valor" hidden>Quanto é seu (R$)<input name="parteValor" inputmode="decimal" placeholder="0,00"></label>
-      <label style="flex:3 1 260px">Observação<input name="obs" autocomplete="off" placeholder="Para lembrar depois: o que foi, para quem…"></label>`;
+      <label class="av">Parcelas<select name="parcelas">${Array.from({ length: 24 }, (_, i) => `<option value="${i + 1}">${i + 1}x</option>`).join('')}</select></label>
+      <label class="av">O valor é<select name="valorDe"><option value="total">Total da compra</option><option value="parcela">De cada parcela</option></select></label>
+      <label class="av">Sua parte<select name="parte"><option value="1">Tudo</option><option value="1/2">Metade</option><option value="2/3">2/3</option><option value="1/3">1/3</option><option value="3/4">3/4</option><option value="1/4">1/4</option><option value="valor">Valor em R$…</option></select></label>
+      <label class="parte-valor av" hidden>Quanto é seu (R$)<input name="parteValor" inputmode="decimal" placeholder="0,00"></label>
+      <label class="av" style="flex:3 1 260px">Observação<input name="obs" autocomplete="off" placeholder="Para lembrar depois: o que foi, para quem…"></label>
+      <button type="button" class="link mais-campos" data-mais-campos>+ Parcelas, sua parte e observação</button>`;
 // diferença entre os cenários; `subirEhRuim` para valores de fatura
 const difTxt = (a, b, subirEhRuim) => { const d = r2(b - a); return Math.abs(d) < .01 ? '<span class="sim-dif">sem mudança</span>' : `<span class="sim-dif ${(d < 0) !== !!subirEhRuim ? 'neg' : 'pos'}">${d < 0 ? '−' : '+'} ${fmt.format(Math.abs(d))}</span>`; };
 
@@ -4087,6 +4094,13 @@ document.addEventListener('submit', e => {
     const valor = num(f.valor); if (valor <= 0) return alert('Informe um valor maior que zero.');
     const { dias, uteis, pct, valores } = lerAgenda(f.dias);
     S.fixos.push({ id: uid(), tipo: f.tipo, desc: f.desc.trim(), cat: f.cat.trim(), valor, inicio: f.inicio, fim: f.fim || null, ...(f.cartao ? { cartao: f.cartao } : {}), ...(dias.length ? { dias } : {}), ...(uteis.length ? { uteis } : {}), ...(Object.keys(pct).length ? { pct } : {}), ...(Object.keys(valores).length ? { valores } : {}) });
+  } else if (e.target.id === 'f-del') {
+    const [modo, id] = e.submitter.value.split('|'), l = S.lanc.find(x => x.id === id);
+    document.getElementById('dlg').close();
+    if (!l) return;
+    const fora = modo === 'todas' ? parcelasIrmas(l) : [l];
+    S.lanc = S.lanc.filter(x => !fora.includes(x));
+    return salvar();
   } else if (e.target.id === 'f-edit') {
     return salvarEdicao(f, e.submitter.value);
   } else if (e.target.id === 'f-oc') {
@@ -4140,7 +4154,20 @@ document.addEventListener('click', e => {
   }
   if (d.delLanc) {
     const l = S.lanc.find(l => l.id === d.delLanc);
-    if (l && confirm(`Excluir "${l.desc}" (${fmt.format(Math.abs(l.valor))})?${parcelasIrmas(l).length > 1 ? ' Só esta parcela é excluída; as outras continuam.' : ''}`)) { S.lanc = S.lanc.filter(x => x !== l); salvar(); }
+    const irmas = l ? parcelasIrmas(l) : [];
+    if (irmas.length > 1) {
+      // compra parcelada: escolhe entre esta parcela e todas
+      const dlg = document.getElementById('dlg');
+      dlg.innerHTML = `<form id="f-del" method="dialog"><h2>Excluir lançamento</h2>
+        <p style="margin:0 0 6px">${esc(l.desc)} · ${fmt.format(Math.abs(l.valor))}</p>
+        <p class="hint">Esta compra tem ${irmas.length} parcelas lançadas (${fmt.format(r2(irmas.reduce((a, x) => a + Math.abs(x.valor), 0)))} no total).</p>
+        <div class="row" style="justify-content:flex-end;margin-top:16px">
+          <button type="button" class="btn" id="edit-cancelar">Cancelar</button>
+          <button class="btn" value="uma|${l.id}">Só esta parcela</button>
+          <button class="btn primary" value="todas|${l.id}">Todas as ${irmas.length}</button>
+        </div></form>`;
+      dlg.showModal();
+    } else if (l && confirm(`Excluir "${l.desc}" (${fmt.format(Math.abs(l.valor))})?`)) { S.lanc = S.lanc.filter(x => x !== l); salvar(); }
     return;
   }
   if (d.pago) {
@@ -4201,6 +4228,7 @@ document.addEventListener('click', e => {
     document.getElementById('cf-linhas').insertAdjacentHTML('beforeend', linhaConf({ desc: x.desc, valor: x.valor, cat: x.cat, tipo: confViva().diff < 0 ? 'despesa' : 'receita' }));
     resumoConf(); return;
   }
+  if (e.target.closest('[data-mais-campos]')) { document.body.classList.add('campos-av'); return; }
   const ja = e.target.closest('[data-ja-lanc]');
   if (ja) {
     const l = S.lanc.find(x => x.id === ja.dataset.jaLanc);
@@ -4275,6 +4303,7 @@ document.addEventListener('change', e => {
   if (form && (form.id === 'f-sim' || form.id === 'f-lanc')) {
     if (e.target.name === 'desc') return aplicarSugestao(form);
     if (e.target.name === 'parte' || e.target.name === 'cartao') e.target.dataset.mexeu = 1;
+    if (e.target.name === 'cartao' && e.target.value) document.body.classList.add('campos-av');   // no cartão, parcelas importam
     if (e.target.name === 'parte') { const pv = form.querySelector('.parte-valor'); pv.hidden = e.target.value !== 'valor'; if (!pv.hidden) form.parteValor.focus(); }
   }
   if (e.target.id === 'fundo-arq' && e.target.files[0]) return lerImagemFundo(e.target.files[0]);
