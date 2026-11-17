@@ -1156,7 +1156,8 @@ function aplicarPluggy(d) {
   for (const c of d.contas) if (c.itemId && !S.ofDonos[c.itemId] && (jaVistas.has(c.id) || itensD.length === 1)) S.ofDonos[c.itemId] = 'Eu';
   S.bancos = { ts: d.gerado || new Date().toISOString(), contas: d.contas.map(c => ({ id: c.id, itemId: c.itemId || null, tipo: c.tipo, subtipo: c.subtipo || '', nome: c.nome, nomeBanco: c.nomeBanco || '', numero: c.numero || '',
     saldo: +c.saldo || 0, atualizado: c.atualizado || null,
-    ...(c.tipo === 'cartao' ? { banco: bancoDaConta(c), credito: c.credito || null, fatura: ultBill(c) } : {}) })) };
+    ...(c.tipo === 'cartao' ? { banco: bancoDaConta(c), credito: c.credito || null, fatura: ultBill(c) } : {}) })),
+    conexoes: (d.conexoes || []).map(x => ({ itemId: x.itemId, status: x.status, execucao: x.execucao, conector: x.conector, consenteAte: x.consenteAte, erro: x.erro, contas: x.contas })) };
   for (const c of d.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c))) {
     const banco = bancoDaConta(c);
     const fechadas = S.faturas.filter(f => f.banco === banco && !f.aberta);
@@ -1258,10 +1259,16 @@ function cardBancos() {
         ${g && !dono ? '<span style="color:var(--bad, #c0392b)">nada desta conexão entra no app até você dizer de quem é</span>' : g && !/^eu$/i.test(dono) ? '<span>só entra no app o que você marcar</span>' : ''}</label>
       ${cs.map(linha).join('')}</div>`;
   }).join('') + `<datalist id="of-donos">${nomesDono.map(n => `<option value="${esc(n)}">`).join('')}</datalist>` : todas.map(linha).join('');
+  // conexão que veio sem contas ou com erro: mostra o porquê (ID errado, banco ainda sincronizando, autorização vencida…)
+  const STATUS = { UPDATED: 'atualizada', UPDATING: 'ainda sincronizando com o banco', LOGIN_ERROR: 'o banco pede para conectar de novo', OUTDATED: 'desatualizada (o banco não respondeu)', WAITING_USER_INPUT: 'esperando a pessoa autorizar no banco', CREATED: 'criada, ainda não sincronizou' };
+  const probs = ((S.bancos || {}).conexoes || []).filter(x => x.erro || !x.contas || (x.status && x.status !== 'UPDATED'));
+  const cxHtml = probs.length ? `<div class="hint" style="margin:8px 0;padding:8px 10px;border-radius:8px;background:rgba(192,57,43,.08)"><b>Conexões com problema</b>${probs.map(x => `<div style="margin-top:4px">• <code>${esc(String(x.itemId).slice(0, 8))}…</code>${x.conector ? ` (${esc(x.conector)})` : ''}: ${
+      x.erro && /404|not found|não encontrad/i.test(x.erro) ? 'ID não encontrado na Pluggy. Confira se copiou o ID da conexão (item) da sua aplicação no Dashboard' :
+      x.erro ? esc(x.erro) : x.status && x.status !== 'UPDATED' ? esc(STATUS[x.status] || x.status) : 'nenhuma conta veio. A conexão existe, mas o banco ainda não mandou dados (tente de novo mais tarde)'}${x.contas ? ` · ${x.contas} ${x.contas === 1 ? 'conta' : 'contas'}` : ''}</div>`).join('')}</div>` : '';
   return `
   <div class="card"><h2>Bancos (Open Finance)</h2>
     <p class="hint" style="margin:0 0 8px">Conectado ao Worker <b>${esc(pluggy.url.replace(/^https?:\/\//, ''))}</b>. O app busca ao abrir e de novo quando passa de 4 h (os bancos atualizam no Meu Pluggy uma vez por dia). Fatura que você já importou não volta.</p>
-    ${linhas || '<p class="hint">Clique em "Buscar agora" para ver as contas.</p>'}
+    ${cxHtml}${linhas || `<p class="hint">${(S.bancos || {}).conexoes ? 'Nenhuma conta chegou dos bancos.' : 'Clique em "Buscar agora" para ver as contas.'}</p>`}
     <div style="margin-top:10px;display:grid;gap:6px">
       <label class="hint" style="margin:0"><input type="checkbox" data-of-auto="saldo" ${ofAuto('saldo') ? 'checked' : ''}> <b>Atualizar o saldo sozinho</b>: a soma das contas marcadas vira o saldo de hoje quando o banco tem dado mais novo que o último que você informou. A conferência continua mostrando o que saiu ou entrou sem registro.</label>
       <label class="hint" style="margin:0"><input type="checkbox" data-of-auto="compras" ${ofAuto('compras') ? 'checked' : ''}> <b>Lançar sozinho as compras conhecidas</b>: se todas as compras novas de uma fatura são de lojas que você já marcou (Meu / Metade / Não é meu), ela entra sem pedir revisão. Com loja nova, a fatura vai para <b>Importar fatura → Faturas para revisar</b>, já com as conhecidas marcadas.</label>

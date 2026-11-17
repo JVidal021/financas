@@ -68,12 +68,19 @@ const dia = d => d ? String(d).slice(0, 10) : null;
 async function dados(env, de, ate) {
   const itens = String(env.ITEM_IDS || '').split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
   if (!itens.length) throw new Erro(500, 'ITEM_IDS não configurado no Worker');
-  const contas = [];
+  const contas = [], conexoes = [];
   for (const itemId of itens) {
     // quando o Meu Pluggy buscou no banco pela última vez (o saldo e as faturas são dessa hora)
-    const item = await pluggy(env, `/items/${itemId}`).catch(() => null);
+    let erroItem = null;
+    const item = await pluggy(env, `/items/${itemId}`).catch(e => { erroItem = e.message; return null; });
     const atualizado = item ? item.lastUpdatedAt || item.statusDetail?.updatedAt || null : null;
-    for (const a of await paginas(env, `/accounts?itemId=${itemId}`)) {
+    // estado de cada conexão, para o app mostrar por que uma delas veio sem contas
+    const cx = { itemId, status: item ? item.status : null, execucao: item ? item.executionStatus || null : null,
+      conector: item && item.connector ? item.connector.name || null : null, consenteAte: item ? item.consentExpiresAt || null : null,
+      atualizado, erro: erroItem || (item && item.error ? item.error.message || item.error.code || null : null), contas: 0 };
+    conexoes.push(cx);
+    for (const a of await paginas(env, `/accounts?itemId=${itemId}`).catch(e => { cx.erro = cx.erro || e.message; return []; })) {
+      cx.contas++;
       const cartao = a.type === 'CREDIT';
       const [ts, bills] = await Promise.all([
         transacoes(env, a.id, de, ate),
@@ -93,7 +100,7 @@ async function dados(env, de, ate) {
       });
     }
   }
-  return { gerado: new Date().toISOString(), de, ate, contas };
+  return { gerado: new Date().toISOString(), de, ate, contas, conexoes };
 }
 
 function cors(env, origem) {
