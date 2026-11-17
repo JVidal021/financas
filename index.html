@@ -443,6 +443,18 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .empty { color: var(--muted); text-align: center; padding: 28px 0; }
 
 /* importação de fatura */
+/* Tela inicial: Vai e volta */
+.vv-sec { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 650; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 6px; }
+.vv-sec:first-of-type { margin-top: 0; }
+.vv-sec b { font-family: var(--f-num); color: var(--text); letter-spacing: 0; }
+.vv-item { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--edge); margin-bottom: 8px; }
+.vv-txt { min-width: 0; display: flex; flex-direction: column; }
+.vv-txt b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vv-txt small { color: var(--muted); font-size: 12.5px; }
+.vv-val { font-family: var(--f-num); font-weight: 750; font-variant-numeric: tabular-nums; }
+.vv-acoes { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.vv-sug { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--text-2); padding-top: 6px; border-top: 1px dashed var(--edge); }
+.vv-sug span { flex-basis: 100%; }
 /* Tela inicial: card Bancos */
 .bk .bk-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .bk .bk-cab h2 { margin: 0; }
@@ -908,7 +920,7 @@ td .sim-dif { display: block; font-size: 12px; font-weight: 600; }
 
 <script>
 const KEY = 'financas.v1';
-const CATS_PADRAO = ['Moradia', 'Alimentação', 'Mercado', 'Transporte', 'Saúde', 'Academia', 'Celular', 'Pets', 'Educação', 'Lazer', 'Compras', 'Assinaturas', 'Encargos', 'Outros', 'Salário', 'Freelance'];
+const CATS_PADRAO = ['Moradia', 'Alimentação', 'Fast food', 'Mercado', 'Transporte', 'Saúde', 'Beleza', 'Academia', 'Celular', 'Pets', 'Educação', 'Lazer', 'Jogos', 'Compras', 'Compras online', 'Roupas', 'Presentes', 'Família', 'Assinaturas', 'Encargos', 'Outros', 'Salário', 'Freelance'];
 
 const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -1009,6 +1021,68 @@ function normalizar(d) {
   limpouParcelas += limparParcelasDuplicadas(s);
   return s;
 }
+// ---------- Vai e volta: dinheiro que sai e vai voltar (ou entra e vai sair de volta) ----------
+// O app entende pela descrição ou observação ("será reposto", "vai me devolver", "emprestado da vó"…),
+// procura a entrada/saída de mesmo valor que fecha o par e liga as duas. Esses lançamentos continuam no saldo
+// (o dinheiro saiu e entrou de verdade), mas ficam fora dos gastos por categoria e das médias.
+// l.volta = { lado: 'receber' | 'devolver' | 'devolucao' | 'pagamento', quem, par, recusa: [ids], fechado } ou { nao: true }
+const RE_RECEBER = /SER[AÁ] (REPOST|DEVOLVID|REEMBOLSAD|PAG[OA] DE VOLTA|RESSARCID)|VA[IO]M? (ME )?(REPOR|DEVOLVER|REEMBOLSAR|RESSARCIR|PAGAR DE VOLTA|ME PAGAR)|ME DEVE|A RECEBER|EMPRESTEI|REEMBOLSAVEL/;
+const RE_DEVOLVER = /EMPRESTAD|EMPRESTIMO|VOU DEVOLVER|VOU PAGAR DE VOLTA|DEVO (PRA|PARA|A)\b/;
+const RE_E_VOLTA = /DEVOLU|DEVOLVEU|REEMBOLS|REPOSI|RESSARC|ME PAGOU|PAGOU DE VOLTA|PAGOU O QUE|ACERTO/;
+const QUEM_FIXO = [[/\bMAE\b|MAMAE/, 'Mãe'], [/\bAVO\b|\bVO\b|VOVO/, 'Vó'], [/\bPAI\b|PAPAI/, 'Pai'], [/\bKIM\b|KIMBERLY/, 'Kim']];
+const ehVaiEVolta = l => !!(l && l.volta && !l.volta.nao);
+const textoLanc = l => semAcentoMai(`${l.desc} ${l.obs || ''}`);
+function quemDe(l) {
+  const t = textoLanc(l);
+  const fixo = QUEM_FIXO.find(([re]) => re.test(t));
+  if (fixo) return fixo[1];
+  const txt = `${l.desc} ${l.obs || ''}`;
+  const m = txt.match(/\b(?:de|da|do|pra|para|p\/)\s+([A-ZÀ-Ý][a-zà-ÿ]{2,})/) || txt.match(/\b([A-ZÀ-Ý][a-zà-ÿ]{2,})\s+(?:vai|vão|ficou de|tem que)\s+(?:me\s+)?(?:devolver|repor|pagar|reembolsar)/i);
+  return m && !/^(Vai|Me|Dinheiro|Pagamento|Parte)$/i.test(m[1]) ? m[1][0].toUpperCase() + m[1].slice(1) : null;
+}
+const pendenteVolta = l => ehVaiEVolta(l) && (l.volta.lado === 'receber' || l.volta.lado === 'devolver') && !l.volta.par && !l.volta.fechado;
+// Lançamentos que podem ser a outra ponta de `l` (mesmo valor, sentido contrário, perto na data)
+function candidatosVolta(l) {
+  const outro = l.tipo === 'despesa' ? 'receita' : 'despesa', recusa = l.volta.recusa || [];
+  return S.lanc.filter(c => c !== l && c.tipo === outro && !c.volta && !c.cartao && !c.naoIdentificado && !c.fixoRef && !c.pagamentoFatura && !c.meta && !c.agregado
+    && !['Salário', 'Freelance'].includes(c.cat) && !recusa.includes(c.id)
+    && Math.abs(Math.abs(c.valor) - Math.abs(l.valor)) <= Math.max(1, Math.abs(l.valor) * 0.02)
+    && diasEntre(l.data, c.data) >= -10 && diasEntre(l.data, c.data) <= 120);
+}
+// A outra ponta "parece mesmo" ser esta: fala da mesma pessoa ou diz que é devolução
+const fortePar = (l, c) => { const q = l.volta.quem, t = textoLanc(c); return RE_E_VOLTA.test(t) || (q && semAcentoMai(quemDe(c) || '') === semAcentoMai(q)) || (q && t.includes(semAcentoMai(q))); };
+function ligarVolta(l, c) {
+  l.volta = { ...l.volta, par: c.id };
+  c.volta = { lado: l.volta.lado === 'receber' ? 'devolucao' : 'pagamento', par: l.id, ...(l.volta.quem ? { quem: l.volta.quem } : {}) };
+}
+function desligarVolta(l) {
+  const p = l.volta && l.volta.par && S.lanc.find(x => x.id === l.volta.par);
+  if (p && p.volta) {
+    if (p.volta.lado === 'receber' || p.volta.lado === 'devolver') { p.volta = { ...p.volta, recusa: [...(p.volta.recusa || []), l.id] }; delete p.volta.par; }
+    else delete p.volta;
+  }
+}
+// Lê descrições e observações, marca e liga sozinho o que dá; devolve se mudou algo.
+function entenderVaiEVolta() {
+  let mudou = false;
+  for (const l of S.lanc) {
+    if (l.volta || l.cartao || l.prevista || l.naoIdentificado || l.pagamentoFatura || l.meta) continue;
+    const t = textoLanc(l);
+    const lado = l.tipo === 'despesa' && RE_RECEBER.test(t) ? 'receber' : l.tipo === 'receita' && RE_DEVOLVER.test(t) && !RE_E_VOLTA.test(t) ? 'devolver' : null;
+    if (!lado) continue;
+    const quem = quemDe(l);
+    l.volta = { lado, ...(quem ? { quem } : {}) };
+    mudou = true;
+  }
+  for (const l of S.lanc) {
+    if (!pendenteVolta(l)) continue;
+    const cs = candidatosVolta(l), fortes = cs.filter(c => fortePar(l, c));
+    // liga sozinho só quando não há dúvida: uma única candidata, e ela fala da pessoa ou diz que é devolução
+    if (cs.length === 1 && fortes.length === 1) { ligarVolta(l, cs[0]); mudou = true; }
+  }
+  return mudou;
+}
+
 // Parcelas previstas repetidas. Devolve quantas saíram (ao abrir o app, grava se tirou alguma).
 function limparParcelasDuplicadas(s) {
   const n0 = s.lanc.length;
@@ -1044,6 +1118,7 @@ function gravarLocal() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
 }
 function salvar() {
+  try { entenderVaiEVolta(); } catch (e) { console.error(e); }
   S.atualizado = Date.now();
   gravarLocal();
   agendarEnvio();
@@ -1162,7 +1237,7 @@ let _contasPluggy = null;
 const cartaoTudoMeu = (c, banco) => !ehMeu(c) && cartaoEmUso(c) && !S.lanc.some(l => l.cartao === banco && l.tipo === 'despesa' && l.share != null && l.share !== 1);   // contas da última busca (para achar o banco de um cartão pelo resto da conexão)
 const bancoPeloNome = t => (NOMES_BANCO.find(([re]) => re.test(t)) || [])[1] || null;
 const bancoDaConta = c => {
-  const salvo = (pluggy.bancos || {})[c.id];
+  const salvo = ((pluggy || {}).bancos || {})[c.id];
   if (salvo && salvo !== c.nome) return salvo;   // "no app é o cartão" escolhido por você (o nome cru do cartão não conta)
   const proprio = bancoPeloNome(`${c.nome} ${c.nomeBanco || ''}`);
   if (proprio) return proprio;
@@ -1250,6 +1325,43 @@ function reconhecerFatura(pd) {
   try { confirmarImportacao(true); } finally { impModo = m; impFuturas = fu; imp = null; }
   return novas;
 }
+// O Itaú (e outros bancos) às vezes devolvem no Open Finance o saldo de ontem junto com as movimentações de hoje.
+// Por conta, o app guarda o saldo do banco e as movimentações que já vieram com ele (a "âncora"). Enquanto o
+// saldo não muda, as movimentações que chegam depois ainda não estão nele: entram somadas por cima.
+const valorTx = t => t.tipo === 'DEBIT' ? -Math.abs(+t.valor || 0) : t.tipo === 'CREDIT' ? Math.abs(+t.valor || 0) : +t.valor || 0;
+const chaveTx = t => `${t.data}|${r2(valorTx(t))}`;   // o id pode mudar quando a movimentação sai de pendente
+function saldoReconciliado(c, antes, antesTs) {
+  S.ofAncora = S.ofAncora || {};
+  const anc = S.ofAncora[c.id], B = r2(+c.saldo || 0);
+  const txs = (c.transacoes || []).filter(t => t.id && t.data && t.data <= hoje());
+  const marca = txs.map(t => ({ id: t.id, k: chaveTx(t) }));
+  // quais destas movimentações estão no conjunto (por id; senão pela data e valor, cada uma conta uma vez)
+  const fora = (lista, conj) => {
+    if (!conj) return [];
+    const ids = new Set(conj.map(x => x.id)), ks = {};
+    for (const x of conj) ks[x.k] = (ks[x.k] || 0) + 1;
+    for (const t of lista) if (ids.has(t.id)) ks[chaveTx(t)]--;
+    return lista.filter(t => { if (ids.has(t.id)) return false; const k = chaveTx(t); if (ks[k] > 0) { ks[k]--; return false; } return true; });
+  };
+  let a, mudou;
+  if (anc && Math.abs(anc.saldo - B) < 0.01) { a = anc; mudou = false; }
+  else if (!anc && antes && Math.abs((+antes.saldoBanco || +antes.saldo || 0) - B) < 0.01) {
+    // primeira vez com a âncora: o saldo é o mesmo da busca anterior, mas não dá para saber o que já estava nele
+    a = { saldo: B, com: marca, ts: Date.parse(antesTs) || Date.now() }; mudou = false;
+  } else { a = { saldo: B, com: marca, ts: Date.now() }; mudou = true; }
+  const novas = fora(txs, a.com), novasAgora = mudou ? [] : fora(txs, anc ? anc.visto || anc.com : marca);
+  S.ofAncora[c.id] = { saldo: a.saldo, com: a.com, ts: a.ts, visto: marca };
+  const extra = r2(novas.reduce((s, t) => s + valorTx(t), 0));
+  return { saldo: r2(B + extra), saldoBanco: B, depois: novas.length ? { n: novas.length, valor: extra } : null,
+    paradoDesde: mudou ? null : a.ts, novidade: mudou || novasAgora.length > 0 };
+}
+// Frase para o saldo: quando o banco está devolvendo um saldo antigo
+function notaSaldoBanco(contas) {
+  const p = contas.filter(c => c.paradoDesde && (c.depois || Date.now() - c.paradoDesde > 20 * 3600e3));
+  if (!p.length) return '';
+  const desde = Math.min(...p.map(c => c.paradoDesde)), n = p.reduce((s, c) => s + (c.depois ? c.depois.n : 0), 0);
+  return `o banco não muda o saldo desde ${quandoBanco(desde)}` + (n ? `; somei ${n} ${n === 1 ? 'movimentação' : 'movimentações'} de depois` : '');
+}
 // Transforma o que o Worker mandou em faturas (lançadas sozinhas ou para revisar) e no saldo da conta.
 function aplicarPluggy(d) {
   const novas = [];
@@ -1260,8 +1372,11 @@ function aplicarPluggy(d) {
   const itensD = [...new Set(d.contas.map(c => c.itemId).filter(Boolean))];
   S.ofDonos = { ...(S.ofDonos || {}) };
   for (const c of d.contas) if (c.itemId && !S.ofDonos[c.itemId] && (jaVistas.has(c.id) || itensD.length === 1)) S.ofDonos[c.itemId] = 'Eu';
+  const antes = S.bancos || {}, rec = {};
+  for (const c of d.contas) if (c.tipo === 'conta') rec[c.id] = saldoReconciliado(c, (antes.contas || []).find(x => x.id === c.id), antes.ts);
   S.bancos = { ts: d.gerado || new Date().toISOString(), contas: d.contas.map(c => ({ id: c.id, itemId: c.itemId || null, tipo: c.tipo, subtipo: c.subtipo || '', nome: c.nome, nomeBanco: c.nomeBanco || '', numero: c.numero || '',
-    saldo: +c.saldo || 0, atualizado: c.atualizado || null,
+    saldo: rec[c.id] ? rec[c.id].saldo : +c.saldo || 0, atualizado: c.atualizado || null,
+    ...(rec[c.id] ? { saldoBanco: rec[c.id].saldoBanco, depois: rec[c.id].depois, paradoDesde: rec[c.id].paradoDesde } : {}),
     ...(c.tipo === 'cartao' ? { banco: bancoDaConta(c), credito: c.credito || null, fatura: ultBill(c) } : {}) })),
     conexoes: (d.conexoes || []).map(x => ({ itemId: x.itemId, status: x.status, execucao: x.execucao, conector: x.conector, consenteAte: x.consenteAte, erro: x.erro, contas: x.contas })) };
   for (const c of d.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c))) {
@@ -1295,19 +1410,29 @@ function aplicarPluggy(d) {
     if (n == null) r.revisar++;
     else { r.compras += n; if (!r.lancadas.includes(pd.banco)) r.lancadas.push(pd.banco); }
   }
-  // saldo: soma das contas marcadas; só substitui o seu se o banco tiver dado mais novo que o último informado
+  // saldo: soma das contas marcadas (já com as movimentações que o saldo do banco ainda não tinha).
+  // Só substitui o seu quando o banco trouxe algo novo: saldo diferente ou movimentação nova. A hora de
+  // "atualizado" do Meu Pluggy muda a cada busca mesmo quando o banco devolve o saldo de ontem, então não serve.
   const contas = S.bancos.contas.filter(contaNoSaldo);
   if (ofAuto('saldo') && contas.length) {
     const soma = r2(contas.reduce((a, c) => a + c.saldo, 0));
-    const ts = Math.max(...contas.map(c => Date.parse(c.atualizado || S.bancos.ts) || 0));
-    const desde = S.saldoTs || (S.saldoData ? Date.parse(S.saldoData + 'T00:00') : 0);
+    const novidade = contas.some(c => rec[c.id] && rec[c.id].novidade);
     // mesmo dado do banco, mas as contas que entram mudaram (ex.: conta de outra pessoa saiu do seu saldo): refaz a soma
-    const recompor = S.saldoBanco && ts === desde && Math.abs(soma - S.saldoAtual) >= 0.01;
-    if ((ts > desde || recompor) && (Math.abs(soma - S.saldoAtual) >= 0.01 || S.saldoData !== hoje())) { informarSaldo(soma, ts); r.saldo = soma; }
-    else if (ts > desde) { S.saldoTs = ts; S.saldoBanco = true; }   // o banco confirmou o que o app já tinha (você lançou antes de ele atualizar)
+    const sig = contas.map(c => c.id).sort().join(',');
+    const recompor = S.saldoBanco && S.ofSaldoSig != null && S.ofSaldoSig !== sig;
+    S.ofSaldoSig = sig;
+    if ((novidade || recompor) && (Math.abs(soma - S.saldoAtual) >= 0.01 || S.saldoData !== hoje())) { informarSaldo(soma, Date.now()); r.saldo = soma; }
+    else if (novidade) { S.saldoTs = Date.now(); S.saldoBanco = true; }   // o banco confirmou o que o app já tinha (você lançou antes de ele atualizar)
   }
   if (r.compras || r.saldo != null) S.ofLog = [{ ts: Date.now(), compras: r.compras, lancadas: r.lancadas, saldo: r.saldo }].concat(S.ofLog || []).slice(0, 10);
   return r;
+}
+// Ao abrir (depois de puxar a nuvem): arrumações que precisam ser gravadas
+function aoAbrir() {
+  const mudou = limparParcelasDuplicadas(S) + limpouParcelas + migrarCategorias() + (entenderVaiEVolta() ? 1 : 0);
+  limpouParcelas = 0;
+  if (mudou) salvar();
+  reprocessarFilaPluggy();
 }
 // Fila "Faturas para revisar" vinda dos bancos: refaz com as regras atuais (cartão certo, já importada, tudo meu)
 // e lança sozinho o que não precisa de você. Roda ao abrir o app.
@@ -1480,7 +1605,7 @@ const comEstimativa = () => prevModo !== 'conhecido';
 function comModo(modo, fn) { const ant = prevModo; prevModo = modo; try { return fn(); } finally { prevModo = ant; } }
 // Meses usados na média e quanto foi gasto em cada um (compras novas, sem parcelas nem contas mensais)
 function detalheMedia(filtro) {
-  const ls = S.lanc.filter(l => l.tipo === 'despesa' && !l.parcela && !l.agregado && !l.prevista && !l.fixoRef && !l.pagamentoFatura && !l.meta && l.data <= hoje() && filtro(l));
+  const ls = S.lanc.filter(l => l.tipo === 'despesa' && !l.parcela && !l.agregado && !l.prevista && !l.fixoRef && !l.pagamentoFatura && !l.meta && !ehVaiEVolta(l) && l.data <= hoje() && filtro(l));
   const meses = [];
   for (let i = 1; i <= 3; i++) { const m = addMes(mesAtual(), -i); if (ls.some(l => l.data.slice(0, 7) === m)) meses.push(m); }
   return meses.reverse().map(m => { const x = ls.filter(l => l.data.slice(0, 7) === m); return { m, v: r2(x.reduce((a, l) => a + l.valor, 0)), n: x.length }; });
@@ -1792,7 +1917,7 @@ function cardBancosAgora() {
   };
   const linhaConta = (c, cor) => `<div class="bk-item" style="--c:${cor}">
       <span class="bk-ic">${ico('carteira')}</span>
-      <div class="bk-nome"><b>${esc(nomeConta(c))}</b>${dono(c)}<span class="bk-sub">${c.atualizado ? 'atualizado ' + quandoBanco(c.atualizado) : 'conta'}</span></div>
+      <div class="bk-nome"><b>${esc(nomeConta(c))}</b>${dono(c)}<span class="bk-sub">${notaSaldoBanco([c]) || (c.atualizado ? 'atualizado ' + quandoBanco(c.atualizado) : 'conta')}</span></div>
       <div class="bk-val"><b>${fmt.format(c.saldo || 0)}</b><span>saldo</span></div></div>`;
   let aviso = '';
   const blocoPessoa = p => {
@@ -1960,7 +2085,7 @@ function cardFechamento(m) {
   const it = itensReais(m);
   if (!it.length) return '';
   const t = totais(it), ant = addMes(m, -1), ia = itensReais(ant), ta = totais(ia), dias = +fimDoMes(m).slice(8), out = [];
-  const soma = itens => { const o = {}; itens.filter(i => i.tipo === 'despesa').forEach(i => o[i.cat] = (o[i.cat] || 0) + i.valor); return o; };
+  const soma = itens => { const o = {}; itens.filter(i => i.tipo === 'despesa' && !ehVaiEVolta(i)).forEach(i => o[i.cat] = (o[i.cat] || 0) + i.valor); return o; };
   const pc = soma(it), pa = soma(ia), G = 'var(--good)', W = 'var(--warn)', A = 'var(--accent)';
   out.push(t.saldo >= 0
     ? { cor: G, ic: 'carteira', txt: `Sobrou <b>${fmt.format(t.saldo)}</b>${t.r > 0 ? `, <b>${Math.round(t.saldo / t.r * 100)}%</b> do que entrou` : ''}.` }
@@ -2012,7 +2137,7 @@ function cardSemana() {
 // Destaques do mês atual: o que merece atenção agora, tirado dos dados que já existem
 function cardDestaques() {
   const hj = hoje(), dia = +hj.slice(8), m = mesAtual(), diasMes = +fimDoMes(m).slice(8), ant = addMes(m, -1), out = [];
-  const soma = itens => { const o = {}; itens.filter(i => i.tipo === 'despesa').forEach(i => o[i.cat] = (o[i.cat] || 0) + i.valor); return o; };
+  const soma = itens => { const o = {}; itens.filter(i => i.tipo === 'despesa' && !ehVaiEVolta(i)).forEach(i => o[i.cat] = (o[i.cat] || 0) + i.valor); return o; };
   const reais = itensReais(m), porCat = soma(reais), varCat = soma(reais.filter(i => !i.fixo));
   // limites: estourado, ou a caminho de estourar no ritmo dos gastos variáveis
   for (const [c, lim] of Object.entries(S.orc)) {
@@ -2055,14 +2180,14 @@ function telaVisao() {
   const vencSel = viaFatura ? [...new Set(itens.map(i => i.quando))].sort() : [];
   const desp = itens.filter(i => i.tipo === 'despesa');
   const porCat = {};
-  desp.forEach(i => porCat[i.cat] = (porCat[i.cat] || 0) + i.valor);
+  desp.filter(i => !ehVaiEVolta(i)).forEach(i => porCat[i.cat] = (porCat[i.cat] || 0) + i.valor);
   if (cartaoSel === null) Object.keys(S.orc).forEach(c => { if (S.orc[c] > 0 && !(c in porCat)) porCat[c] = 0; });
   const cats = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
   // mês anterior até o mesmo dia (só compara quando ele tem receitas: antes disso o histórico está incompleto)
   const mesAnt = addMes(mesSel, -1), todosAnt = atual ? reaisAteODia(mesAnt, hoje().slice(8)) : itensReais(mesAnt), tAnt = totais(filtraCartao(todosAnt));
   const comparaAnt = !futuro && !viaFatura && totais(itensReais(mesAnt)).r > 0;
   const porCatAnt = {};
-  if (comparaAnt) filtraCartao(todosAnt).filter(i => i.tipo === 'despesa').forEach(i => porCatAnt[i.cat] = (porCatAnt[i.cat] || 0) + i.valor);
+  if (comparaAnt) filtraCartao(todosAnt).filter(i => i.tipo === 'despesa' && !ehVaiEVolta(i)).forEach(i => porCatAnt[i.cat] = (porCatAnt[i.cat] || 0) + i.valor);
   const maxG = Math.max(1, ...cats.map(([c, v]) => Math.max(v, cartaoSel === null ? S.orc[c] || 0 : 0)));
   const orcTotal = Object.values(S.orc).reduce((a, b) => a + (b || 0), 0);
   const gastoOrcado = Object.keys(S.orc).reduce((a, c) => a + (porCat[c] || 0), 0);
@@ -2125,7 +2250,7 @@ function telaVisao() {
   const hero = cartaoSel === null ? `
   <div class="hero">
     <div class="hero-ico">${ico('carteira')}</div>
-    ${atual ? `<div class="lbl">Saldo na conta${S.saldoBanco && S.saldoTs ? ` · do banco, ${quandoBanco(S.saldoTs)}` : dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}${depoisFoto ? ` · ${depoisFoto < 0 ? '−' : '+'} ${fmt.format(Math.abs(depoisFoto))} lançado depois` : ''}${olhoBtn}</div>
+    ${atual ? `<div class="lbl">Saldo na conta${S.saldoBanco && S.saldoTs ? ` · do banco, ${quandoBanco(S.saldoTs)}${(n => n ? ` (${n})` : '')(notaSaldoBanco(((S.bancos || {}).contas || []).filter(contaNoSaldo)))}` :dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}${depoisFoto ? ` · ${depoisFoto < 0 ? '−' : '+'} ${fmt.format(Math.abs(depoisFoto))} lançado depois` : ''}${olhoBtn}</div>
     <div class="big-linha"><div class="big">${fmt.format(S.saldoAtual)}</div>${dias === null || mostraSaldo ? '' : bancoAuto
       ? `<button class="btn mini" data-buscar-bancos title="Busca o saldo e as faturas no banco (o Meu Pluggy atualiza uma vez por dia)">${ico('repete')} Buscar no banco</button><button class="olho" data-editar-saldo title="Informar o saldo à mão" aria-label="Informar o saldo à mão">${ico('lapis')}</button>`
       : `<button class="btn mini" data-editar-saldo title="Informar o saldo de hoje: o app compara com o esperado">${ico('lapis')} Atualizar</button>`}</div>` : `<div class="lbl">${futuro ? 'Previsto para' : 'Resultado de'} ${nomeMes(mesSel)}${futuro ? ' · só o que já existe' : ''}${olhoBtn}</div>
@@ -2179,7 +2304,7 @@ function telaVisao() {
       <div class="ev-txt"><b title="${esc(i.desc + (i.obs ? ' · ' + i.obs : ''))}">${esc(i.desc)}</b>${i.obs ? `<span class="obs">${esc(i.obs)}</span>` : ''}<small>${ddmm(i.quando)} ${DIAS_SEM[new Date(i.quando + 'T12:00').getDay()]} · ${esc(i.cat)}${i.cartao ? ' · ' + esc(nomeCartao(i.cartao)) : ''}${i.parcInfo ? ` · ${i.parcInfo.N}x` : ''}</small></div>
       <div class="ev-val"><b class="${i.tipo === 'receita' ? 'pos' : ''}">${i.tipo === 'receita' ? '+' : '−'} ${fmt.format(i.valor)}</b></div></div>`; }).join('')}</div>` : '<div class="empty">Nada neste mês ainda.</div>'}
   </div>`;
-  return `${chipsCartao()}${hero}${atual && cartaoSel === null ? cardBancosAgora() : ''}${cartaoSel === null ? telaPendencias() : ''}${cartaoSel === null && !atual && !futuro ? cardFechamento(mesSel) : ''}${atual && cartaoSel === null ? linkFechamento() + cardDestaques() + cardSemana() : ''}${kpis}${cardResto}
+  return `${chipsCartao()}${hero}${atual && cartaoSel === null ? cardBancosAgora() : ''}${cartaoSel === null ? telaPendencias() : ''}${atual && cartaoSel === null ? cardVaiEVolta() : ''}${cartaoSel === null && !atual && !futuro ? cardFechamento(mesSel) : ''}${atual && cartaoSel === null ? linkFechamento() + cardDestaques() + cardSemana() : ''}${kpis}${cardResto}
   <div class="g21">${cardCats}${cardCartoes || cardUltimas}</div>
   <div class="g21">${cardHist}${cardCartoes ? cardUltimas : ''}</div>
   <div class="card"><h2>${ico('lista')} Movimentações de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}${atual && !viaFatura ? ' até hoje' : ''}</span></h2>${tabelaItens(itens, true)}</div>
@@ -2214,7 +2339,7 @@ function tabelaItens(itens, mostraFixo) {
   };
   const dt = (d, i) => `<span class="${d === dataItem(i) ? 'dt' : ''}">${dataBR(d)}</span>`;
   return `<div class="tbl-wrap"><table class="tabela-mov"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th></th></tr></thead><tbody>` +
-    itens.map((i, k) => `${cabDia(i, k)}<tr><td style="white-space:nowrap">${i.fixo ? (i.data ? dt(i.data, i) + ' ' : '') + '<span class="tag t-azul">fixo</span>' + (i.orig && i.orig !== i.data ? ` <span class="tag t-aviso" title="Data mudada só desta vez">era ${ddmm(i.orig)}</span>` : '') + (i.orig && i.ajustes && i.ajustes[i.orig] != null ? ' <span class="tag t-aviso" title="Valor diferente do normal só desta vez">ajustado</span>' : '') : dt(dataDaCompra(i), i)}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.parcInfo ? ` <span class="tag">${i.parcInfo.N}x de ${fmt.format(r2(i.valor / i.parcInfo.N))}</span>` : ''}${!i.fixo && !i.parcInfo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}${i.obs ? `<span class="obs">${esc(i.obs)}</span>` : ''}</div></div></td><td>${esc(i.cat)}</td>
+    itens.map((i, k) => `${cabDia(i, k)}<tr><td style="white-space:nowrap">${i.fixo ? (i.data ? dt(i.data, i) + ' ' : '') + '<span class="tag t-azul">fixo</span>' + (i.orig && i.orig !== i.data ? ` <span class="tag t-aviso" title="Data mudada só desta vez">era ${ddmm(i.orig)}</span>` : '') + (i.orig && i.ajustes && i.ajustes[i.orig] != null ? ' <span class="tag t-aviso" title="Valor diferente do normal só desta vez">ajustado</span>' : '') : dt(dataDaCompra(i), i)}</td><td><div class="it"><span class="av-cat" style="--c:${corCategoria(i.cat)}">${esc((i.cat || '?').trim().charAt(0).toUpperCase())}</span><div>${esc(i.desc)}${!i.fixo && i.data > hoje() && !i.parcela ? ' <span class="tag t-azul">planejado</span>' : ''}${i.cartao ? ' ' + tagCartao(i.cartao) : ''}${i.parcInfo ? ` <span class="tag">${i.parcInfo.N}x de ${fmt.format(r2(i.valor / i.parcInfo.N))}</span>` : ''}${!i.fixo && !i.parcInfo && vencDoLanc(i) ? ` <span class="tag" title="Data da compra: ${dataBR(dataDaCompra(i))}. É paga na fatura que vence nesse dia.">paga em ${ddmm(vencDoLanc(i))}</span>` : ''}${i.provisorio ? ' <span class="tag t-aviso" title="Lançado à mão; será trocado pelo da fatura quando ela for importada">a conferir</span>' : ''}${i.agregado ? ' <span class="tag t-aviso" title="Diferença entre o valor do app do banco e o que o app já conhecia; some ao importar o PDF">valor do banco</span>' : ''}${tagVolta(i)}${i.obs ? `<span class="obs">${esc(i.obs)}</span>` : ''}</div></div></td><td>${esc(i.cat)}</td>
       <td class="num ${i.tipo === 'receita' || i.valor < 0 ? 'pos' : ''}">${(i.tipo === 'receita') === (i.valor >= 0) ? '+' : '−'} ${fmt.format(Math.abs(i.valor))}</td>
       <td class="num">${i.fixo ? (i.orig && !i.cartao ? `<button class="link" data-oc="${i.id}|${i.orig}" title="Mudar só esta vez: valor, data ou não acontece">${ico('lapis')}</button>` : '') : `${!i.cartao && i.data > hoje() && !i.parcela ? `<button class="link" data-ja-lanc="${i.id}" title="Já ${i.tipo === 'receita' ? 'recebeu' : 'pagou'}: passa para hoje e sai da previsão">✓ já ${i.tipo === 'receita' ? 'recebi' : 'paguei'}</button>` : ''}<button class="link" data-rep-lanc="${i.id}" title="Repetir: novo lançamento igual, com a data de hoje" aria-label="Repetir">${ico('copia')}</button><button class="link" data-edit-lanc="${i.id}" title="Editar" aria-label="Editar">${ico('lapis')}</button><button class="link" data-del-lanc="${i.id}" title="Excluir" aria-label="Excluir">✕</button>`}</td></tr>`).join('') +
     `</tbody></table></div>`;
@@ -2437,21 +2562,52 @@ let imp = null;          // fatura carregada, ainda não importada
 let impModo = 'compra';  // 'compra' = data da compra | 'fatura' = data de fechamento
 let impFuturas = true;   // lançar próximas parcelas como planejadas
 
+// Categoria pelo nome da loja (sem acento, maiúsculas). A primeira regra que casar vale, então a ordem importa:
+// drogaria antes de perfumaria, Shopee/Shein antes de "moda", Mercado Livre antes de mercado, fast food antes de padaria.
 const PALPITES = [
-  [/UBER|99 RIDE|99 L2L|RIOCARD|MOBI|POSTO|COMBUST/, 'Transporte'],
-  [/DROGARI|FARMA|OTICA|CLINIC|LABORAT/, 'Saúde'],
+  [/UBER|99 RIDE|99 L2L|RIOCARD|MOBI|POSTO|COMBUST|SHELL|IPIRANGA|ESTACIONA/, 'Transporte'],
+  [/DROGARI|FARMA|\bOTICA|CLINIC|LABORAT|HOSPITAL|DENTIST|ODONTO/, 'Saúde'],
+  [/BOTICARIO|NATURA|EUDORA|AVON|SEPHORA|PERFUM|COSMETIC|SALAO|BARBEAR|BARBEARIA|MANICURE|BELEZA|BELA FERRAZ/, 'Beleza'],
   [/ACADEMIA|WHITE FIT|TOTALPASS|SMART ?FIT/, 'Academia'],
   [/^TIM\*|VIVO|CLARO/, 'Celular'],
-  [/NETFLIX|SPOTIFY|GOOGLE|MICROSOFT|CLAUDE|AMAZON ?PRIME|AMAZONPRIME|AD FREE|DISCORD|DISNEY|HBO|YOUTUBE/, 'Assinaturas'],
-  [/MERCADOLIVRE|MERCADO\*|SHOPEE|MAGALU|CASA E VIDEO|LOJAS|PLAST|IMPORTADOS|COSMETIC|CALCA|AMAZON/, 'Compras'],
-  [/AMIGAO|ZONA SUL|MERCADO|SUPERMERC|ATACAD|ASSAI|GUANABARA|PREZUNIC/, 'Mercado'],
-  [/LANCH|PAO|ALIMENTOS|PASTA|DOCURA|IFOOD|IFD\*|RESTAUR|PIZZ|BURGER|PADARIA|MC ?DONALD|PIPOCA|ESKIMO/, 'Alimentação'],
-  [/PES E PATAS|PET/, 'Pets'],
-  [/COLEGIO|ESCOLA|CURSO|FACULD/, 'Educação'],
-  [/RIOTGAME|STEAM|SHOW|CINEMA|INGRESSO/, 'Lazer'],
-  [/^JUROS|^IOF/, 'Encargos'],
+  [/RIOT ?GAME|STEAM|PLAYSTATION|\bPSN\b|SONY ?INTERACTIVE|XBOX|NINTENDO|EPIC ?GAMES|GARENA|NUUVEM|BLIZZARD|HOYOVERSE|SUPERCELL|ROBLOX|FREE ?FIRE|GAMERSCLUB|KINGUIN|G2A/, 'Jogos'],
+  [/NETFLIX|SPOTIFY|GOOGLE|MICROSOFT|CLAUDE|ANTHROPIC|APPLE\.COM|AMAZON ?PRIME|AMAZONPRIME|AD FREE|DISCORD|DISNEY|HBO|YOUTUBE|DEEZER|GLOBOPLAY|PARAMOUNT|CRUNCHYROLL/, 'Assinaturas'],
+  [/MERCADO ?LIVRE|MERCADOLIVRE|MERCADO\*MERCADO|SHOPEE|SHEIN|TIKTOK|TIKFR|ALIEXPRESS|TEMU|AMAZON|MAGALU|MAGAZINE ?LUIZA|AMERICANAS\.COM|KABUM|PICPAY ?SHOP/, 'Compras online'],
+  [/\bMODAS?\b|LINGERIE|FASHION|CALCA|CALCADO|RENNER|RIACHUELO|\bC ?& ?A\b|HERING|ZARA|MARISA|PERNAMBUCANAS|CENTAURO|NETSHOES|VESTUARIO|CONFEC|BOUTIQUE/, 'Roupas'],
+  [/MERCADO\*|CASA E VIDEO|LOJAS|PLAST|IMPORTADOS|AMERICANAS|PAPELARIA|UTILIDADES/, 'Compras'],
+  [/AMIGAO|ZONA SUL|MERCADO|SUPERMERC|ATACAD|ASSAI|GUANABARA|PREZUNIC|COSTAZUL|HORTIFRUTI/, 'Mercado'],
+  [/MC ?DONALD|BURGER|BURGU|\bBK\b|HABIB|\bBOBS\b|SUBWAY|\bKFC\b|SPOLETO|GIRAFFAS|PIZZ|IFOOD|IFD\*|99FOOD|RAPPI|AIQFOME|LANCH|HOT ?DOG|PASTEL|ACAI|ESFIH|NA BRASA|CHURRAS/, 'Fast food'],
+  [/PAO|PADARIA|PANIFIC|CONFEIT|DOCURA|DOCES|CHOCOLAT|\bCAFE|CAFETERIA|RESTAUR|ALIMENTOS|PASTA|PIPOCA|ESKIMO|SORVET|CEREJINHA/, 'Alimentação'],
+  [/PES E PATAS|\bPET/, 'Pets'],
+  [/COLEGIO|ESCOLA|CURSO|FACULD|LIVRARIA|UDEMY|ALURA/, 'Educação'],
+  [/SHOW|CINEMA|INGRESSO|TEATRO|SYMPLA|EVENTIM/, 'Lazer'],
+  [/PRESENTE|CASAMENTO|ANIVERS|FLORICULT|\bFLORES\b/, 'Presentes'],
+  [/\bMAE\b|MAMAE|\bAVO\b|\bVO\b|VOVO|\bPAI\b|PAPAI/, 'Família'],
+  [/^JUROS|^IOF|ANUIDADE|ENCARGO|MULTA/, 'Encargos'],
 ];
-const palpiteCat = desc => (PALPITES.find(([re]) => re.test(desc.toUpperCase())) || [, 'Outros'])[1];
+const semAcentoMai = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+const palpiteCat = desc => (PALPITES.find(([re]) => re.test(semAcentoMai(desc))) || [, 'Outros'])[1];
+
+// Uma vez só: põe as categorias novas na lista e reclassifica o histórico. Só mexe quando a categoria atual é
+// a genérica de onde a nova saiu (ex.: Alimentação -> Fast food); o que você colocou em outra categoria fica.
+const ORIGEM_CAT = {
+  'Fast food': ['Alimentação', 'Outros'], 'Compras online': ['Compras', 'Outros'], 'Roupas': ['Compras', 'Outros'],
+  'Jogos': ['Lazer', 'Outros', 'Compras', 'Assinaturas'], 'Beleza': ['Saúde', 'Compras', 'Outros'],
+  'Presentes': ['Outros', 'Compras'], 'Família': ['Outros'],
+};
+function migrarCategorias() {
+  if ((S.migCats || 0) >= 1) return 0;
+  const novas = Object.keys(ORIGEM_CAT);
+  for (const c of novas) if (!S.cats.includes(c)) { const i = S.cats.indexOf('Outros'); i >= 0 ? S.cats.splice(i, 0, c) : S.cats.push(c); }
+  let n = 0;
+  const troca = x => { const nova = palpiteCat(x.desc); if (ORIGEM_CAT[nova] && ORIGEM_CAT[nova].includes(x.cat)) { x.cat = nova; n++; } };
+  S.lanc.forEach(l => { if (l.tipo === 'despesa') troca(l); });
+  S.fixos.forEach(f => { if (f.tipo === 'despesa') troca(f); });
+  for (const [desc, r] of Object.entries(S.regras || {})) if (r && r.cat) { const x = { desc, cat: r.cat }; troca(x); r.cat = x.cat; }
+  for (const pd of S.faturasPendentes || []) (pd.itens || []).forEach(it => it.cat && troca(it));
+  S.migCats = 1;
+  return n || 1;
+}
 
 let pdfjsPronto;
 function carregarPdfjs() {
@@ -3496,6 +3652,35 @@ function pendencias() {
   if (fp) p.push({ txt: `${fp} ${fp === 1 ? 'fatura chegou' : 'faturas chegaram'} para revisar e marcar o que é seu.`, acao: 'fatura', botao: 'Revisar' });
   return p;
 }
+function tagVolta(i) {
+  if (!ehVaiEVolta(i)) return '';
+  const v = i.volta, par = v.par && S.lanc.find(x => x.id === v.par), q = v.quem ? ` ${esc(v.quem)}` : '';
+  if (par) return ` <span class="tag t-azul" title="Ligado a: ${esc(par.desc)} (${ddmm(par.data)}). Fica fora dos gastos por categoria.">↔ ${v.lado === 'receber' || v.lado === 'devolucao' ? 'devolvido' : 'acertado'}</span>`;
+  if (v.fechado) return ` <span class="tag t-azul">↔ resolvido</span>`;
+  return ` <span class="tag t-aviso" title="Fica fora dos gastos por categoria até voltar">${v.lado === 'receber' ? 'a receber' + (q ? ' de' + q : '') : 'a devolver' + (q ? ' para' + q : '')}</span>`;
+}
+// Tela inicial: o que vai voltar para você e o que você ainda vai devolver
+function cardVaiEVolta() {
+  const pend = S.lanc.filter(pendenteVolta).sort((a, b) => a.data.localeCompare(b.data));
+  if (!pend.length) return '';
+  const rec = pend.filter(l => l.volta.lado === 'receber'), dev = pend.filter(l => l.volta.lado === 'devolver');
+  const total = ls => fmt.format(r2(ls.reduce((a, l) => a + Math.abs(l.valor), 0)));
+  const linha = l => {
+    const cs = candidatosVolta(l), q = l.volta.quem;
+    const sug = cs.length ? `<div class="vv-sug"><span>${cs.length === 1 ? 'Parece que' : 'Qual destas é a'} ${l.volta.lado === 'receber' ? 'devolução' : 'que você pagou de volta'}${cs.length === 1 ? ' é esta' : '?'}</span>${cs.slice(0, 4).map(c => `<button class="btn mini" data-volta-ligar="${l.id}|${c.id}">${esc(c.desc)} · ${ddmm(c.data)}</button>`).join('')}</div>` : '';
+    return `<div class="vv-item">
+      <div class="vv-txt"><b>${esc(l.desc)}</b><small>${ddmm(l.data)}${q ? ` · ${l.volta.lado === 'receber' ? 'de' : 'para'} ${esc(q)}` : ''}</small></div>
+      <div class="vv-val">${fmt.format(Math.abs(l.valor))}</div>
+      <div class="vv-acoes"><button class="btn mini" data-volta-fechar="${l.id}" title="Já foi acertado (fora do app ou sem lançamento)">${l.volta.lado === 'receber' ? 'Já recebi' : 'Já devolvi'}</button><button class="btn mini" data-volta-nao="${l.id}" title="${l.volta.lado === 'receber' ? 'Não vai voltar: conta como gasto seu' : 'Não precisa devolver'}">Não volta</button></div>
+      ${sug}</div>`;
+  };
+  const bloco = (titulo, ls) => ls.length ? `<div class="vv-sec">${titulo} <b>${total(ls)}</b></div>${ls.map(linha).join('')}` : '';
+  return `<div class="card vv">
+    <h2>${ico('repete')} Vai e volta <span class="sub">· fora dos gastos por categoria até acertar</span></h2>
+    ${bloco('A receber', rec)}${bloco('A devolver', dev)}
+    <p class="hint" style="margin:10px 0 0">O app entende quando a descrição ou a observação diz "será reposto", "vai me devolver", "emprestado"… Também dá para marcar ao editar o lançamento.</p>
+  </div>`;
+}
 function telaPendencias() {
   const p = pendencias();
   if (!p.length) return '';
@@ -3691,7 +3876,8 @@ function abrirEdicao(id) {
       <label>Valor total${irmas.length > 1 ? ' da parcela' : ''} (R$)<input name="valor" inputmode="decimal" value="${String(r2(Math.abs(l.valor) / share)).replace('.', ',')}" required></label>
       <label>Sua parte<select name="parte">${opcoes.map(([v, t]) => `<option value="${v}" ${Math.abs(v - share) < 0.001 ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>ou quanto é seu (R$)<input name="parteValor" inputmode="decimal" placeholder="usar a fração"></label>
-      <label style="flex-basis:100%">Observação<input name="obs" value="${esc(l.obs || '')}" autocomplete="off" placeholder="Para lembrar depois: o que foi, para quem…"></label>
+      <label style="flex-basis:100%">Observação<input name="obs" value="${esc(l.obs || '')}" autocomplete="off" placeholder="Para lembrar depois: o que foi, para quem… (ex.: será reposto pela mãe)"></label>
+      <label style="flex-basis:100%">Vai e volta<select name="volta">${opcoesVolta(l)}</select></label>
     </div>
     <p class="hint">Sua parte: <b id="edit-parte">${fmt.format(Math.abs(l.valor))}</b></p>
     ${irmas.length > 1 ? `<label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" name="todas" checked> Aplicar a todas as ${irmas.length} parcelas desta compra (a data de cada uma não muda)</label>` : ''}
@@ -3704,6 +3890,22 @@ function abrirEdicao(id) {
   dlg.showModal();
 }
 
+const estadoVolta = l => !l.volta ? 'auto' : l.volta.nao ? 'nao' : l.volta.par ? 'ligado' : l.volta.lado === 'receber' || l.volta.lado === 'devolver' ? l.volta.lado : 'ligado';
+function opcoesVolta(l) {
+  const est = estadoVolta(l), par = l.volta && l.volta.par && S.lanc.find(x => x.id === l.volta.par);
+  const ops = [['auto', 'Automático (o app entende pela descrição)'], ['receber', 'Vão me devolver este valor'], ['devolver', 'Peguei emprestado, vou devolver'], ['nao', 'Não é vai e volta']];
+  if (est === 'ligado') ops.unshift(['ligado', `Ligado a: ${par ? par.desc + ' (' + ddmm(par.data) + ')' : '—'}`]);
+  return ops.map(([v, t]) => `<option value="${v}" ${v === est ? 'selected' : ''}>${esc(t)}</option>`).join('');
+}
+function aplicarVolta(l, quer) {
+  const est = estadoVolta(l);
+  if (!quer || quer === est) return;
+  const recusa = [...((l.volta && l.volta.recusa) || []), ...(l.volta && l.volta.par ? [l.volta.par] : [])];
+  if (l.volta && l.volta.par) desligarVolta(l);
+  if (quer === 'auto') delete l.volta;
+  else if (quer === 'nao') l.volta = { nao: true };
+  else if (quer === 'receber' || quer === 'devolver') { const q = quemDe(l); l.volta = { lado: quer, ...(q ? { quem: q } : {}), ...(recusa.length ? { recusa } : {}) }; }
+}
 function salvarEdicao(f, id) {
   const l = S.lanc.find(l => l.id === id), total = num(f.valor), meu = f.parteValor.trim() ? num(f.parteValor) : null;
   if (!l) return document.getElementById('dlg').close();
@@ -3724,6 +3926,7 @@ function salvarEdicao(f, id) {
   // a data só muda no lançamento aberto; compra à vista lançada à mão guarda também a data da compra
   if (l.compra && l.compra.data && !(l.compra.N > 1) && l.data !== f.data) l.compra.data = f.data;
   l.data = f.data;
+  aplicarVolta(l, f.volta);
   if (estavaNoSaldo) porNoSaldo(l);
   document.getElementById('dlg').close();
   salvar();
@@ -4738,6 +4941,14 @@ document.addEventListener('click', e => {
     else if (od.bancoPessoa) { bancoPessoa = od.bancoPessoa; try { localStorage.setItem('financas.bancoPessoa', bancoPessoa); } catch (er) {} render(); }
     return;
   }
+  const vv = e.target.closest('[data-volta-ligar],[data-volta-fechar],[data-volta-nao]');
+  if (vv) {
+    const vd = vv.dataset;
+    if (vd.voltaLigar) { const [a, b] = vd.voltaLigar.split('|'), l = S.lanc.find(x => x.id === a), c = S.lanc.find(x => x.id === b); if (l && c) { ligarVolta(l, c); salvar(); toast(`Ligado: ${c.desc} é a volta de ${l.desc}.`); } }
+    else if (vd.voltaFechar) { const l = S.lanc.find(x => x.id === vd.voltaFechar); if (l) { l.volta = { ...l.volta, fechado: true }; salvar(); } }
+    else if (vd.voltaNao) { const l = S.lanc.find(x => x.id === vd.voltaNao); if (l) { l.volta = { nao: true }; salvar(); toast(l.tipo === 'despesa' ? 'Certo: conta como gasto seu.' : 'Certo.'); } }
+    return;
+  }
   if (e.target.closest('[data-limpar-busca]')) { filtroBusca = null; render(); return; }
   const fo = e.target.closest('[data-fundo]');
   if (fo) {
@@ -5008,7 +5219,7 @@ window.addEventListener('resize', () => {
   larguraAnt = innerWidth; clearTimeout(rz); rz = setTimeout(desenharGraficos, 150);
 });
 // ao voltar para o app (ex.: depois de usar no celular), busca o que mudou
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) Promise.resolve(puxar()).finally(() => { try { if (limparParcelasDuplicadas(S) + limpouParcelas) { limpouParcelas = 0; salvar(); } reprocessarFilaPluggy(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); }); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) Promise.resolve(puxar()).finally(() => { try { aoAbrir(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); }); });
 window.addEventListener('beforeunload', e => { if (timerEnvio) { enviar(); e.preventDefault(); } });
 
 function exemplo() {
@@ -5038,7 +5249,7 @@ function exemplo() {
 
 render();
 // depois de sincronizar, busca nos bancos (se a última busca tem mais de 4 h)
-Promise.resolve(puxar()).finally(() => { try { if (limparParcelasDuplicadas(S) + limpouParcelas) { limpouParcelas = 0; salvar(); } reprocessarFilaPluggy(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); });
+Promise.resolve(puxar()).finally(() => { try { aoAbrir(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); });
 </script>
 </body>
 </html>
