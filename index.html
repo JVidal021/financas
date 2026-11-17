@@ -2581,7 +2581,7 @@ const PALPITES = [
   [/PES E PATAS|\bPET/, 'Pets'],
   [/COLEGIO|ESCOLA|CURSO|FACULD|LIVRARIA|UDEMY|ALURA/, 'Educação'],
   [/SHOW|CINEMA|INGRESSO|TEATRO|SYMPLA|EVENTIM/, 'Lazer'],
-  [/PRESENTE|CASAMENTO|ANIVERS|FLORICULT|\bFLORES\b/, 'Presentes'],
+  [/PRESENTE|ANIVERS|FLORICULT|\bFLORES\b/, 'Presentes'],
   [/\bMAE\b|MAMAE|\bAVO\b|\bVO\b|VOVO|\bPAI\b|PAPAI/, 'Família'],
   [/^JUROS|^IOF|ANUIDADE|ENCARGO|MULTA/, 'Encargos'],
 ];
@@ -2597,11 +2597,12 @@ const ORIGEM_CAT = {
 };
 function migrarCategorias() {
   if ((S.migCats || 0) >= 1) return 0;
+  entenderVaiEVolta();
   const novas = Object.keys(ORIGEM_CAT);
   for (const c of novas) if (!S.cats.includes(c)) { const i = S.cats.indexOf('Outros'); i >= 0 ? S.cats.splice(i, 0, c) : S.cats.push(c); }
   let n = 0;
   const troca = x => { const nova = palpiteCat(x.desc); if (ORIGEM_CAT[nova] && ORIGEM_CAT[nova].includes(x.cat)) { x.cat = nova; n++; } };
-  S.lanc.forEach(l => { if (l.tipo === 'despesa') troca(l); });
+  S.lanc.forEach(l => { if (l.tipo === 'despesa' && !ehVaiEVolta(l)) troca(l); });
   S.fixos.forEach(f => { if (f.tipo === 'despesa') troca(f); });
   for (const [desc, r] of Object.entries(S.regras || {})) if (r && r.cat) { const x = { desc, cat: r.cat }; troca(x); r.cat = x.cat; }
   for (const pd of S.faturasPendentes || []) (pd.itens || []).forEach(it => it.cat && troca(it));
@@ -3655,9 +3656,9 @@ function pendencias() {
 function tagVolta(i) {
   if (!ehVaiEVolta(i)) return '';
   const v = i.volta, par = v.par && S.lanc.find(x => x.id === v.par), q = v.quem ? ` ${esc(v.quem)}` : '';
-  if (par) return ` <span class="tag t-azul" title="Ligado a: ${esc(par.desc)} (${ddmm(par.data)}). Fica fora dos gastos por categoria.">↔ ${v.lado === 'receber' || v.lado === 'devolucao' ? 'devolvido' : 'acertado'}</span>`;
+  if (par) return ` <span class="tag t-azul" title="Ligado a: ${esc(par.desc)} (${ddmm(par.data)}). Fica fora dos gastos por categoria.">↔ ${v.lado === 'receber' || v.lado === 'devolucao' ? 'devolvido' : v.lado === 'devolver' ? 'empréstimo pago' : 'pagou empréstimo'}</span>`;
   if (v.fechado) return ` <span class="tag t-azul">↔ resolvido</span>`;
-  return ` <span class="tag t-aviso" title="Fica fora dos gastos por categoria até voltar">${v.lado === 'receber' ? 'a receber' + (q ? ' de' + q : '') : 'a devolver' + (q ? ' para' + q : '')}</span>`;
+  return ` <span class="tag t-aviso" title="Fica fora dos gastos por categoria até voltar">${v.lado === 'receber' ? 'a receber' + (q ? ' de' + q : '') : 'empréstimo' + (q ? ' de' + q : '')}</span>`;
 }
 // Tela inicial: o que vai voltar para você e o que você ainda vai devolver
 function cardVaiEVolta() {
@@ -3677,7 +3678,7 @@ function cardVaiEVolta() {
   const bloco = (titulo, ls) => ls.length ? `<div class="vv-sec">${titulo} <b>${total(ls)}</b></div>${ls.map(linha).join('')}` : '';
   return `<div class="card vv">
     <h2>${ico('repete')} Vai e volta <span class="sub">· fora dos gastos por categoria até acertar</span></h2>
-    ${bloco('A receber', rec)}${bloco('A devolver', dev)}
+    ${bloco('A receber', rec)}${bloco('Empréstimos que você vai devolver', dev)}
     <p class="hint" style="margin:10px 0 0">O app entende quando a descrição ou a observação diz "será reposto", "vai me devolver", "emprestado"… Também dá para marcar ao editar o lançamento.</p>
   </div>`;
 }
