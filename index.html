@@ -1183,8 +1183,9 @@ function definirDono(g, v) {
 // Cartão que veio do banco mas você não usa (adicional, virtual, antigo): não aparece e as faturas dele não chegam.
 // Cartão de outra pessoa começa desmarcado; marque se é você quem paga.
 const cartaoEmUso = c => { const m = (S.ofCartaoFora || {})[c.id]; return m != null ? !m : ehMeu(c); };
-// contas que entram no "saldo na conta": conta corrente sua sim, poupança/investimento e contas de outra pessoa só se você marcar
-const contaNoSaldo = c => { const m = (S.ofSaldo || {})[c.id]; return m != null ? m : ehMeu(c) && c.tipo === 'conta' && !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`); };
+// contas que entram no "meu saldo": só as suas. Conta corrente sim; poupança/investimento só se você ligar.
+// Conta de outra pessoa nunca entra (ela aparece no seletor de pessoa da tela inicial).
+const contaNoSaldo = c => { if (!ehMeu(c)) return false; const m = (S.ofSaldo || {})[c.id]; return m != null ? m : c.tipo === 'conta' && !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`); };
 const isoLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const quandoBanco = ts => { const d = new Date(ts); if (!ts || isNaN(d)) return ''; const iso = isoLocal(d); return (iso === hoje() ? 'hoje' : iso === addDia(hoje(), -1) ? 'ontem' : ddmm(iso)) + ' às ' + d.toTimeString().slice(0, 5); };
 // Fatura que chegou do banco: se todas as compras já são conhecidas (lançamento, regra da loja, fixo ou
@@ -1253,7 +1254,9 @@ function aplicarPluggy(d) {
     const soma = r2(contas.reduce((a, c) => a + c.saldo, 0));
     const ts = Math.max(...contas.map(c => Date.parse(c.atualizado || S.bancos.ts) || 0));
     const desde = S.saldoTs || (S.saldoData ? Date.parse(S.saldoData + 'T00:00') : 0);
-    if (ts > desde && (Math.abs(soma - S.saldoAtual) >= 0.01 || S.saldoData !== hoje())) { informarSaldo(soma, ts); r.saldo = soma; }
+    // mesmo dado do banco, mas as contas que entram mudaram (ex.: conta de outra pessoa saiu do seu saldo): refaz a soma
+    const recompor = S.saldoBanco && ts === desde && Math.abs(soma - S.saldoAtual) >= 0.01;
+    if ((ts > desde || recompor) && (Math.abs(soma - S.saldoAtual) >= 0.01 || S.saldoData !== hoje())) { informarSaldo(soma, ts); r.saldo = soma; }
     else if (ts > desde) { S.saldoTs = ts; S.saldoBanco = true; }   // o banco confirmou o que o app já tinha (você lançou antes de ele atualizar)
   }
   if (r.compras || r.saldo != null) S.ofLog = [{ ts: Date.now(), compras: r.compras, lancadas: r.lancadas, saldo: r.saldo }].concat(S.ofLog || []).slice(0, 10);
@@ -1308,7 +1311,7 @@ function cardBancos() {
     <div class="of-ctrl">${c.tipo === 'cartao'
       ? sw(`data-of-cartao="${esc(c.id)}"`, usa, 'Uso este cartão', 'Desligado: o cartão não entra nas suas faturas nem no seu resumo')
         + (usa ? `<span class="para">é o <select data-pluggy-banco="${esc(c.id)}" aria-label="Cartão no app">${cartoes.map(x => `<option ${x === b ? 'selected' : ''}>${esc(x)}</option>`).join('')}${cartoes.includes(b) ? '' : `<option selected>${esc(b)}</option>`}</select></span>` : '')
-      : sw(`data-of-conta="${esc(c.id)}"`, contaNoSaldo(c), 'Entra no meu saldo')}</div>
+      : ehMeu(c) ? sw(`data-of-conta="${esc(c.id)}"`, contaNoSaldo(c), 'Entra no meu saldo') : `<span class="para">só para ver, não entra no seu saldo</span>`}</div>
   </div>`;
   };
   const nomesDono = [...new Set(['Eu', ...Object.values(S.ofDonos || {})].filter(Boolean))];
@@ -1318,7 +1321,7 @@ function cardBancos() {
     const meu = /^eu$/i.test(dono);
     const nC = cs.filter(c => c.tipo === 'conta').length, nK = cs.length - nC;
     const qtd = [nC && `${nC} ${nC === 1 ? 'conta' : 'contas'}`, nK && `${nK} ${nK === 1 ? 'cartão' : 'cartões'}`].filter(Boolean).join(' e ');
-    const nota = g && !dono ? 'De quem é? Nada desta conexão entra no app até você escolher.' : !meu ? 'Só entra nas suas contas o que você ligar.' : '';
+    const nota = g && !dono ? 'De quem é? Nada desta conexão entra no app até você escolher.' : !meu ? 'O saldo não entra no seu; cartão só se você ligar.' : '';
     const escolha = !g ? '' : donoEditando === g
       ? `<input data-of-dono="${esc(g)}" placeholder="Nome da pessoa" aria-label="Nome da pessoa"><button class="btn mini primary" data-of-dono-ok="${esc(g)}">Salvar</button><button class="btn mini" data-of-dono-cancela="1">Cancelar</button>`
       : `<span class="seg">${nomesDono.map(n => `<button class="${n === dono ? 'on' : ''}" data-of-dono-set="${esc(g)}|${esc(n)}">${esc(n)}</button>`).join('')}<button data-of-dono-outra="${esc(g)}">+ Outra pessoa</button></span>`;
@@ -1715,7 +1718,7 @@ function cardBancosAgora() {
       if (contas.length) {
         const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
         const dif = Math.abs(soma - S.saldoAtual) >= 0.01;
-        tiles.push(tile(pessoas.length > 1 ? 'Meu saldo no banco' : 'Saldo no banco', fmt.format(soma), 'carteira', 'var(--good)', `<div class="sub2">${contas.length > 1 || contas.some(c => !ehMeu(c)) ? esc(contas.map(c => c.nome + (ehMeu(c) ? '' : ` (${rotuloDono(c)})`)).join(' + ')) + ' · ' : ''}${quandoBanco(ts)}</div>
+        tiles.push(tile(pessoas.length > 1 ? 'Meu saldo no banco' : 'Saldo no banco', fmt.format(soma), 'carteira', 'var(--good)', `<div class="sub2">${contas.length > 1 ? esc(contas.map(c => c.nome).join(' + ')) + ' · ' : ''}${quandoBanco(ts)}</div>
           ${dif ? `<div class="sub2">no app: ${fmt.format(S.saldoAtual)} · <button class="link" data-pluggy-saldo="${soma}">usar o do banco</button></div>` : '<div class="sub2">✓ igual ao saldo do app</div>'}`));
       }
       b.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c)).forEach(tileCartao);
@@ -1723,7 +1726,7 @@ function cardBancosAgora() {
     }
     // outra pessoa: só para ver (não mexe no seu saldo); conta corrente dela e os cartões que não foram escondidos
     const dela = b.contas.filter(c => pessoaDe(c) === p);
-    const contas = dela.filter(c => c.tipo === 'conta' && ((S.ofSaldo || {})[c.id] === true || !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`)));
+    const contas = dela.filter(c => c.tipo === 'conta' && !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`));
     if (contas.length) {
       const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
       tiles.push(tile(`Saldo no banco · ${esc(p)}`, fmt.format(soma), 'carteira', corPessoa(p), `<div class="sub2">${esc(contas.map(c => c.nome).join(' + '))} · ${quandoBanco(ts)}</div>`));
