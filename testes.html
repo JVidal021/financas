@@ -25,6 +25,8 @@ document.getElementById('app').addEventListener('load', e => {
     // frações e parcelas
     ['JSON.stringify(lerFracao("2/3"))', '{"k":2,"n":3}'], ['descBase("Loja (2/6) · metade")', 'Loja'], ['sufixoParcela("Loja (2/6) · metade")', ' (2/6)'],
     ['JSON.stringify(parcelaDe({ compra: { n: 2, N: 6 } }))', '{"n":2,"N":6}'],
+    // tela inicial: os destaques e o "livre pra gastar" montam sem erro com os dados atuais
+    ['typeof cardDestaques()', 'string'], ['isFinite(livreParaGastar().valor)', true], ['typeof telaVisao()', 'string'],
     // a projeção fecha: o saldo de cada mês é o anterior mais o que entra menos o que sai
     ['(() => { const p = projecao(); let s = S.saldoAtual; return p.linhas.every(l => { s = r2(s + l.r - l.d); return Math.abs(s - l.saldo) < 0.011; }); })()', true],
   ];
