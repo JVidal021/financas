@@ -443,6 +443,44 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .empty { color: var(--muted); text-align: center; padding: 28px 0; }
 
 /* importação de fatura */
+/* Bancos (Open Finance): pessoa de cada conexão, contas e interruptores */
+.of-pessoa { --c: var(--accent); border: 1px solid var(--edge); background: var(--surface-2); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.of-pessoa.nova { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 7%, var(--surface-2)); }
+.of-cab { display: flex; align-items: center; gap: 12px; }
+.of-av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 750; font-size: 15px; color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent); }
+.of-tit { flex: 1 1 auto; min-width: 0; }
+.of-tit b { font-size: 15px; display: block; }
+.of-tit span { font-size: 12.5px; color: var(--muted); }
+.of-dono { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0 2px; font-size: 13px; color: var(--text-2); }
+.of-dono input { width: 160px; padding: 5px 10px; font-size: 13px; }
+.of-linha { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--edge); flex-wrap: wrap; }
+.of-dono + .of-linha, .of-cab + .of-linha { margin-top: 10px; }
+.of-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; color: var(--c); background: color-mix(in srgb, var(--c) 11%, transparent); }
+.of-ic svg.i { width: 16px; height: 16px; }
+.of-info { flex: 1 1 180px; min-width: 0; }
+.of-info b { font-weight: 650; }
+.of-info .num { color: var(--muted); font-size: 12.5px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.of-info .sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.of-ctrl { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.of-ctrl select { padding: 5px 10px; font-size: 13px; }
+.of-ctrl .para { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-2); user-select: none; position: relative; }
+.sw input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.sw .t { width: 34px; height: 20px; border-radius: 99px; background: color-mix(in srgb, var(--muted) 38%, transparent); position: relative; flex: none; transition: background .2s; }
+.sw .t::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s var(--mola, ease); }
+.sw input:checked + .t { background: var(--accent); }
+.sw input:checked + .t::after { transform: translateX(14px); }
+.sw input:focus-visible + .t { outline: 2px solid var(--accent); outline-offset: 2px; }
+.of-auto { display: grid; gap: 12px; margin-top: 16px; }
+.of-auto .sw { align-items: flex-start; }
+.of-auto .sw .t { margin-top: 1px; }
+.of-auto .sw > span:last-child { line-height: 1.45; }
+.of-pessoas { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
+.of-pessoas .lbl { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.of-pessoas .seg .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c); margin-right: 6px; vertical-align: 1px; }
+.of-pessoas .seg button.on .dot { background: #fff; }
+.of-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--text-2); margin: 6px 0 8px; }
+.of-sec .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
 .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--edge); border-radius: 11px; padding: 2px; gap: 2px; }
 .seg button { font: inherit; font-size: 13px; font-weight: 600; border: 0; background: none; color: var(--text-2); padding: 5px 10px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
 .seg button:hover { color: var(--text); }
@@ -1122,6 +1160,26 @@ const ofAuto = k => (S.ofAuto || {})[k] !== false;
 const donoDe = c => (S.ofDonos || {})[c.itemId] || '';
 const ehMeu = c => !c.itemId || /^eu$/i.test(donoDe(c));
 const rotuloDono = c => ehMeu(c) ? '' : donoDe(c) || 'sem dono';
+const pessoaDe = c => ehMeu(c) ? 'Eu' : donoDe(c);   // '' = conexão sem dono
+const CORES_PESSOA = ['var(--accent)', 'var(--violeta)', 'var(--s2)', 'var(--good)', 'var(--warn)'];
+// cor de cada pessoa pela ordem dos nomes (Eu sempre azul), para duas pessoas nunca terem a mesma cor
+const corPessoa = n => { if (/^eu$/i.test(n || '')) return CORES_PESSOA[0]; const outros = [...new Set(Object.values(S.ofDonos || {}).filter(x => !/^eu$/i.test(x)))].sort((a, b) => a.localeCompare(b)); const i = outros.indexOf(n); return CORES_PESSOA[1 + (i < 0 ? 0 : i) % (CORES_PESSOA.length - 1)]; };
+const pessoasBancos = () => [...new Set(((S.bancos || {}).contas || []).map(pessoaDe).filter(Boolean))].sort((a, b) => (a === 'Eu' ? -1 : b === 'Eu' ? 1 : a.localeCompare(b)));
+// dono de uma conexão: 'Eu', um nome, ou '' (sem dono: nada dela entra no app)
+let donoEditando = null;
+function definirDono(g, v) {
+  v = String(v || '').trim();
+  const era = (S.ofDonos || {})[g] || '';
+  S.ofDonos = { ...(S.ofDonos || {}) };
+  if (v) S.ofDonos[g] = /^eu$/i.test(v) ? 'Eu' : v; else delete S.ofDonos[g];
+  donoEditando = null;
+  // deixou de ser sua: as faturas dela que esperavam revisão saem da fila (a não ser que você ligue o cartão)
+  const ids = new Set(((S.bancos || {}).contas || []).filter(c => c.itemId === g && !cartaoEmUso(c)).map(c => c.id));
+  S.faturasPendentes = (S.faturasPendentes || []).filter(x => !(String(x.id).startsWith('pluggy|') && ids.has(String(x.id).split('|')[2])));
+  salvar();
+  if (v && !/^eu$/i.test(v) && v !== era) toast(`Conexão de ${S.ofDonos[g]}: o saldo e os cartões só entram nas suas contas se você ligar.`);
+  buscarBancos();
+}
 // Cartão que veio do banco mas você não usa (adicional, virtual, antigo): não aparece e as faturas dele não chegam.
 // Cartão de outra pessoa começa desmarcado; marque se é você quem paga.
 const cartaoEmUso = c => { const m = (S.ofCartaoFora || {})[c.id]; return m != null ? !m : ehMeu(c); };
@@ -1240,25 +1298,37 @@ function cardBancos() {
   const cartoes = [...new Set([...cartoesUsados(), ...Object.keys(LEITORES)])];
   const todas = (S.bancos || {}).contas || pluggy.contas || [];
   const grupos = [...new Set(todas.map(c => c.itemId || ''))];
+  const sw = (attr, on, txt, title = '') => `<label class="sw"${title ? ` title="${esc(title)}"` : ''}><input type="checkbox" ${attr} ${on ? 'checked' : ''}><span class="t"></span><span>${txt}</span></label>`;
   const linha = c => {
-    const b = c.tipo === 'cartao' ? bancoDaConta(c) : '', cr = c.credito || {};
-    return `<div class="row" style="align-items:center;justify-content:space-between;padding:6px 0">
-    <div><b>${esc(c.nome)}</b>${c.numero ? ` <span class="hint" style="margin:0">· ${esc(String(c.numero).slice(-4))}</span>` : ''}
-      <div class="hint" style="margin:0">${c.tipo === 'cartao' ? `cartão · limite usado ${fmt.format(c.saldo || 0)}${cr.limite != null ? ` de ${fmt.format(cr.limite)}` : ''}` : `conta · saldo ${fmt.format(c.saldo || 0)}`}${c.atualizado ? ` · banco atualizou ${quandoBanco(c.atualizado)}` : ''}</div></div>
-    ${c.tipo === 'cartao'
-      ? `<label class="hint" style="margin:0;flex:0 0 auto" title="Desmarque o cartão que você não usa: ele some da tela inicial e as faturas dele deixam de chegar"><input type="checkbox" data-of-cartao="${esc(c.id)}" ${cartaoEmUso(c) ? 'checked' : ''}> uso este cartão</label><label class="hint" style="margin:0;flex:0 0 auto${cartaoEmUso(c) ? '' : ';opacity:.45'}">no app é o cartão <select data-pluggy-banco="${esc(c.id)}">${cartoes.map(x => `<option ${x === b ? 'selected' : ''}>${esc(x)}</option>`).join('')}${cartoes.includes(b) ? '' : `<option selected>${esc(b)}</option>`}</select></label>`
-      : `<label class="hint" style="margin:0;flex:0 0 auto"><input type="checkbox" data-of-conta="${esc(c.id)}" ${contaNoSaldo(c) ? 'checked' : ''}> entra no saldo</label>`}
+    const b = c.tipo === 'cartao' ? bancoDaConta(c) : '', cr = c.credito || {}, usa = c.tipo === 'cartao' && cartaoEmUso(c);
+    return `<div class="of-linha">
+    <span class="of-ic">${ico(c.tipo === 'cartao' ? 'cartao' : 'carteira')}</span>
+    <div class="of-info"><b>${esc(c.nome)}</b>${c.numero ? `<span class="num">•••• ${esc(String(c.numero).slice(-4))}</span>` : ''}
+      <div class="sub">${c.tipo === 'cartao' ? `usado ${fmt.format(c.saldo || 0)}${cr.limite != null ? ` de ${fmt.format(cr.limite)}` : ''}` : `saldo ${fmt.format(c.saldo || 0)}`}${c.atualizado ? ` · atualizado ${quandoBanco(c.atualizado)}` : ''}</div></div>
+    <div class="of-ctrl">${c.tipo === 'cartao'
+      ? sw(`data-of-cartao="${esc(c.id)}"`, usa, 'Uso este cartão', 'Desligado: o cartão não entra nas suas faturas nem no seu resumo')
+        + (usa ? `<span class="para">é o <select data-pluggy-banco="${esc(c.id)}" aria-label="Cartão no app">${cartoes.map(x => `<option ${x === b ? 'selected' : ''}>${esc(x)}</option>`).join('')}${cartoes.includes(b) ? '' : `<option selected>${esc(b)}</option>`}</select></span>` : '')
+      : sw(`data-of-conta="${esc(c.id)}"`, contaNoSaldo(c), 'Entra no meu saldo')}</div>
   </div>`;
   };
   const nomesDono = [...new Set(['Eu', ...Object.values(S.ofDonos || {})].filter(Boolean))];
-  const linhas = grupos.length > 1 || grupos[0] && !ehMeu(todas[0]) ? grupos.map((g, i) => {
-    const cs = todas.filter(c => (c.itemId || '') === g), dono = g ? (S.ofDonos || {})[g] || '' : 'Eu';
-    return `<div class="of-grupo" style="border-top:1px solid var(--line, rgba(127,127,127,.25));padding-top:8px;margin-top:${i ? 10 : 0}px">
-      <label class="hint" style="margin:0 0 2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>Conexão ${i + 1}</b> · de quem é:
-        ${g ? `<input data-of-dono="${esc(g)}" list="of-donos" value="${esc(dono)}" placeholder="Eu, ou o nome" style="width:160px;padding:4px 8px">` : '<b>Eu</b>'}
-        ${g && !dono ? '<span style="color:var(--bad, #c0392b)">nada desta conexão entra no app até você dizer de quem é</span>' : g && !/^eu$/i.test(dono) ? '<span>só entra no app o que você marcar</span>' : ''}</label>
+  const linhas = grupos.map(g => {
+    const cs = todas.filter(c => (c.itemId || '') === g);
+    const dono = g ? (S.ofDonos || {})[g] || '' : 'Eu';
+    const meu = /^eu$/i.test(dono);
+    const nC = cs.filter(c => c.tipo === 'conta').length, nK = cs.length - nC;
+    const qtd = [nC && `${nC} ${nC === 1 ? 'conta' : 'contas'}`, nK && `${nK} ${nK === 1 ? 'cartão' : 'cartões'}`].filter(Boolean).join(' e ');
+    const nota = g && !dono ? 'De quem é? Nada desta conexão entra no app até você escolher.' : !meu ? 'Só entra nas suas contas o que você ligar.' : '';
+    const escolha = !g ? '' : donoEditando === g
+      ? `<input data-of-dono="${esc(g)}" placeholder="Nome da pessoa" aria-label="Nome da pessoa"><button class="btn mini primary" data-of-dono-ok="${esc(g)}">Salvar</button><button class="btn mini" data-of-dono-cancela="1">Cancelar</button>`
+      : `<span class="seg">${nomesDono.map(n => `<button class="${n === dono ? 'on' : ''}" data-of-dono-set="${esc(g)}|${esc(n)}">${esc(n)}</button>`).join('')}<button data-of-dono-outra="${esc(g)}">+ Outra pessoa</button></span>`;
+    const av = !dono ? '?' : meu ? 'Eu' : esc([...dono][0].toUpperCase());
+    return `<div class="of-pessoa${g && !dono ? ' nova' : ''}" style="--c:${dono ? corPessoa(dono) : 'var(--warn)'}">
+      <div class="of-cab"><span class="of-av">${av}</span>
+        <div class="of-tit"><b>${!dono ? 'Conexão nova' : meu ? 'Minhas contas' : esc(dono)}</b><span>${qtd}${nota ? ' · ' + nota : ''}</span></div></div>
+      ${g ? `<div class="of-dono">De quem é ${escolha}</div>` : ''}
       ${cs.map(linha).join('')}</div>`;
-  }).join('') + `<datalist id="of-donos">${nomesDono.map(n => `<option value="${esc(n)}">`).join('')}</datalist>` : todas.map(linha).join('');
+  }).join('');
   // conexão que veio sem contas ou com erro: mostra o porquê (ID errado, banco ainda sincronizando, autorização vencida…)
   const STATUS = { UPDATED: 'atualizada', UPDATING: 'ainda sincronizando com o banco', LOGIN_ERROR: 'o banco pede para conectar de novo', OUTDATED: 'desatualizada (o banco não respondeu)', WAITING_USER_INPUT: 'esperando a pessoa autorizar no banco', CREATED: 'criada, ainda não sincronizou' };
   const probs = ((S.bancos || {}).conexoes || []).filter(x => x.erro || !x.contas || (x.status && x.status !== 'UPDATED'));
@@ -1269,9 +1339,9 @@ function cardBancos() {
   <div class="card"><h2>Bancos (Open Finance)</h2>
     <p class="hint" style="margin:0 0 8px">Conectado ao Worker <b>${esc(pluggy.url.replace(/^https?:\/\//, ''))}</b>. O app busca ao abrir e de novo quando passa de 4 h (os bancos atualizam no Meu Pluggy uma vez por dia). Fatura que você já importou não volta.</p>
     ${cxHtml}${linhas || `<p class="hint">${(S.bancos || {}).conexoes ? 'Nenhuma conta chegou dos bancos.' : 'Clique em "Buscar agora" para ver as contas.'}</p>`}
-    <div style="margin-top:10px;display:grid;gap:6px">
-      <label class="hint" style="margin:0"><input type="checkbox" data-of-auto="saldo" ${ofAuto('saldo') ? 'checked' : ''}> <b>Atualizar o saldo sozinho</b>: a soma das contas marcadas vira o saldo de hoje quando o banco tem dado mais novo que o último que você informou. A conferência continua mostrando o que saiu ou entrou sem registro.</label>
-      <label class="hint" style="margin:0"><input type="checkbox" data-of-auto="compras" ${ofAuto('compras') ? 'checked' : ''}> <b>Lançar sozinho as compras conhecidas</b>: se todas as compras novas de uma fatura são de lojas que você já marcou (Meu / Metade / Não é meu), ela entra sem pedir revisão. Com loja nova, a fatura vai para <b>Importar fatura → Faturas para revisar</b>, já com as conhecidas marcadas.</label>
+    <div class="of-auto">
+      ${sw('data-of-auto="saldo"', ofAuto('saldo'), '<span><b>Atualizar o saldo sozinho.</b> A soma das contas ligadas em "Entra no meu saldo" vira o saldo de hoje quando o banco tem dado mais novo que o último que você informou.</span>')}
+      ${sw('data-of-auto="compras"', ofAuto('compras'), '<span><b>Lançar sozinho as compras conhecidas.</b> Se todas as compras novas de uma fatura são de lojas que você já marcou (Meu / Metade / Não é meu), ela entra sem revisão. Com loja nova, vai para <b>Importar fatura → Faturas para revisar</b>.</span>')}
     </div>
     <div class="row" style="margin-top:8px"><button class="btn primary" id="pluggy-agora">Buscar agora</button><button class="btn" id="pluggy-sair">Desconectar</button></div>
     <p class="hint">${esc(pluggyStatus || (pluggy.ultima ? 'última busca: ' + ddmm(pluggy.ultima) : ''))}</p>
@@ -1618,30 +1688,56 @@ function itensPrevistos(m) {
 // Mesmo período do mês anterior (até o mesmo dia), para comparar com o mês atual ainda em andamento
 const reaisAteODia = (m, dia) => itensReais(m).filter(i => i.quando.slice(8) <= dia);
 
-// Tela inicial: o que os bancos dizem agora (saldo real, limite de cada cartão, fatura fechada)
+// Tela inicial: o que os bancos dizem agora (saldo real, limite de cada cartão, fatura fechada).
+// Com contas de mais de uma pessoa, um seletor mostra as de cada uma (ou todas, separadas por pessoa).
+let bancoPessoa = (() => { try { return localStorage.getItem('financas.bancoPessoa') || 'Eu'; } catch (e) { return 'Eu'; } })();
 function cardBancosAgora() {
   const b = S.bancos;
   if (!b || !(b.contas || []).length) return '';
-  const contas = b.contas.filter(contaNoSaldo), cartoes = b.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c));
-  const tiles = [];
-  if (contas.length) {
-    const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
-    const dif = Math.abs(soma - S.saldoAtual) >= 0.01;
-    tiles.push(tile('Saldo no banco', fmt.format(soma), 'carteira', 'var(--good)', `<div class="sub2">${contas.length > 1 || contas.some(c => !ehMeu(c)) ? esc(contas.map(c => c.nome + (ehMeu(c) ? '' : ` (${rotuloDono(c)})`)).join(' + ')) + ' · ' : ''}${quandoBanco(ts)}</div>
-      ${dif ? `<div class="sub2">no app: ${fmt.format(S.saldoAtual)} · <button class="link" data-pluggy-saldo="${soma}">usar o do banco</button></div>` : '<div class="sub2">✓ igual ao saldo do app</div>'}`));
-  }
-  for (const c of cartoes) {
+  const pessoas = pessoasBancos();
+  const sel = pessoas.length > 1 && (bancoPessoa === 'Todos' || pessoas.includes(bancoPessoa)) ? bancoPessoa : 'Eu';
+  const tiles = [], vistos = new Set();
+  const tileCartao = c => {
+    if (vistos.has(c.id)) return; vistos.add(c.id);
     const cr = c.credito || {}, lim = cr.limite != null ? +cr.limite : null;
     const disp = cr.disponivel != null ? +cr.disponivel : lim != null ? r2(lim - c.saldo) : null;
     const usado = lim != null && disp != null ? r2(lim - disp) : c.saldo, pct = lim ? Math.max(0, Math.min(100, usado / lim * 100)) : 0;
-    const f = c.fatura, aPagar = f && f.vence >= hoje() && !(S.faturasPagas || {})[c.banco + '|' + f.vence];
-    tiles.push(tile(`Limite livre · ${esc(c.banco)}${ehMeu(c) ? '' : ` · ${esc(rotuloDono(c))}`}`, disp != null ? fmt.format(disp) : '—', 'cartao', corCartao(c.banco), `
-      ${lim ? `<div class="medidor-lim" style="--c:${corCartao(c.banco)}"><i style="width:${pct}%"></i></div><div class="sub2">usado ${fmt.format(usado)} de ${fmt.format(lim)} (${Math.round(pct)}%)</div>` : `<div class="sub2">usado ${fmt.format(usado)}</div>`}
+    const banco = c.banco || bancoDaConta(c), f = c.fatura, aPagar = f && f.vence >= hoje() && !(S.faturasPagas || {})[banco + '|' + f.vence];
+    const quem = rotuloDono(c), cor = ehMeu(c) ? corCartao(banco) : corPessoa(pessoaDe(c));
+    tiles.push(tile(`Limite livre · ${esc(ehMeu(c) ? banco : c.nome)}${quem ? ` · ${esc(quem)}` : ''}`, disp != null ? fmt.format(disp) : '—', 'cartao', cor, `
+      ${lim ? `<div class="medidor-lim" style="--c:${cor}"><i style="width:${pct}%"></i></div><div class="sub2">usado ${fmt.format(usado)} de ${fmt.format(lim)} (${Math.round(pct)}%)</div>` : `<div class="sub2">usado ${fmt.format(usado)}</div>`}
       ${aPagar ? `<div class="sub2">fatura fechada: <b>${fmt.format(f.total)}</b> · vence ${ddmm(f.vence)}</div>` : cr.vence && cr.vence >= hoje() ? `<div class="sub2">próximo vencimento ${ddmm(cr.vence)}</div>` : ''}`));
-  }
+  };
+  const blocoPessoa = p => {
+    if (p === 'Eu') {
+      // o seu: as contas ligadas em "Entra no meu saldo" e os cartões que você usa (inclusive de outra pessoa que você paga)
+      const contas = b.contas.filter(contaNoSaldo);
+      if (contas.length) {
+        const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
+        const dif = Math.abs(soma - S.saldoAtual) >= 0.01;
+        tiles.push(tile(pessoas.length > 1 ? 'Meu saldo no banco' : 'Saldo no banco', fmt.format(soma), 'carteira', 'var(--good)', `<div class="sub2">${contas.length > 1 || contas.some(c => !ehMeu(c)) ? esc(contas.map(c => c.nome + (ehMeu(c) ? '' : ` (${rotuloDono(c)})`)).join(' + ')) + ' · ' : ''}${quandoBanco(ts)}</div>
+          ${dif ? `<div class="sub2">no app: ${fmt.format(S.saldoAtual)} · <button class="link" data-pluggy-saldo="${soma}">usar o do banco</button></div>` : '<div class="sub2">✓ igual ao saldo do app</div>'}`));
+      }
+      b.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c)).forEach(tileCartao);
+      return;
+    }
+    // outra pessoa: só para ver (não mexe no seu saldo); conta corrente dela e os cartões que não foram escondidos
+    const dela = b.contas.filter(c => pessoaDe(c) === p);
+    const contas = dela.filter(c => c.tipo === 'conta' && ((S.ofSaldo || {})[c.id] === true || !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`)));
+    if (contas.length) {
+      const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
+      tiles.push(tile(`Saldo no banco · ${esc(p)}`, fmt.format(soma), 'carteira', corPessoa(p), `<div class="sub2">${esc(contas.map(c => c.nome).join(' + '))} · ${quandoBanco(ts)}</div>`));
+    }
+    dela.filter(c => c.tipo === 'cartao' && (S.ofCartaoFora || {})[c.id] !== true).forEach(tileCartao);
+  };
+  const secoes = (sel === 'Todos' ? pessoas : [sel]).map(p => { const ini = tiles.length; blocoPessoa(p); return { p, t: tiles.slice(ini) }; });
+  const seletor = pessoas.length > 1 ? `<div class="of-pessoas"><span class="lbl">Bancos</span><div class="seg" role="tablist" aria-label="De quem são as contas">${[...pessoas, 'Todos'].map(p => `<button role="tab" aria-selected="${p === sel}" class="${p === sel ? 'on' : ''}" data-banco-pessoa="${esc(p)}">${p !== 'Todos' ? `<span class="dot" style="--c:${corPessoa(p)}"></span>` : ''}${esc(p)}</button>`).join('')}</div></div>` : '';
   const log = (S.ofLog || [])[0], recente = log && Date.now() - log.ts < 36 * 3600e3;
   const msg = recente ? [log.saldo != null && `saldo atualizado para ${fmt.format(log.saldo)}`, log.compras && `${log.compras} ${log.compras === 1 ? 'compra lançada' : 'compras lançadas'} sozinhas no ${esc(log.lancadas.join(' e '))}`].filter(Boolean).join(' · ') : '';
-  return `<div class="tiles">${tiles.join('')}</div>
+  const grade = sel === 'Todos'
+    ? secoes.filter(x => x.t.length).map(x => `<div class="of-sec" style="--c:${corPessoa(x.p)}"><span class="dot"></span>${x.p === 'Eu' ? 'Minhas contas' : esc(x.p)}</div><div class="tiles">${x.t.join('')}</div>`).join('')
+    : `<div class="tiles">${tiles.join('') || '<div class="hint">Nenhuma conta para mostrar.</div>'}</div>`;
+  return `${seletor}${grade}
   ${msg ? `<div class="card" style="padding:10px 16px;margin:-4px 0 16px;font-size:13px;color:var(--text-2)"><b>Open Finance ${quandoBanco(log.ts)}:</b> ${msg}.</div>` : ''}`;
 }
 // ---------- avisos rápidos (no lugar de alert) e desfazer ----------
@@ -4541,6 +4637,16 @@ document.addEventListener('submit', e => {
 
 document.addEventListener('click', e => {
   const d = e.target.dataset || {};
+  const ofb = e.target.closest('[data-of-dono-set],[data-of-dono-outra],[data-of-dono-ok],[data-of-dono-cancela],[data-banco-pessoa]');
+  if (ofb) {
+    const od = ofb.dataset;
+    if (od.ofDonoSet) { const i = od.ofDonoSet.indexOf('|'); definirDono(od.ofDonoSet.slice(0, i), od.ofDonoSet.slice(i + 1)); }
+    else if (od.ofDonoOutra) { donoEditando = od.ofDonoOutra; render(); const inp = document.querySelector('[data-of-dono]'); if (inp) inp.focus(); }
+    else if (od.ofDonoOk) { const inp = document.querySelector(`[data-of-dono="${CSS.escape(od.ofDonoOk)}"]`); if (inp && inp.value.trim()) definirDono(od.ofDonoOk, inp.value); }
+    else if (od.ofDonoCancela) { donoEditando = null; render(); }
+    else if (od.bancoPessoa) { bancoPessoa = od.bancoPessoa; try { localStorage.setItem('financas.bancoPessoa', bancoPessoa); } catch (er) {} render(); }
+    return;
+  }
   if (e.target.closest('[data-limpar-busca]')) { filtroBusca = null; render(); return; }
   const fo = e.target.closest('[data-fundo]');
   if (fo) {
@@ -4727,18 +4833,7 @@ document.addEventListener('change', e => {
     if (usa) buscarBancos();
     return;
   }
-  if (e.target.dataset && e.target.dataset.ofDono) {
-    const g = e.target.dataset.ofDono, v = e.target.value.trim(), era = (S.ofDonos || {})[g] || '';
-    S.ofDonos = { ...(S.ofDonos || {}) };
-    if (v) S.ofDonos[g] = /^eu$/i.test(v) ? 'Eu' : v; else delete S.ofDonos[g];
-    // deixou de ser sua: as faturas dela que esperavam revisão saem da fila (a não ser que você marque o cartão)
-    const ids = new Set(((S.bancos || {}).contas || []).filter(c => c.itemId === g && !cartaoEmUso(c)).map(c => c.id));
-    S.faturasPendentes = (S.faturasPendentes || []).filter(x => !(String(x.id).startsWith('pluggy|') && ids.has(String(x.id).split('|')[2])));
-    salvar();
-    if (v && !/^eu$/i.test(v) && v !== era) toast(`Conexão de ${S.ofDonos[g]}: o saldo e os cartões dela só entram no app se você marcar.`);
-    buscarBancos();
-    return;
-  }
+  if (e.target.dataset && e.target.dataset.ofDono) { if (e.target.value.trim()) definirDono(e.target.dataset.ofDono, e.target.value); return; }
   if (e.target.dataset && e.target.dataset.ofConta) { S.ofSaldo = { ...(S.ofSaldo || {}), [e.target.dataset.ofConta]: e.target.checked }; salvar(); return; }
   if (e.target.dataset && e.target.dataset.pluggyBanco) { pluggy.bancos = { ...(pluggy.bancos || {}), [e.target.dataset.pluggyBanco]: e.target.value }; gravarPluggy(); buscarBancos(); return; }
   if (e.target.id === 'oc-orig') { abrirOcorrencia(e.target.dataset.fixo, e.target.value); return; }
