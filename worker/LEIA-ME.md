@@ -56,6 +56,17 @@ O deploy mostra o endereço do Worker, algo como `https://financas-pluggy.SEU-US
 
 Abra **Dados → Bancos (Open Finance)**, cole o endereço do Worker e o APP_TOKEN e clique em **Conectar**. Na lista de contas, confira se cada cartão está ligado ao cartão certo do app ("no app é o cartão").
 
+## Contas de outra pessoa (mulher, avó…)
+
+1. A pessoa cria a própria conta no Meu Pluggy e conecta os bancos dela (a autorização é no celular dela).
+2. No Dashboard, na mesma aplicação, conecte de novo o conector **MeuPluggy** entrando com o login dela. Anote o ID da conexão nova.
+3. Rode `npx wrangler secret put ITEM_IDS` com todos os IDs (os seus e os dela), separados por vírgula.
+4. No app, em **Dados → Bancos**, escreva de quem é a **Conexão** nova. Até você fazer isso, nada dela entra no app.
+
+Conta e cartão de outra pessoa começam fora do saldo e das faturas. Marque **entra no saldo** ou **uso este cartão** só no que você paga. Na tela inicial o cartão dela aparece com o nome da pessoa.
+
+O Meu Pluggy grátis é para uso pessoal. Confira os termos da Pluggy e tenha a concordância de cada pessoa antes de conectar.
+
 ## Se der erro
 
 - **"o token do app não confere"**: o token colado no app é diferente do APP_TOKEN do Worker.

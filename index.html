@@ -1117,10 +1117,16 @@ function fechamentoPluggy(banco, f) {
 }
 // Liga/desliga o que o app faz sozinho com os dados dos bancos (padrão: ligado)
 const ofAuto = k => (S.ofAuto || {})[k] !== false;
-// Cartão que veio do banco mas você não usa (adicional, virtual, antigo): não aparece e as faturas dele não chegam
-const cartaoEmUso = c => (S.ofCartaoFora || {})[c.id] !== true;
-// contas que entram no "saldo na conta": conta corrente sim, poupança/investimento só se você marcar
-const contaNoSaldo = c => { const m = (S.ofSaldo || {})[c.id]; return m != null ? m : c.tipo === 'conta' && !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`); };
+// De quem é cada conexão do Meu Pluggy (uma por pessoa): 'Eu' ou o nome. Conexão nova fica sem dono até você
+// dizer de quem é, e enquanto isso nada dela entra no app (nem saldo nem faturas).
+const donoDe = c => (S.ofDonos || {})[c.itemId] || '';
+const ehMeu = c => !c.itemId || /^eu$/i.test(donoDe(c));
+const rotuloDono = c => ehMeu(c) ? '' : donoDe(c) || 'sem dono';
+// Cartão que veio do banco mas você não usa (adicional, virtual, antigo): não aparece e as faturas dele não chegam.
+// Cartão de outra pessoa começa desmarcado; marque se é você quem paga.
+const cartaoEmUso = c => { const m = (S.ofCartaoFora || {})[c.id]; return m != null ? !m : ehMeu(c); };
+// contas que entram no "saldo na conta": conta corrente sua sim, poupança/investimento e contas de outra pessoa só se você marcar
+const contaNoSaldo = c => { const m = (S.ofSaldo || {})[c.id]; return m != null ? m : ehMeu(c) && c.tipo === 'conta' && !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`); };
 const isoLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const quandoBanco = ts => { const d = new Date(ts); if (!ts || isNaN(d)) return ''; const iso = isoLocal(d); return (iso === hoje() ? 'hoje' : iso === addDia(hoje(), -1) ? 'ontem' : ddmm(iso)) + ' às ' + d.toTimeString().slice(0, 5); };
 // Fatura que chegou do banco: se todas as compras já são conhecidas (lançamento, regra da loja, fixo ou
@@ -1143,7 +1149,12 @@ function reconhecerFatura(pd) {
 function aplicarPluggy(d) {
   const novas = [];
   const ultBill = c => (c.faturas || []).filter(f => f.vence && f.total != null).sort((a, b) => b.vence.localeCompare(a.vence))[0] || null;
-  S.bancos = { ts: d.gerado || new Date().toISOString(), contas: d.contas.map(c => ({ id: c.id, tipo: c.tipo, subtipo: c.subtipo || '', nome: c.nome, nomeBanco: c.nomeBanco || '', numero: c.numero || '',
+  // conexão que já mandava contas antes de existir o dono (ou a única conexão) é sua
+  const jaVistas = new Set(((S.bancos || {}).contas || []).filter(c => !c.itemId).map(c => c.id));
+  const itensD = [...new Set(d.contas.map(c => c.itemId).filter(Boolean))];
+  S.ofDonos = { ...(S.ofDonos || {}) };
+  for (const c of d.contas) if (c.itemId && !S.ofDonos[c.itemId] && (jaVistas.has(c.id) || itensD.length === 1)) S.ofDonos[c.itemId] = 'Eu';
+  S.bancos = { ts: d.gerado || new Date().toISOString(), contas: d.contas.map(c => ({ id: c.id, itemId: c.itemId || null, tipo: c.tipo, subtipo: c.subtipo || '', nome: c.nome, nomeBanco: c.nomeBanco || '', numero: c.numero || '',
     saldo: +c.saldo || 0, atualizado: c.atualizado || null,
     ...(c.tipo === 'cartao' ? { banco: bancoDaConta(c), credito: c.credito || null, fatura: ultBill(c) } : {}) })) };
   for (const c of d.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c))) {
@@ -1171,7 +1182,7 @@ function aplicarPluggy(d) {
     }
   }
   S.faturasPendentes = (S.faturasPendentes || []).filter(p => !String(p.id).startsWith('pluggy|')).concat(novas);
-  const r = { compras: 0, lancadas: [], revisar: 0, saldo: null };
+  const r = { compras: 0, lancadas: [], revisar: 0, saldo: null, semDono: itensD.filter(i => !S.ofDonos[i]).length };
   for (const pd of novas) {   // fechadas antes da aberta (já estão em ordem de vencimento por cartão)
     const n = reconhecerFatura(pd);
     if (n == null) r.revisar++;
@@ -1204,6 +1215,7 @@ async function buscarBancos() {
       res.saldo != null && `saldo atualizado para ${fmt.format(res.saldo)}`,
       res.compras && `${res.compras} ${res.compras === 1 ? 'compra lançada' : 'compras lançadas'} sozinhas no ${res.lancadas.join(' e ')}`,
       res.revisar && `${res.revisar} ${res.revisar === 1 ? 'fatura' : 'faturas'} para revisar em Importar fatura`,
+      res.semDono && `${res.semDono === 1 ? 'conexão nova' : res.semDono + ' conexões novas'}: diga de quem é em Dados → Bancos`,
     ].filter(Boolean).join(' · ') || 'nada novo');
     salvar();
   } catch (e) {
@@ -1225,7 +1237,9 @@ function cardBancos() {
     <p class="hint">O token fica salvo só neste navegador. O Client Secret da Pluggy nunca passa por aqui.</p>
   </div>`;
   const cartoes = [...new Set([...cartoesUsados(), ...Object.keys(LEITORES)])];
-  const linhas = ((S.bancos || {}).contas || pluggy.contas || []).map(c => {
+  const todas = (S.bancos || {}).contas || pluggy.contas || [];
+  const grupos = [...new Set(todas.map(c => c.itemId || ''))];
+  const linha = c => {
     const b = c.tipo === 'cartao' ? bancoDaConta(c) : '', cr = c.credito || {};
     return `<div class="row" style="align-items:center;justify-content:space-between;padding:6px 0">
     <div><b>${esc(c.nome)}</b>${c.numero ? ` <span class="hint" style="margin:0">· ${esc(String(c.numero).slice(-4))}</span>` : ''}
@@ -1234,7 +1248,16 @@ function cardBancos() {
       ? `<label class="hint" style="margin:0;flex:0 0 auto" title="Desmarque o cartão que você não usa: ele some da tela inicial e as faturas dele deixam de chegar"><input type="checkbox" data-of-cartao="${esc(c.id)}" ${cartaoEmUso(c) ? 'checked' : ''}> uso este cartão</label><label class="hint" style="margin:0;flex:0 0 auto${cartaoEmUso(c) ? '' : ';opacity:.45'}">no app é o cartão <select data-pluggy-banco="${esc(c.id)}">${cartoes.map(x => `<option ${x === b ? 'selected' : ''}>${esc(x)}</option>`).join('')}${cartoes.includes(b) ? '' : `<option selected>${esc(b)}</option>`}</select></label>`
       : `<label class="hint" style="margin:0;flex:0 0 auto"><input type="checkbox" data-of-conta="${esc(c.id)}" ${contaNoSaldo(c) ? 'checked' : ''}> entra no saldo</label>`}
   </div>`;
-  }).join('');
+  };
+  const nomesDono = [...new Set(['Eu', ...Object.values(S.ofDonos || {})].filter(Boolean))];
+  const linhas = grupos.length > 1 || grupos[0] && !ehMeu(todas[0]) ? grupos.map((g, i) => {
+    const cs = todas.filter(c => (c.itemId || '') === g), dono = g ? (S.ofDonos || {})[g] || '' : 'Eu';
+    return `<div class="of-grupo" style="border-top:1px solid var(--line, rgba(127,127,127,.25));padding-top:8px;margin-top:${i ? 10 : 0}px">
+      <label class="hint" style="margin:0 0 2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>Conexão ${i + 1}</b> · de quem é:
+        ${g ? `<input data-of-dono="${esc(g)}" list="of-donos" value="${esc(dono)}" placeholder="Eu, ou o nome" style="width:160px;padding:4px 8px">` : '<b>Eu</b>'}
+        ${g && !dono ? '<span style="color:var(--bad, #c0392b)">nada desta conexão entra no app até você dizer de quem é</span>' : g && !/^eu$/i.test(dono) ? '<span>só entra no app o que você marcar</span>' : ''}</label>
+      ${cs.map(linha).join('')}</div>`;
+  }).join('') + `<datalist id="of-donos">${nomesDono.map(n => `<option value="${esc(n)}">`).join('')}</datalist>` : todas.map(linha).join('');
   return `
   <div class="card"><h2>Bancos (Open Finance)</h2>
     <p class="hint" style="margin:0 0 8px">Conectado ao Worker <b>${esc(pluggy.url.replace(/^https?:\/\//, ''))}</b>. O app busca ao abrir e de novo quando passa de 4 h (os bancos atualizam no Meu Pluggy uma vez por dia). Fatura que você já importou não volta.</p>
@@ -1597,7 +1620,7 @@ function cardBancosAgora() {
   if (contas.length) {
     const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
     const dif = Math.abs(soma - S.saldoAtual) >= 0.01;
-    tiles.push(tile('Saldo no banco', fmt.format(soma), 'carteira', 'var(--good)', `<div class="sub2">${contas.length > 1 ? esc(contas.map(c => c.nome).join(' + ')) + ' · ' : ''}${quandoBanco(ts)}</div>
+    tiles.push(tile('Saldo no banco', fmt.format(soma), 'carteira', 'var(--good)', `<div class="sub2">${contas.length > 1 || contas.some(c => !ehMeu(c)) ? esc(contas.map(c => c.nome + (ehMeu(c) ? '' : ` (${rotuloDono(c)})`)).join(' + ')) + ' · ' : ''}${quandoBanco(ts)}</div>
       ${dif ? `<div class="sub2">no app: ${fmt.format(S.saldoAtual)} · <button class="link" data-pluggy-saldo="${soma}">usar o do banco</button></div>` : '<div class="sub2">✓ igual ao saldo do app</div>'}`));
   }
   for (const c of cartoes) {
@@ -1605,7 +1628,7 @@ function cardBancosAgora() {
     const disp = cr.disponivel != null ? +cr.disponivel : lim != null ? r2(lim - c.saldo) : null;
     const usado = lim != null && disp != null ? r2(lim - disp) : c.saldo, pct = lim ? Math.max(0, Math.min(100, usado / lim * 100)) : 0;
     const f = c.fatura, aPagar = f && f.vence >= hoje() && !(S.faturasPagas || {})[c.banco + '|' + f.vence];
-    tiles.push(tile(`Limite livre · ${esc(c.banco)}`, disp != null ? fmt.format(disp) : '—', 'cartao', corCartao(c.banco), `
+    tiles.push(tile(`Limite livre · ${esc(c.banco)}${ehMeu(c) ? '' : ` · ${esc(rotuloDono(c))}`}`, disp != null ? fmt.format(disp) : '—', 'cartao', corCartao(c.banco), `
       ${lim ? `<div class="medidor-lim" style="--c:${corCartao(c.banco)}"><i style="width:${pct}%"></i></div><div class="sub2">usado ${fmt.format(usado)} de ${fmt.format(lim)} (${Math.round(pct)}%)</div>` : `<div class="sub2">usado ${fmt.format(usado)}</div>`}
       ${aPagar ? `<div class="sub2">fatura fechada: <b>${fmt.format(f.total)}</b> · vence ${ddmm(f.vence)}</div>` : cr.vence && cr.vence >= hoje() ? `<div class="sub2">próximo vencimento ${ddmm(cr.vence)}</div>` : ''}`));
   }
@@ -4695,6 +4718,18 @@ document.addEventListener('change', e => {
     salvar();
     toast(usa ? 'Cartão de volta: as faturas dele chegam na próxima busca nos bancos.' : 'Cartão escondido: não aparece mais e as faturas dele deixam de chegar.');
     if (usa) buscarBancos();
+    return;
+  }
+  if (e.target.dataset && e.target.dataset.ofDono) {
+    const g = e.target.dataset.ofDono, v = e.target.value.trim(), era = (S.ofDonos || {})[g] || '';
+    S.ofDonos = { ...(S.ofDonos || {}) };
+    if (v) S.ofDonos[g] = /^eu$/i.test(v) ? 'Eu' : v; else delete S.ofDonos[g];
+    // deixou de ser sua: as faturas dela que esperavam revisão saem da fila (a não ser que você marque o cartão)
+    const ids = new Set(((S.bancos || {}).contas || []).filter(c => c.itemId === g && !cartaoEmUso(c)).map(c => c.id));
+    S.faturasPendentes = (S.faturasPendentes || []).filter(x => !(String(x.id).startsWith('pluggy|') && ids.has(String(x.id).split('|')[2])));
+    salvar();
+    if (v && !/^eu$/i.test(v) && v !== era) toast(`Conexão de ${S.ofDonos[g]}: o saldo e os cartões dela só entram no app se você marcar.`);
+    buscarBancos();
     return;
   }
   if (e.target.dataset && e.target.dataset.ofConta) { S.ofSaldo = { ...(S.ofSaldo || {}), [e.target.dataset.ofConta]: e.target.checked }; salvar(); return; }
