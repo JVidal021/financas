@@ -2565,6 +2565,7 @@ let impFuturas = true;   // lançar próximas parcelas como planejadas
 // Categoria pelo nome da loja (sem acento, maiúsculas). A primeira regra que casar vale, então a ordem importa:
 // drogaria antes de perfumaria, Shopee/Shein antes de "moda", Mercado Livre antes de mercado, fast food antes de padaria.
 const PALPITES = [
+  [/KIMBERLY|KIMBERLYDIK|\bKIM\b/, 'Kim'],   // o que vai para a Kim ou é dela (Pix, Mercado Pago, celular, passagem)
   [/UBER|99 RIDE|99 L2L|RIOCARD|MOBI|POSTO|COMBUST|SHELL|IPIRANGA|ESTACIONA/, 'Transporte'],
   [/DROGARI|FARMA|\bOTICA|CLINIC|LABORAT|HOSPITAL|DENTIST|ODONTO/, 'Saúde'],
   [/BOTICARIO|NATURA|EUDORA|AVON|SEPHORA|PERFUM|COSMETIC|SALAO|BARBEAR|BARBEARIA|MANICURE|BELEZA|BELA FERRAZ/, 'Beleza'],
@@ -2593,20 +2594,20 @@ const palpiteCat = desc => (PALPITES.find(([re]) => re.test(semAcentoMai(desc)))
 const ORIGEM_CAT = {
   'Fast food': ['Alimentação', 'Outros'], 'Compras online': ['Compras', 'Outros'], 'Roupas': ['Compras', 'Outros'],
   'Jogos': ['Lazer', 'Outros', 'Compras', 'Assinaturas'], 'Beleza': ['Saúde', 'Compras', 'Outros'],
-  'Presentes': ['Outros', 'Compras'], 'Família': ['Outros'],
+  'Presentes': ['Outros', 'Compras'], 'Família': ['Outros'], 'Kim': ['Outros', 'Celular', 'Transporte'],
 };
 function migrarCategorias() {
-  if ((S.migCats || 0) >= 1) return 0;
+  if ((S.migCats || 0) >= 2) return 0;   // 1: categorias novas; 2: Kim (rodar de novo é seguro: só move a partir das de origem)
   entenderVaiEVolta();
   const novas = Object.keys(ORIGEM_CAT);
   for (const c of novas) if (!S.cats.includes(c)) { const i = S.cats.indexOf('Outros'); i >= 0 ? S.cats.splice(i, 0, c) : S.cats.push(c); }
   let n = 0;
   const troca = x => { const nova = palpiteCat(x.desc); if (ORIGEM_CAT[nova] && ORIGEM_CAT[nova].includes(x.cat)) { x.cat = nova; n++; } };
-  S.lanc.forEach(l => { if (l.tipo === 'despesa' && !ehVaiEVolta(l)) troca(l); });
+  S.lanc.forEach(l => { if (l.tipo === 'despesa' && !ehVaiEVolta(l) && !l.pagamentoFatura) troca(l); });
   S.fixos.forEach(f => { if (f.tipo === 'despesa') troca(f); });
   for (const [desc, r] of Object.entries(S.regras || {})) if (r && r.cat) { const x = { desc, cat: r.cat }; troca(x); r.cat = x.cat; }
   for (const pd of S.faturasPendentes || []) (pd.itens || []).forEach(it => it.cat && troca(it));
-  S.migCats = 1;
+  S.migCats = 2;
   return n || 1;
 }
 
