@@ -443,6 +443,34 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .empty { color: var(--muted); text-align: center; padding: 28px 0; }
 
 /* importação de fatura */
+/* Tela inicial: card Bancos */
+.bk .bk-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.bk .bk-cab h2 { margin: 0; }
+.bk-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+.bk-sec { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 650; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; margin-top: 6px; }
+.bk-sec:first-child { margin-top: 0; }
+.bk-sec .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.bk-item { display: grid; grid-template-columns: auto 1fr auto; column-gap: 12px; row-gap: 8px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--edge); }
+.bk-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
+.bk-ic svg.i { width: 17px; height: 17px; }
+.bk-nome { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; }
+.bk-nome b { font-weight: 650; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.bk-sub { flex-basis: 100%; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.bk-sub b { color: var(--text); font-weight: 650; }
+.bk-dono { font-size: 11.5px; font-weight: 650; padding: 1px 8px; border-radius: 99px; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
+.bk-val { text-align: right; }
+.bk-val b { display: block; font-family: var(--f-num); font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; }
+.bk-val span { font-size: 11.5px; color: var(--muted); }
+.bk-barra { grid-column: 1 / -1; height: 6px; border-radius: 99px; background: var(--grid); overflow: hidden; }
+.bk-barra i { display: block; height: 100%; border-radius: 99px; background: var(--c); }
+.bk-barra.alto i { background: var(--crit); }
+.bk-uso { grid-column: 1 / -1; display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: -4px; font-variant-numeric: tabular-nums; }
+.bk-aviso { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 12px; border-radius: 12px; font-size: 13px; color: var(--text-2); background: color-mix(in srgb, var(--warn) 10%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent); }
+.bk-aviso > svg.i { width: 16px; height: 16px; color: var(--warn); flex: none; }
+.bk-aviso span { flex: 1 1 200px; }
+.bk-log { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; font-size: 12.5px; color: var(--muted); }
+.bk-log svg.i { width: 14px; height: 14px; flex: none; }
+@media (max-width: 640px) { .bk-lista { grid-template-columns: 1fr; gap: 8px; } .bk-item { padding: 11px 12px; } .bk .bk-cab .bk-seg { width: 100%; } .bk .bk-cab .bk-seg button { flex: 1; } }
 /* Bancos (Open Finance): pessoa de cada conexão, contas e interruptores */
 .of-pessoa { --c: var(--accent); border: 1px solid var(--edge); background: var(--surface-2); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
 .of-pessoa.nova { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 7%, var(--surface-2)); }
@@ -475,12 +503,6 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .of-auto .sw { align-items: flex-start; }
 .of-auto .sw .t { margin-top: 1px; }
 .of-auto .sw > span:last-child { line-height: 1.45; }
-.of-pessoas { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
-.of-pessoas .lbl { font-size: 13px; font-weight: 650; color: var(--text-2); }
-.of-pessoas .seg .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c); margin-right: 6px; vertical-align: 1px; }
-.of-pessoas .seg button.on .dot { background: #fff; }
-.of-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--text-2); margin: 6px 0 8px; }
-.of-sec .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
 .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--edge); border-radius: 11px; padding: 2px; gap: 2px; }
 .seg button { font: inherit; font-size: 13px; font-weight: 600; border: 0; background: none; color: var(--text-2); padding: 5px 10px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
 .seg button:hover { color: var(--text); }
@@ -1123,7 +1145,10 @@ let pluggy = (() => { try { return JSON.parse(localStorage.getItem(PLUGGY_KEY));
 let pluggyStatus = '';
 const gravarPluggy = () => { try { if (pluggy) localStorage.setItem(PLUGGY_KEY, JSON.stringify(pluggy)); else localStorage.removeItem(PLUGGY_KEY); } catch (e) {} };
 const NOMES_BANCO = [[/ita[uú]|itaucard/i, 'Itaú'], [/santander/i, 'Santander'], [/nubank|nu pagamentos/i, 'Nubank'], [/bradesco/i, 'Bradesco']];
-let _contasPluggy = null;   // contas da última busca (para achar o banco de um cartão pelo resto da conexão)
+let _contasPluggy = null;
+// Cartão de outra pessoa que você paga inteiro (ex.: o da Kim): no app, todas as compras dele são suas (nenhuma dividida).
+// Cartão em que você divide compras (ex.: um que outra pessoa também usa) segue pedindo revisão das lojas novas.
+const cartaoTudoMeu = (c, banco) => !ehMeu(c) && cartaoEmUso(c) && !S.lanc.some(l => l.cartao === banco && l.tipo === 'despesa' && l.share != null && l.share !== 1);   // contas da última busca (para achar o banco de um cartão pelo resto da conexão)
 const bancoPeloNome = t => (NOMES_BANCO.find(([re]) => re.test(t)) || [])[1] || null;
 const bancoDaConta = c => {
   const salvo = (pluggy.bancos || {})[c.id];
@@ -1229,7 +1254,7 @@ function aplicarPluggy(d) {
     ...(c.tipo === 'cartao' ? { banco: bancoDaConta(c), credito: c.credito || null, fatura: ultBill(c) } : {}) })),
     conexoes: (d.conexoes || []).map(x => ({ itemId: x.itemId, status: x.status, execucao: x.execucao, conector: x.conector, consenteAte: x.consenteAte, erro: x.erro, contas: x.contas })) };
   for (const c of d.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c))) {
-    const banco = bancoDaConta(c), tudoMeu = !ehMeu(c) ? { tudoMeu: true } : {};
+    const banco = bancoDaConta(c), tudoMeu = cartaoTudoMeu(c, banco) ? { tudoMeu: true } : {};
     const fechadas = S.faturas.filter(f => f.banco === banco && !f.aberta);
     const ultVenc = fechadas.reduce((m, f) => f.vencimento > m ? f.vencimento : m, '');
     let ultFech = fechadas.reduce((m, f) => f.fechamento > m ? f.fechamento : m, '');
@@ -1272,6 +1297,30 @@ function aplicarPluggy(d) {
   }
   if (r.compras || r.saldo != null) S.ofLog = [{ ts: Date.now(), compras: r.compras, lancadas: r.lancadas, saldo: r.saldo }].concat(S.ofLog || []).slice(0, 10);
   return r;
+}
+// Fila "Faturas para revisar" vinda dos bancos: refaz com as regras atuais (cartão certo, já importada, tudo meu)
+// e lança sozinho o que não precisa de você. Roda ao abrir o app.
+function reprocessarFilaPluggy() {
+  const contas = (S.bancos || {}).contas || [];
+  contas.forEach(c => { if (c.tipo === 'cartao') c.banco = bancoDaConta(c); });   // nome do cartão no app com as regras atuais
+  const fila = (S.faturasPendentes || []).filter(p => String(p.id).startsWith('pluggy|'));
+  if (!fila.length) return 0;
+  const novas = [];
+  for (const pd of fila) {
+    const id = String(pd.id).split('|')[2], c = contas.find(x => x.id === id);
+    if (!c || c.tipo !== 'cartao' || !cartaoEmUso(c)) continue;   // cartão desligado ou que sumiu: sai da fila
+    const banco = bancoDaConta(c);
+    const ultVenc = S.faturas.filter(f => f.banco === banco && !f.aberta).reduce((m, f) => f.vencimento > m ? f.vencimento : m, '');
+    if (!pd.aberta && ultVenc && pd.vencimento <= addDia(ultVenc, 7)) continue;   // já importada (PDF ou revisão)
+    novas.push({ ...pd, banco, id: `pluggy|${banco}|${id}|${pd.aberta ? 'aberta' : pd.vencimento}`, tudoMeu: cartaoTudoMeu(c, banco) || undefined, semMarca: undefined, naoBate: undefined });
+  }
+  novas.sort((a, b) => (a.aberta ? 1 : 0) - (b.aberta ? 1 : 0) || String(a.vencimento).localeCompare(String(b.vencimento)));
+  S.faturasPendentes = (S.faturasPendentes || []).filter(p => !String(p.id).startsWith('pluggy|')).concat(novas);
+  let lancadas = 0;
+  for (const pd of novas) if (reconhecerFatura(pd) != null) lancadas++;
+  const mudou = novas.length !== fila.length || lancadas;
+  if (mudou) salvar();
+  return fila.length - S.faturasPendentes.filter(p => String(p.id).startsWith('pluggy|')).length;
 }
 let buscandoBancos = false;
 async function buscarBancos() {
@@ -1702,57 +1751,69 @@ function itensPrevistos(m) {
 // Mesmo período do mês anterior (até o mesmo dia), para comparar com o mês atual ainda em andamento
 const reaisAteODia = (m, dia) => itensReais(m).filter(i => i.quando.slice(8) <= dia);
 
-// Tela inicial: o que os bancos dizem agora (saldo real, limite de cada cartão, fatura fechada).
+// Tela inicial: um card "Bancos" com uma linha por cartão/conta (limite livre, uso, fatura fechada).
 // Com contas de mais de uma pessoa, um seletor mostra as de cada uma (ou todas, separadas por pessoa).
+// O seu saldo no banco já aparece no card principal; aqui só aparece se for diferente do app.
 let bancoPessoa = (() => { try { return localStorage.getItem('financas.bancoPessoa') || 'Eu'; } catch (e) { return 'Eu'; } })();
+const nomeConta = c => { const b = bancoPeloNome(`${c.nome} ${c.nomeBanco || ''}`), pp = /SAVINGS|POUPAN/i.test(`${c.subtipo || ''} ${c.nome || ''}`); return b ? (pp ? 'Poupança ' : 'Conta ') + b : c.nome; };
 function cardBancosAgora() {
   const b = S.bancos;
   if (!b || !(b.contas || []).length) return '';
   const pessoas = pessoasBancos();
   const sel = pessoas.length > 1 && (bancoPessoa === 'Todos' || pessoas.includes(bancoPessoa)) ? bancoPessoa : 'Eu';
-  const tiles = [], vistos = new Set();
-  const tileCartao = c => {
-    if (vistos.has(c.id)) return; vistos.add(c.id);
+  const vistos = new Set();
+  let secao = 'Eu';   // na seção "Eu", cartão de outra pessoa que você usa leva uma etiqueta com o nome dela
+  const dono = c => !ehMeu(c) && secao === 'Eu' ? `<span class="bk-dono" style="--c:${corPessoa(pessoaDe(c))}">${esc(rotuloDono(c))}</span>` : '';
+  const linhaCartao = c => {
+    if (vistos.has(c.id)) return ''; vistos.add(c.id);
     const cr = c.credito || {}, lim = cr.limite != null ? +cr.limite : null;
     const disp = cr.disponivel != null ? +cr.disponivel : lim != null ? r2(lim - c.saldo) : null;
     const usado = lim != null && disp != null ? r2(lim - disp) : c.saldo, pct = lim ? Math.max(0, Math.min(100, usado / lim * 100)) : 0;
-    const banco = c.banco || bancoDaConta(c), f = c.fatura, aPagar = f && f.vence >= hoje() && !(S.faturasPagas || {})[banco + '|' + f.vence];
-    const quem = rotuloDono(c), cor = ehMeu(c) ? corCartao(banco) : corPessoa(pessoaDe(c));
-    tiles.push(tile(`Limite livre · ${esc(ehMeu(c) ? banco : c.nome)}${quem ? ` · ${esc(quem)}` : ''}`, disp != null ? fmt.format(disp) : '—', 'cartao', cor, `
-      ${lim ? `<div class="medidor-lim" style="--c:${cor}"><i style="width:${pct}%"></i></div><div class="sub2">usado ${fmt.format(usado)} de ${fmt.format(lim)} (${Math.round(pct)}%)</div>` : `<div class="sub2">usado ${fmt.format(usado)}</div>`}
-      ${aPagar ? `<div class="sub2">fatura fechada: <b>${fmt.format(f.total)}</b> · vence ${ddmm(f.vence)}</div>` : cr.vence && cr.vence >= hoje() ? `<div class="sub2">próximo vencimento ${ddmm(cr.vence)}</div>` : ''}`));
+    const banco = bancoDaConta(c), f = c.fatura, aPagar = f && f.vence >= hoje() && !(S.faturasPagas || {})[banco + '|' + f.vence];
+    const cor = ehMeu(c) ? corCartao(banco) : corPessoa(pessoaDe(c));
+    const alto = pct >= 90 ? ' alto' : '';
+    return `<div class="bk-item" style="--c:${cor}">
+      <span class="bk-ic">${ico('cartao')}</span>
+      <div class="bk-nome"><b>${esc(banco)}</b>${dono(c)}<span class="bk-sub">${aPagar ? `fatura fechada <b>${fmt.format(f.total)}</b> · vence ${ddmm(f.vence)}` : cr.vence && cr.vence >= hoje() ? `vence ${ddmm(cr.vence)}` : 'cartão'}</span></div>
+      <div class="bk-val"><b>${disp != null ? fmt.format(disp) : '—'}</b><span>livre</span></div>
+      ${lim ? `<div class="bk-barra${alto}" title="usado ${fmt.format(usado)} de ${fmt.format(lim)}"><i style="width:${pct}%"></i></div><div class="bk-uso">usado ${fmt.format(usado)} de ${fmt.format(lim)}<span>${Math.round(pct)}%</span></div>` : ''}
+    </div>`;
   };
+  const linhaConta = (c, cor) => `<div class="bk-item" style="--c:${cor}">
+      <span class="bk-ic">${ico('carteira')}</span>
+      <div class="bk-nome"><b>${esc(nomeConta(c))}</b>${dono(c)}<span class="bk-sub">${c.atualizado ? 'atualizado ' + quandoBanco(c.atualizado) : 'conta'}</span></div>
+      <div class="bk-val"><b>${fmt.format(c.saldo || 0)}</b><span>saldo</span></div></div>`;
+  let aviso = '';
   const blocoPessoa = p => {
+    secao = p;
     if (p === 'Eu') {
-      // o seu: as contas ligadas em "Entra no meu saldo" e os cartões que você usa (inclusive de outra pessoa que você paga)
       const contas = b.contas.filter(contaNoSaldo);
       if (contas.length) {
-        const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
-        const dif = Math.abs(soma - S.saldoAtual) >= 0.01;
-        tiles.push(tile(pessoas.length > 1 ? 'Meu saldo no banco' : 'Saldo no banco', fmt.format(soma), 'carteira', 'var(--good)', `<div class="sub2">${contas.length > 1 ? esc(contas.map(c => c.nome).join(' + ')) + ' · ' : ''}${quandoBanco(ts)}</div>
-          ${dif ? `<div class="sub2">no app: ${fmt.format(S.saldoAtual)} · <button class="link" data-pluggy-saldo="${soma}">usar o do banco</button></div>` : '<div class="sub2">✓ igual ao saldo do app</div>'}`));
+        const soma = r2(contas.reduce((a, c) => a + c.saldo, 0));
+        if (Math.abs(soma - S.saldoAtual) >= 0.01) aviso = `<div class="bk-aviso">${ico('alerta')}<span>O banco diz <b>${fmt.format(soma)}</b> na sua conta e o app está com ${fmt.format(S.saldoAtual)}.</span><button class="btn mini primary" data-pluggy-saldo="${soma}">Usar o do banco</button></div>`;
       }
-      b.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c)).forEach(tileCartao);
-      return;
+      // a sua conta já aparece no card principal; aqui só se você tiver mais de uma (para ver cada uma)
+      return (contas.length > 1 ? contas.map(c => linhaConta(c, 'var(--good)')).join('') : '')
+        + b.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c)).map(linhaCartao).join('');
     }
-    // outra pessoa: só para ver (não mexe no seu saldo); conta corrente dela e os cartões que não foram escondidos
     const dela = b.contas.filter(c => pessoaDe(c) === p);
-    const contas = dela.filter(c => c.tipo === 'conta' && !/SAVINGS|POUPAN|INVEST/i.test(`${c.subtipo || ''} ${c.nome || ''}`));
-    if (contas.length) {
-      const soma = r2(contas.reduce((a, c) => a + c.saldo, 0)), ts = Math.max(...contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
-      tiles.push(tile(`Saldo no banco · ${esc(p)}`, fmt.format(soma), 'carteira', corPessoa(p), `<div class="sub2">${esc(contas.map(c => c.nome).join(' + '))} · ${quandoBanco(ts)}</div>`));
-    }
-    dela.filter(c => c.tipo === 'cartao' && (S.ofCartaoFora || {})[c.id] !== true).forEach(tileCartao);
+    return dela.filter(c => c.tipo === 'conta').map(c => linhaConta(c, corPessoa(p))).join('')
+      + dela.filter(c => c.tipo === 'cartao' && (S.ofCartaoFora || {})[c.id] !== true).map(linhaCartao).join('');
   };
-  const secoes = (sel === 'Todos' ? pessoas : [sel]).map(p => { const ini = tiles.length; blocoPessoa(p); return { p, t: tiles.slice(ini) }; });
-  const seletor = pessoas.length > 1 ? `<div class="of-pessoas"><span class="lbl">Bancos</span><div class="seg" role="tablist" aria-label="De quem são as contas">${[...pessoas, 'Todos'].map(p => `<button role="tab" aria-selected="${p === sel}" class="${p === sel ? 'on' : ''}" data-banco-pessoa="${esc(p)}">${p !== 'Todos' ? `<span class="dot" style="--c:${corPessoa(p)}"></span>` : ''}${esc(p)}</button>`).join('')}</div></div>` : '';
+  const corpo = (sel === 'Todos' ? pessoas : [sel]).map(p => {
+    const h = blocoPessoa(p);
+    return h && sel === 'Todos' ? `<div class="bk-sec" style="--c:${corPessoa(p)}"><span class="dot"></span>${p === 'Eu' ? 'Minhas contas' : esc(p)}</div>${h}` : h;
+  }).join('');
+  const ts = Math.max(...b.contas.map(c => Date.parse(c.atualizado || b.ts) || 0));
+  const seletor = pessoas.length > 1 ? `<div class="seg bk-seg" role="tablist" aria-label="De quem são as contas">${[...pessoas, 'Todos'].map(p => `<button role="tab" aria-selected="${p === sel}" class="${p === sel ? 'on' : ''}" data-banco-pessoa="${esc(p)}">${esc(p)}</button>`).join('')}</div>` : '';
   const log = (S.ofLog || [])[0], recente = log && Date.now() - log.ts < 36 * 3600e3;
   const msg = recente ? [log.saldo != null && `saldo atualizado para ${fmt.format(log.saldo)}`, log.compras && `${log.compras} ${log.compras === 1 ? 'compra lançada' : 'compras lançadas'} sozinhas no ${esc(log.lancadas.join(' e '))}`].filter(Boolean).join(' · ') : '';
-  const grade = sel === 'Todos'
-    ? secoes.filter(x => x.t.length).map(x => `<div class="of-sec" style="--c:${corPessoa(x.p)}"><span class="dot"></span>${x.p === 'Eu' ? 'Minhas contas' : esc(x.p)}</div><div class="tiles">${x.t.join('')}</div>`).join('')
-    : `<div class="tiles">${tiles.join('') || '<div class="hint">Nenhuma conta para mostrar.</div>'}</div>`;
-  return `${seletor}${grade}
-  ${msg ? `<div class="card" style="padding:10px 16px;margin:-4px 0 16px;font-size:13px;color:var(--text-2)"><b>Open Finance ${quandoBanco(log.ts)}:</b> ${msg}.</div>` : ''}`;
+  return `<div class="card bk">
+    <div class="bk-cab"><h2>${ico('cartao')} Bancos <span class="sub">· ${quandoBanco(ts) || 'Open Finance'}</span></h2>${seletor}</div>
+    ${aviso}
+    <div class="bk-lista">${corpo || '<p class="hint">Nada para mostrar aqui.</p>'}</div>
+    ${msg ? `<p class="bk-log">${ico('repete')} ${msg}.</p>` : ''}
+  </div>`;
 }
 // ---------- avisos rápidos (no lugar de alert) e desfazer ----------
 // Fica na camada de cima do navegador (popover) para aparecer também sobre os diálogos.
@@ -4937,7 +4998,7 @@ window.addEventListener('resize', () => {
   larguraAnt = innerWidth; clearTimeout(rz); rz = setTimeout(desenharGraficos, 150);
 });
 // ao voltar para o app (ex.: depois de usar no celular), busca o que mudou
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) Promise.resolve(puxar()).finally(() => { if (bancosVelhos()) buscarBancos(); }); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) Promise.resolve(puxar()).finally(() => { try { reprocessarFilaPluggy(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); }); });
 window.addEventListener('beforeunload', e => { if (timerEnvio) { enviar(); e.preventDefault(); } });
 
 function exemplo() {
@@ -4967,7 +5028,7 @@ function exemplo() {
 
 render();
 // depois de sincronizar, busca nos bancos (se a última busca tem mais de 4 h)
-Promise.resolve(puxar()).finally(() => { if (bancosVelhos()) buscarBancos(); });
+Promise.resolve(puxar()).finally(() => { try { reprocessarFilaPluggy(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); });
 </script>
 </body>
 </html>
