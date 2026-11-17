@@ -1123,7 +1123,17 @@ let pluggy = (() => { try { return JSON.parse(localStorage.getItem(PLUGGY_KEY));
 let pluggyStatus = '';
 const gravarPluggy = () => { try { if (pluggy) localStorage.setItem(PLUGGY_KEY, JSON.stringify(pluggy)); else localStorage.removeItem(PLUGGY_KEY); } catch (e) {} };
 const NOMES_BANCO = [[/ita[uú]|itaucard/i, 'Itaú'], [/santander/i, 'Santander'], [/nubank|nu pagamentos/i, 'Nubank'], [/bradesco/i, 'Bradesco']];
-const bancoDaConta = c => (pluggy.bancos || {})[c.id] || (NOMES_BANCO.find(([re]) => re.test(`${c.nome} ${c.nomeBanco || ''}`)) || [, c.nome])[1];
+let _contasPluggy = null;   // contas da última busca (para achar o banco de um cartão pelo resto da conexão)
+const bancoPeloNome = t => (NOMES_BANCO.find(([re]) => re.test(t)) || [])[1] || null;
+const bancoDaConta = c => {
+  const salvo = (pluggy.bancos || {})[c.id];
+  if (salvo && salvo !== c.nome) return salvo;   // "no app é o cartão" escolhido por você (o nome cru do cartão não conta)
+  const proprio = bancoPeloNome(`${c.nome} ${c.nomeBanco || ''}`);
+  if (proprio) return proprio;
+  const irmaos = [...new Set((_contasPluggy || (S.bancos || {}).contas || []).filter(x => x.itemId && x.itemId === c.itemId && x.id !== c.id)
+    .map(x => bancoPeloNome(`${x.nome} ${x.nomeBanco || ''}`)).filter(Boolean))];
+  return irmaos.length === 1 ? irmaos[0] : salvo || c.nome;
+};
 const chavePendente = x => `${x.desc}|${r2(x.valor)}|${x.data}|${x.parc ? x.parc.N : ''}|${x.parc ? x.parc.n : ''}`;
 
 // transação do cartão → item de fatura (compra positiva, estorno negativo; pagamento da fatura fica de fora)
@@ -1208,6 +1218,7 @@ function reconhecerFatura(pd) {
 function aplicarPluggy(d) {
   const novas = [];
   const ultBill = c => (c.faturas || []).filter(f => f.vence && f.total != null).sort((a, b) => b.vence.localeCompare(a.vence))[0] || null;
+  _contasPluggy = d.contas;
   // conexão que já mandava contas antes de existir o dono (ou a única conexão) é sua
   const jaVistas = new Set(((S.bancos || {}).contas || []).filter(c => !c.itemId).map(c => c.id));
   const itensD = [...new Set(d.contas.map(c => c.itemId).filter(Boolean))];
@@ -1218,7 +1229,7 @@ function aplicarPluggy(d) {
     ...(c.tipo === 'cartao' ? { banco: bancoDaConta(c), credito: c.credito || null, fatura: ultBill(c) } : {}) })),
     conexoes: (d.conexoes || []).map(x => ({ itemId: x.itemId, status: x.status, execucao: x.execucao, conector: x.conector, consenteAte: x.consenteAte, erro: x.erro, contas: x.contas })) };
   for (const c of d.contas.filter(c => c.tipo === 'cartao' && cartaoEmUso(c))) {
-    const banco = bancoDaConta(c);
+    const banco = bancoDaConta(c), tudoMeu = !ehMeu(c) ? { tudoMeu: true } : {};
     const fechadas = S.faturas.filter(f => f.banco === banco && !f.aberta);
     const ultVenc = fechadas.reduce((m, f) => f.vencimento > m ? f.vencimento : m, '');
     let ultFech = fechadas.reduce((m, f) => f.fechamento > m ? f.fechamento : m, '');
@@ -1228,7 +1239,7 @@ function aplicarPluggy(d) {
       if (fechamento > ultFech) ultFech = fechamento;
       if (ultVenc && f.vence <= addDia(ultVenc, 7)) continue;   // já importada: a fatura fechada não muda
       const itens = c.transacoes.filter(t => t.fatura === f.id).map(itemPluggy).filter(Boolean);
-      if (itens.length) novas.push({ id: `pluggy|${banco}|${c.id}|${f.vence}`, banco, fechamento, vencimento: f.vence, itens, total: f.total ?? null, origem: 'Open Finance (Pluggy)' });
+      if (itens.length) novas.push({ id: `pluggy|${banco}|${c.id}|${f.vence}`, banco, fechamento, vencimento: f.vence, itens, total: f.total ?? null, origem: 'Open Finance (Pluggy)', ...tudoMeu });
     }
     // fatura em aberto: o que não pertence a nenhuma fatura fechada (pendente no banco ou lançado depois do último fechamento;
     // compras de antes do fechamento podem estar nela, quando você antecipa a virada)
@@ -1238,7 +1249,7 @@ function aplicarPluggy(d) {
       const ja = new Set(S.faturas.filter(f => f.banco === banco && f.aberta).flatMap(f => f.itens.map(i => i.key)));
       if (!abertos.every(x => ja.has(chavePendente(x))))
         novas.push({ id: `pluggy|${banco}|${c.id}|aberta`, banco, aberta: true, itens: abertos, total: null,   // o saldo do cartão é o limite usado (inclui parcelas futuras), não a fatura
-        origem: 'Open Finance (Pluggy), fatura em aberto' });
+        origem: 'Open Finance (Pluggy), fatura em aberto', ...tudoMeu });
     }
   }
   S.faturasPendentes = (S.faturasPendentes || []).filter(p => !String(p.id).startsWith('pluggy|')).concat(novas);
@@ -1321,7 +1332,7 @@ function cardBancos() {
     const meu = /^eu$/i.test(dono);
     const nC = cs.filter(c => c.tipo === 'conta').length, nK = cs.length - nC;
     const qtd = [nC && `${nC} ${nC === 1 ? 'conta' : 'contas'}`, nK && `${nK} ${nK === 1 ? 'cartão' : 'cartões'}`].filter(Boolean).join(' e ');
-    const nota = g && !dono ? 'De quem é? Nada desta conexão entra no app até você escolher.' : !meu ? 'O saldo não entra no seu; cartão só se você ligar.' : '';
+    const nota = g && !dono ? 'De quem é? Nada desta conexão entra no app até você escolher.' : !meu ? 'O saldo não entra no seu. Cartão ligado: as compras dele entram como suas.' : '';
     const escolha = !g ? '' : donoEditando === g
       ? `<input data-of-dono="${esc(g)}" placeholder="Nome da pessoa" aria-label="Nome da pessoa"><button class="btn mini primary" data-of-dono-ok="${esc(g)}">Salvar</button><button class="btn mini" data-of-dono-cancela="1">Cancelar</button>`
       : `<span class="seg">${nomesDono.map(n => `<button class="${n === dono ? 'on' : ''}" data-of-dono-set="${esc(g)}|${esc(n)}">${esc(n)}</button>`).join('')}<button data-of-dono-outra="${esc(g)}">+ Outra pessoa</button></span>`;
@@ -2640,6 +2651,12 @@ function faturaDePendente(pd) {
     return it;
   });
   marcarItens(itens, pd.banco, fechamento);
+  // cartão de outra pessoa que você paga (ex.: o da Kim): toda compra é sua, mesmo de loja que em outro cartão você divide.
+  // Fica como estava o que já foi lançado, o que você marcou "não é meu" numa importação anterior e as assinaturas dos Fixos.
+  if (pd.tudoMeu) itens.forEach(it => {
+    if (it.importado || it.manual || it.prevista || it.fixo || S.faturas.some(f => f.itens.some(x => x.key === it.key))) return;
+    it.escolha = 'meu'; delete it.k; delete it.n; delete it.meu;
+  });
   return { banco: pd.banco, fechamento, vencimento, itens, soma: r2(itens.reduce((a, i) => a + i.valor, 0)), totalFatura: pd.total ?? null, ignorados: 0, futuros: 0,
     revisao: itens.some(i => i.importado), aberta: !!pd.aberta, pendente: pd.id, origem: pd.origem };
 }
