@@ -1184,6 +1184,7 @@ function aplicarPluggy(d) {
     const ts = Math.max(...contas.map(c => Date.parse(c.atualizado || S.bancos.ts) || 0));
     const desde = S.saldoTs || (S.saldoData ? Date.parse(S.saldoData + 'T00:00') : 0);
     if (ts > desde && (Math.abs(soma - S.saldoAtual) >= 0.01 || S.saldoData !== hoje())) { informarSaldo(soma, ts); r.saldo = soma; }
+    else if (ts > desde) { S.saldoTs = ts; S.saldoBanco = true; }   // o banco confirmou o que o app já tinha (você lançou antes de ele atualizar)
   }
   if (r.compras || r.saldo != null) S.ofLog = [{ ts: Date.now(), compras: r.compras, lancadas: r.lancadas, saldo: r.saldo }].concat(S.ofLog || []).slice(0, 10);
   return r;
@@ -1665,6 +1666,30 @@ function repetirLanc(id) {
   toast('Formulário preenchido: confira o valor e a data e toque em Adicionar.');
 }
 
+// ---------- lançamento feito depois do saldo ----------
+// O saldo (do banco ou informado) é uma foto de uma certa hora. Pix, débito ou entrada lançados depois
+// dessa foto, com data de hoje ou anterior, mexem no saldo na hora, sem esperar o banco atualizar.
+// O lançamento fica marcado com a hora da foto (noSaldo) para não ser contado de novo na conferência;
+// quando chega um saldo novo, a foto muda e a marca deixa de valer para desfazer.
+const efeitoLanc = l => (l.tipo === 'receita' ? 1 : -1) * l.valor;
+const noSaldoAgora = l => !!l.noSaldo && l.noSaldo === S.saldoTs;
+function porNoSaldo(l) {
+  if (l.cartao || l.prevista || !S.saldoData || l.data > hoje() || l.data < S.saldoData) return false;
+  if (!S.saldoTs) S.saldoTs = Date.parse(S.saldoData + 'T00:00');
+  S.saldoAtual = r2(S.saldoAtual + efeitoLanc(l));
+  l.noSaldo = S.saldoTs;
+  return true;
+}
+// Tira o efeito do lançamento do saldo (ao excluir ou editar), se ele ainda está na foto atual
+function tirarDoSaldo(l) {
+  if (!noSaldoAgora(l)) return false;
+  S.saldoAtual = r2(S.saldoAtual - efeitoLanc(l));
+  delete l.noSaldo;
+  return true;
+}
+// Quanto do saldo de agora vem de lançamentos feitos depois da última foto
+const lancadoDepois = () => r2(S.lanc.filter(noSaldoAgora).reduce((a, l) => a + efeitoLanc(l), 0));
+
 // ---------- metas de reserva ----------
 // Meta: { id, nome, valor, ate: 'AAAA-MM', inicial }. O que você guarda vira um lançamento marcado com a meta
 // (sai da conta como qualquer Pix), então o total guardado é sempre a soma deles + o que já tinha no começo.
@@ -1878,7 +1903,9 @@ function telaVisao() {
   </div>` : '';
   const dias = S.saldoData ? Math.round((new Date(hoje()) - new Date(S.saldoData)) / 864e5) : null;
   const confPend = (c => !!c && !c.resolvida && Math.abs(c.diff) >= 1)(confViva());
-  const mostraSaldo = saldoAberto || dias === null || dias > 3 || confPend;
+  const bancoAuto = !!pluggy && ofAuto('saldo') && !!S.saldoBanco;   // o banco atualiza o saldo sozinho neste aparelho
+  const mostraSaldo = saldoAberto || dias === null || (dias > 3 && !bancoAuto) || confPend;
+  const depoisFoto = atual ? lancadoDepois() : 0;
   const lv = atual && dias !== null ? livreParaGastar() : null;
   const rotAnt = 'vs ' + nomeMes(mesAnt) + (atual ? ' até o dia ' + +hoje().slice(8) : '');
   const dl = (a, b, ruim) => comparaAnt && b > 0 && Math.abs(a / b - 1) >= 0.005 ? delta(a, b, ruim, rotAnt).replace('class="delta', `title="${rotAnt}" class="delta`) : '';
@@ -1886,8 +1913,10 @@ function telaVisao() {
   const hero = cartaoSel === null ? `
   <div class="hero">
     <div class="hero-ico">${ico('carteira')}</div>
-    ${atual ? `<div class="lbl">Saldo na conta${S.saldoBanco && S.saldoTs ? ` · do banco, ${quandoBanco(S.saldoTs)}` : dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}${olhoBtn}</div>
-    <div class="big-linha"><div class="big">${fmt.format(S.saldoAtual)}</div>${dias !== null && !mostraSaldo ? `<button class="btn mini" data-editar-saldo title="Informar o saldo de hoje: o app compara com o esperado">${ico('lapis')} Atualizar</button>` : ''}</div>` : `<div class="lbl">${futuro ? 'Previsto para' : 'Resultado de'} ${nomeMes(mesSel)}${futuro ? ' · só o que já existe' : ''}${olhoBtn}</div>
+    ${atual ? `<div class="lbl">Saldo na conta${S.saldoBanco && S.saldoTs ? ` · do banco, ${quandoBanco(S.saldoTs)}` : dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}${depoisFoto ? ` · ${depoisFoto < 0 ? '−' : '+'} ${fmt.format(Math.abs(depoisFoto))} lançado depois` : ''}${olhoBtn}</div>
+    <div class="big-linha"><div class="big">${fmt.format(S.saldoAtual)}</div>${dias === null || mostraSaldo ? '' : bancoAuto
+      ? `<button class="btn mini" data-buscar-bancos title="Busca o saldo e as faturas no banco (o Meu Pluggy atualiza uma vez por dia)">${ico('repete')} Buscar no banco</button><button class="olho" data-editar-saldo title="Informar o saldo à mão" aria-label="Informar o saldo à mão">${ico('lapis')}</button>`
+      : `<button class="btn mini" data-editar-saldo title="Informar o saldo de hoje: o app compara com o esperado">${ico('lapis')} Atualizar</button>`}</div>` : `<div class="lbl">${futuro ? 'Previsto para' : 'Resultado de'} ${nomeMes(mesSel)}${futuro ? ' · só o que já existe' : ''}${olhoBtn}</div>
     <div class="big-linha"><div class="big">${fmt.format(t.saldo)}</div></div>`}
     <div class="stats">
       <div class="stat" style="--c:var(--good)">${ico('sobe')}<div><small>${futuro ? 'Vai entrar' : `Entrou ${atual ? 'até hoje' : 'no mês'}`}</small><b>${fmt.format(t.r)}</b>${dl(t.r, tAnt.r, false)}</div></div>
@@ -2840,12 +2869,12 @@ function confViva() {
   const base = evConf(c), ids = new Set(base.filter(e => e.lanc).map(e => e.lanc));
   const ev = base.map(e => { const v = r2(valorAgoraEv(c, e)); return { ...e, valor: v, antes: Math.abs(v - e.valor) >= 0.01 ? e.valor : null }; });
   // lançado depois de informar o saldo, com data dentro do período (Pix, débito, entrada)
-  const depois = S.lanc.filter(l => !l.cartao && !l.naoIdentificado && l.data > c.de && l.data <= c.ate && !ids.has(l.id))
+  const depois = S.lanc.filter(l => !l.cartao && !l.naoIdentificado && !l.noSaldo && l.data > c.de && l.data <= c.ate && !ids.has(l.id))
     .map(l => ({ desc: l.desc, data: l.data, valor: (l.tipo === 'receita' ? 1 : -1) * l.valor }));
   const todos = ev.concat(depois);
   const entradas = r2(todos.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0));
   const saidas = r2(-todos.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0));
-  const esperado = r2(c.anterior + entradas - saidas);
+  const esperado = r2(c.anterior + (c.jaNoSaldo || 0) + entradas - saidas);
   return { ...c, ev, depois, lancadoDepois: r2(depois.reduce((a, e) => a + e.valor, 0)), entradas, saidas, esperado, diff: r2(c.informado - esperado) };
 }
 function valorFatura(c, fech) {
@@ -2883,7 +2912,7 @@ function eventos(ini, fim) {
       if (v) ev.push({ data: venc, desc: `Fatura ${c}`, valor: -v, cartao: c, previa: fech > hoje(), estimado: est, outros: parteOutros(c, fech) });
     }
   }
-  S.lanc.filter(l => !l.cartao && dentro(l.data)).forEach(l => ev.push({ lanc: l.id, data: l.data, desc: l.desc, valor: (l.tipo === 'receita' ? 1 : -1) * l.valor, tag: 'planejado' }));
+  S.lanc.filter(l => !l.cartao && !l.noSaldo && dentro(l.data)).forEach(l => ev.push({ lanc: l.id, data: l.data, desc: l.desc, valor: (l.tipo === 'receita' ? 1 : -1) * l.valor, tag: 'planejado' }));
   return ev.sort((a, b) => a.data.localeCompare(b.data) || b.valor - a.valor);
 }
 // Livre pra gastar: o menor saldo previsto nos próximos 45 dias (contas, salários, faturas com a
@@ -3008,8 +3037,10 @@ function informarSaldo(novo, doBanco) {
     const ev = eventos(base.data, hoje());
     const entradas = r2(ev.filter(e => e.valor > 0).reduce((a, e) => a + e.valor, 0));
     const saidas = r2(-ev.filter(e => e.valor < 0).reduce((a, e) => a + e.valor, 0));
-    const esperado = r2(base.saldo + entradas - saidas);
-    S.conferencia = { de: base.data, ate: hoje(), anterior: base.saldo, entradas, saidas, esperado, informado: novo, diff: r2(novo - esperado),
+    // corrigindo no mesmo dia, a base é o saldo de antes: soma o que foi lançado depois e já estava no saldo
+    const jaNoSaldo = c && c.ate === hoje() ? r2((c.jaNoSaldo || 0) + lancadoDepois()) : 0;
+    const esperado = r2(base.saldo + jaNoSaldo + entradas - saidas);
+    S.conferencia = { de: base.data, ate: hoje(), anterior: base.saldo, ...(jaNoSaldo ? { jaNoSaldo } : {}), entradas, saidas, esperado, informado: novo, diff: r2(novo - esperado),
       ev: ev.map(e => ({ data: e.data, orig: e.orig, desc: e.desc, valor: e.valor, fixo: e.fixo, lanc: e.lanc, cartao: e.cartao })) };
   }
   S.saldoAtual = novo; S.saldoData = hoje();
@@ -3209,7 +3240,7 @@ function campoSaldo() {
   const conf = c && !c.resolvida && Math.abs(c.diff) >= 1 ? `
     <div class="card" style="box-shadow:none;background:var(--surface-2);margin:0 0 12px;padding:14px 16px;border-color:${c.diff < 0 ? 'var(--warn)' : 'var(--border)'}">
       <b>${c.diff < 0 ? '▲' : '●'} ${c.diff < 0 ? 'Saiu' : 'Entrou'} ${fmt.format(Math.abs(c.diff))} sem registro entre ${ddmm(c.de)} e ${ddmm(c.ate)}</b>
-      <div class="hint">Esperado: ${fmt.format(c.anterior)} + ${fmt.format(c.entradas)} de entradas − ${fmt.format(c.saidas)} de saídas previstas = ${fmt.format(c.esperado)}. Você informou ${fmt.format(c.informado)}.${c.ev.some(e => e.antes != null) || c.depois.length ? ' Já considera o que você mudou ou lançou depois de informar o saldo.' : ''}
+      <div class="hint">Esperado: ${fmt.format(c.anterior)}${c.jaNoSaldo ? ` ${c.jaNoSaldo < 0 ? '−' : '+'} ${fmt.format(Math.abs(c.jaNoSaldo))} que você lançou no dia` : ''} + ${fmt.format(c.entradas)} de entradas − ${fmt.format(c.saidas)} de saídas previstas = ${fmt.format(c.esperado)}. Você informou ${fmt.format(c.informado)}.${c.ev.some(e => e.antes != null) || c.depois.length ? ' Já considera o que você mudou ou lançou depois de informar o saldo.' : ''}
         ${c.diff < 0 ? 'Pode ser Pix, débito ou boleto que não está no app, ou algo previsto que veio diferente.' : 'Pode ser uma entrada que não estava cadastrada, ou algo previsto que ainda não saiu.'} Em "Explicar" você diz o que foi e o app corrige a previsão.</div>
       <div class="row" style="margin-top:10px">
         <button class="btn primary" data-conf="explicar">Explicar a diferença</button>
@@ -3218,7 +3249,7 @@ function campoSaldo() {
       </div>
     </div>` : '';
   return `<div class="row" style="align-items:end;margin-bottom:12px">
-    <label style="flex:0 1 220px">Saldo na conta hoje (R$)<input id="saldo" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
+    <label style="flex:0 1 220px">Saldo na conta hoje (R$)<input id="saldo" autocomplete="off" inputmode="decimal" value="${String(S.saldoAtual).replace('.', ',')}"></label>
     ${dias === null || dias > 0 ? `<button class="btn" data-conf-saldo title="O saldo continua o mesmo: só confirma que é o de hoje">✓ Confirmar</button>` : ''}
     <p class="hint" style="flex:1 1 220px;margin:0 0 8px">${dias === null ? 'Informe quanto você tem hoje na conta (somando as contas que usa). O que já entrou e já saiu está nele; daqui para frente o app soma só o que ainda falta.'
       : `Atualizado ${dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias (${ddmm(S.saldoData)})`}.${dias > 3 ? ' <span class="status warn">● Atualize para a agenda e a projeção ficarem certas.</span>' : ''} Ao atualizar, o app compara com o esperado e mostra o que entrou ou saiu sem registro.`}</p>
@@ -3466,6 +3497,7 @@ function salvarEdicao(f, id) {
   const share = meu != null ? meu / total : +f.parte;
   const sinal = l.valor < 0 ? -1 : 1, base = f.desc.trim();
   const alvo = f.todas ? parcelasIrmas(l) : [l];
+  const estavaNoSaldo = tirarDoSaldo(l);   // o saldo acompanha a edição
   for (const x of alvo) {
     Object.assign(x, { tipo: f.tipo, cat: f.cat.trim(), share, valor: sinal * r2(total * share), desc: base + sufixoParcela(x.desc) + rotuloFracao(share) });
     if (f.cartao) x.cartao = f.cartao; else delete x.cartao;
@@ -3475,6 +3507,7 @@ function salvarEdicao(f, id) {
   // a data só muda no lançamento aberto; compra à vista lançada à mão guarda também a data da compra
   if (l.compra && l.compra.data && !(l.compra.N > 1) && l.data !== f.data) l.compra.data = f.data;
   l.data = f.data;
+  if (estavaNoSaldo) porNoSaldo(l);
   document.getElementById('dlg').close();
   salvar();
 }
@@ -4411,9 +4444,15 @@ document.addEventListener('submit', e => {
     if (!/^\d{4}-\d\d-\d\d$/.test(f.data)) return aviso('Informe uma data válida.');
     const nParc = f.cartao && f.tipo === 'despesa' ? +f.parcelas || 1 : 1;
     return comDesfazer(`Adicionado: ${f.desc.trim()} · ${nParc > 1 ? nParc + 'x · ' : ''}${fmt.format(r2(valor * share))}`, () => {
-      const novos = lancsDoForm(f, S.lanc);
+      const novos = lancsDoForm(f, S.lanc), novo = novos[novos.length - 1];
       // mostra o mês em que o lançamento aparece na lista (compra no cartão: o do vencimento da fatura)
       mesSel = mesDoLanc(novos[novos.length - nParc]);
+      if (porNoSaldo(novo)) setTimeout(() => toast(`O saldo ${novo.tipo === 'receita' ? 'subiu' : 'baixou'} ${fmt.format(novo.valor)}: agora ${fmt.format(S.saldoAtual)}.`, { acao: 'Já estava no saldo', ms: 8000, fn: () => {
+        const l = S.lanc.find(x => x.id === novo.id);
+        if (!l || !noSaldoAgora(l)) return;
+        S.saldoAtual = r2(S.saldoAtual - efeitoLanc(l)); l.noSaldo = 1;   // continua fora da conferência: o saldo já contava com ele
+        salvar();
+      } }), 0);
     });
   } else if (e.target.id === 'f-fixo') {
     const valor = num(f.valor); if (valor <= 0) return aviso('Informe um valor maior que zero.');
@@ -4431,13 +4470,13 @@ document.addEventListener('submit', e => {
     if (!(valor > 0)) return aviso('Informe um valor maior que zero.');
     if (!/^\d{4}-\d\d-\d\d$/.test(f.data) || f.data > hoje()) return aviso('A data precisa ser hoje ou antes.');
     document.getElementById('dlg').close();
-    return comDesfazer(`Guardado: ${fmt.format(valor)} para ${mt.nome}`, () => { S.lanc.push({ id: uid(), tipo: 'despesa', data: f.data, desc: 'Reserva: ' + mt.nome, cat: 'Reserva', valor: r2(valor), share: 1, meta: mt.id }); });
+    return comDesfazer(`Guardado: ${fmt.format(valor)} para ${mt.nome}`, () => { const l = { id: uid(), tipo: 'despesa', data: f.data, desc: 'Reserva: ' + mt.nome, cat: 'Reserva', valor: r2(valor), share: 1, meta: mt.id }; S.lanc.push(l); porNoSaldo(l); });
   } else if (e.target.id === 'f-del') {
     const [modo, id] = (e.submitter || e.target.querySelector('button.primary')).value.split('|'), l = S.lanc.find(x => x.id === id);
     document.getElementById('dlg').close();
     if (!l) return;
     const fora = modo === 'todas' ? parcelasIrmas(l) : [l];
-    return comDesfazer(fora.length > 1 ? `${fora.length} parcelas excluídas: ${descBase(l.desc)}` : `Excluído: ${l.desc} · ${fmt.format(Math.abs(l.valor))}`, () => { S.lanc = S.lanc.filter(x => !fora.includes(x)); });
+    return comDesfazer(fora.length > 1 ? `${fora.length} parcelas excluídas: ${descBase(l.desc)}` : `Excluído: ${l.desc} · ${fmt.format(Math.abs(l.valor))}`, () => { fora.forEach(tirarDoSaldo); S.lanc = S.lanc.filter(x => !fora.includes(x)); });
   } else if (e.target.id === 'f-edit') {
     return salvarEdicao(f, e.submitter.value);
   } else if (e.target.id === 'f-oc') {
@@ -4504,7 +4543,7 @@ document.addEventListener('click', e => {
           <button class="btn primary" value="todas|${l.id}">Todas as ${irmas.length}</button>
         </div></form>`;
       dlg.showModal();
-    } else if (l) comDesfazer(`Excluído: ${l.desc} · ${fmt.format(Math.abs(l.valor))}`, () => { S.lanc = S.lanc.filter(x => x !== l); });
+    } else if (l) comDesfazer(`Excluído: ${l.desc} · ${fmt.format(Math.abs(l.valor))}`, () => { tirarDoSaldo(l); S.lanc = S.lanc.filter(x => x !== l); });
     return;
   }
   if (d.pago) {
@@ -4578,6 +4617,11 @@ document.addEventListener('click', e => {
     try { localStorage.setItem('financas.oculto', oculto ? '1' : ''); } catch (err) {}
     document.documentElement.classList.toggle('oculto', oculto); render(); return;
   }
+  if (e.target.closest('[data-buscar-bancos]')) {
+    toast('Buscando nos bancos…', { ms: 2500 });
+    buscarBancos().then(() => { if (pluggyStatus) toast(/nada novo/.test(pluggyStatus) ? 'Nada novo no banco. O Meu Pluggy atualiza uma vez por dia; o que você lançar aqui já entra no saldo.' : pluggyStatus.charAt(0).toUpperCase() + pluggyStatus.slice(1), { ms: 7000 }); });
+    return;
+  }
   if (e.target.closest('[data-editar-saldo]')) { saldoAberto = true; render(); const cs = document.getElementById('saldo'); if (cs) { cs.focus(); cs.select(); } return; }
   if (e.target.closest('[data-pend]')) { pendAberta = !pendAberta; render(); return; }
   const btRep = e.target.closest('[data-rep-lanc]');
@@ -4586,7 +4630,7 @@ document.addEventListener('click', e => {
   const ja = e.target.closest('[data-ja-lanc]');
   if (ja) {
     const l = S.lanc.find(x => x.id === ja.dataset.jaLanc);
-    if (l && l.data > hoje()) { l.previstoPara = l.previstoPara || l.data; l.data = hoje(); salvar(); }
+    if (l && l.data > hoje()) { l.previstoPara = l.previstoPara || l.data; l.data = hoje(); porNoSaldo(l); salvar(); }
     return;
   }
   const oc = e.target.closest('[data-oc]');
