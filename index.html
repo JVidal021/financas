@@ -2096,7 +2096,7 @@ function telaVisao() {
       <div class="ev-txt"><b title="${esc(i.desc + (i.obs ? ' · ' + i.obs : ''))}">${esc(i.desc)}</b>${i.obs ? `<span class="obs">${esc(i.obs)}</span>` : ''}<small>${ddmm(i.quando)} ${DIAS_SEM[new Date(i.quando + 'T12:00').getDay()]} · ${esc(i.cat)}${i.cartao ? ' · ' + esc(nomeCartao(i.cartao)) : ''}${i.parcInfo ? ` · ${i.parcInfo.N}x` : ''}</small></div>
       <div class="ev-val"><b class="${i.tipo === 'receita' ? 'pos' : ''}">${i.tipo === 'receita' ? '+' : '−'} ${fmt.format(i.valor)}</b></div></div>`; }).join('')}</div>` : '<div class="empty">Nada neste mês ainda.</div>'}
   </div>`;
-  return `${chipsCartao()}${hero}${cartaoSel === null ? telaPendencias() : ''}${cartaoSel === null && !atual && !futuro ? cardFechamento(mesSel) : ''}${atual && cartaoSel === null ? linkFechamento() + cardDestaques() + cardSemana() : ''}${atual && cartaoSel === null ? cardBancosAgora() : ''}${kpis}${cardResto}
+  return `${chipsCartao()}${hero}${atual && cartaoSel === null ? cardBancosAgora() : ''}${cartaoSel === null ? telaPendencias() : ''}${cartaoSel === null && !atual && !futuro ? cardFechamento(mesSel) : ''}${atual && cartaoSel === null ? linkFechamento() + cardDestaques() + cardSemana() : ''}${kpis}${cardResto}
   <div class="g21">${cardCats}${cardCartoes || cardUltimas}</div>
   <div class="g21">${cardHist}${cardCartoes ? cardUltimas : ''}</div>
   <div class="card"><h2>${ico('lista')} Movimentações de ${nomeMes(mesSel)} <span class="sub">· ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}${atual && !viaFatura ? ' até hoje' : ''}</span></h2>${tabelaItens(itens, true)}</div>
