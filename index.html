@@ -1001,10 +1001,17 @@ function novoEstado() {
   return { saldoAtual: 0, lanc: [], fixos: [], orc: {}, cats: CATS_PADRAO.slice(), ajuste: 0, horizonte: 12, regras: {}, faturas: [], faturasPendentes: [], diasFechamento: {}, diasVencimento: {}, cartaoDiaUtil: {}, infoFatura: {}, melhorDia: {}, viradaAntecipada: {} };
 }
 // Ajusta dados salvos por versões antigas do app.
+let limpouParcelas = 0;   // normalizar tirou parcelas repetidas: grava (e manda para a nuvem) ao terminar de abrir
 function normalizar(d) {
   const s = Object.assign(novoEstado(), d);
   // a primeira versão do importador só lia Santander e não gravava o cartão
   s.lanc.forEach(l => { if (l.origem === 'fatura' && !l.cartao) l.cartao = 'Santander'; });
+  limpouParcelas += limparParcelasDuplicadas(s);
+  return s;
+}
+// Parcelas previstas repetidas. Devolve quantas saíram (ao abrir o app, grava se tirou alguma).
+function limparParcelasDuplicadas(s) {
+  const n0 = s.lanc.length;
   // parcela prevista que já chegou numa fatura com centavos diferentes: fica só a da fatura
   const reais = s.lanc.filter(l => l.parcela && !l.prevista && l.key);
   s.lanc = s.lanc.filter(l => !(l.prevista && l.key && reais.some(r => mesmaParcela(l, r))));
@@ -1012,7 +1019,7 @@ function normalizar(d) {
   const ficam = [];
   for (const l of s.lanc.filter(l => l.prevista && l.key).sort((a, b) => b.data.localeCompare(a.data))) if (!ficam.some(r => mesmaParcela(l, r))) ficam.push(l);
   s.lanc = s.lanc.filter(l => !(l.prevista && l.key) || ficam.includes(l));
-  return s;
+  return n0 - s.lanc.length;
 }
 // Mesma parcela da mesma compra: mesmo cartão, descrição, número/total de parcelas e valor até R$ 1 de diferença.
 // A chave é "descrição|valor|data|total|número".
@@ -5001,7 +5008,7 @@ window.addEventListener('resize', () => {
   larguraAnt = innerWidth; clearTimeout(rz); rz = setTimeout(desenharGraficos, 150);
 });
 // ao voltar para o app (ex.: depois de usar no celular), busca o que mudou
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) Promise.resolve(puxar()).finally(() => { try { reprocessarFilaPluggy(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); }); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !timerEnvio) Promise.resolve(puxar()).finally(() => { try { if (limparParcelasDuplicadas(S) + limpouParcelas) { limpouParcelas = 0; salvar(); } reprocessarFilaPluggy(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); }); });
 window.addEventListener('beforeunload', e => { if (timerEnvio) { enviar(); e.preventDefault(); } });
 
 function exemplo() {
@@ -5031,7 +5038,7 @@ function exemplo() {
 
 render();
 // depois de sincronizar, busca nos bancos (se a última busca tem mais de 4 h)
-Promise.resolve(puxar()).finally(() => { try { reprocessarFilaPluggy(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); });
+Promise.resolve(puxar()).finally(() => { try { if (limparParcelasDuplicadas(S) + limpouParcelas) { limpouParcelas = 0; salvar(); } reprocessarFilaPluggy(); } catch (e) { console.error(e); } if (bancosVelhos()) buscarBancos(); });
 </script>
 </body>
 </html>
