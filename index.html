@@ -1263,7 +1263,7 @@ function cardBancos() {
   const STATUS = { UPDATED: 'atualizada', UPDATING: 'ainda sincronizando com o banco', LOGIN_ERROR: 'o banco pede para conectar de novo', OUTDATED: 'desatualizada (o banco não respondeu)', WAITING_USER_INPUT: 'esperando a pessoa autorizar no banco', CREATED: 'criada, ainda não sincronizou' };
   const probs = ((S.bancos || {}).conexoes || []).filter(x => x.erro || !x.contas || (x.status && x.status !== 'UPDATED'));
   const cxHtml = probs.length ? `<div class="hint" style="margin:8px 0;padding:8px 10px;border-radius:8px;background:rgba(192,57,43,.08)"><b>Conexões com problema</b>${probs.map(x => `<div style="margin-top:4px">• <code>${esc(String(x.itemId).slice(0, 8))}…</code>${x.conector ? ` (${esc(x.conector)})` : ''}: ${
-      x.erro && /404|not found|não encontrad/i.test(x.erro) ? 'ID não encontrado na Pluggy. Confira se copiou o ID da conexão (item) da sua aplicação no Dashboard' :
+      x.erro && /404|not found|não encontrad/i.test(x.erro) ? `ID não encontrado na Pluggy. Confira se copiou o ID da conexão (item) da sua aplicação no Dashboard<div style="margin-top:2px;opacity:.75;font-size:12px;word-break:break-word">resposta da Pluggy: ${esc(x.erro.replace(/\/items\/[0-9a-f-]{8,}/i, '/items/…'))}</div>` :
       x.erro ? esc(x.erro) : x.status && x.status !== 'UPDATED' ? esc(STATUS[x.status] || x.status) : 'nenhuma conta veio. A conexão existe, mas o banco ainda não mandou dados (tente de novo mais tarde)'}${x.contas ? ` · ${x.contas} ${x.contas === 1 ? 'conta' : 'contas'}` : ''}</div>`).join('')}</div>` : '';
   return `
   <div class="card"><h2>Bancos (Open Finance)</h2>
