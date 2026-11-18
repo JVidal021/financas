@@ -854,6 +854,29 @@ td .sim-dif { display: block; font-size: 12px; font-weight: 600; }
   .meta-info { flex-direction: column; align-items: stretch; gap: 8px; }
   .meta-acoes { justify-content: flex-end; }
   .hero .big-linha { margin-bottom: 14px; }
+  /* card de saldo no celular: texto não passa por baixo do ícone; botões ficam juntos na mesma linha */
+  .hero { padding: 18px; }
+  .hero .lbl { padding-right: 46px; line-height: 1.35; }
+  .hero .big-linha { flex-wrap: wrap; gap: 6px 10px; }
+  .hero .saldo-acoes { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+  .hero .saldo-acoes .btn.mini { white-space: nowrap; }
+  .hero .saldo-acoes .olho { margin-left: 0; }
+  .so-largo { display: none; }
+  /* mini-cards: ícone e rótulo em cima, valor alinhado embaixo */
+  .hero .stats { gap: 8px; }
+  .hero .stat { display: grid; grid-template-columns: 24px minmax(0, 1fr); grid-template-rows: 1fr auto; column-gap: 8px; row-gap: 4px; align-items: start; padding: 10px 12px; }
+  .hero .stat > svg.i { width: 24px; height: 24px; padding: 5px; border-radius: 8px; grid-column: 1; grid-row: 1; }
+  .hero .stat > div { display: contents; }
+  .hero .stat > div > small:first-child { grid-column: 2; grid-row: 1; align-self: center; line-height: 1.25; font-size: 11.5px; }
+  .hero .stat b { grid-column: 1 / -1; grid-row: 2; align-self: end; font-size: 15.5px; line-height: 1.2; white-space: nowrap; }
+  .hero .stat .delta { grid-column: 1 / -1; margin: 0; justify-self: start; }
+  .hero .stat b ~ small { grid-column: 1 / -1; font-size: 11px; }
+  /* rolagem mais leve no iPhone: fundo desfocado num layer próprio, topo sem blur ao vivo */
+  #fundo-vidro { transform: translateZ(0); contain: strict; }
+  .topo::before { backdrop-filter: none; -webkit-backdrop-filter: none; background: hsl(var(--th) var(--tinta) 9% / .94); }
+  :root:not([data-theme="dark"]) .topo::before { background: hsl(var(--th) var(--tinta) 99% / .94); }
+  nav { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transform: translateZ(0); }
+  main { padding-bottom: calc(116px + env(safe-area-inset-bottom)); }
   .tiles > .tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .pend-resumo .sub { display: none; }
   .pend-resumo b { flex: 1; }
@@ -2252,7 +2275,7 @@ function telaVisao() {
     <div class="hero-ico">${ico('carteira')}</div>
     ${atual ? `<div class="lbl">Saldo na conta${S.saldoBanco && S.saldoTs ? ` · do banco, ${quandoBanco(S.saldoTs)}${(n => n ? ` (${n})` : '')(notaSaldoBanco(((S.bancos || {}).contas || []).filter(contaNoSaldo)))}` :dias === null ? '' : dias === 0 ? ' · hoje' : ` · informado ${dias === 1 ? 'ontem' : `há ${dias} dias`}`}${depoisFoto ? ` · ${depoisFoto < 0 ? '−' : '+'} ${fmt.format(Math.abs(depoisFoto))} lançado depois` : ''}${olhoBtn}</div>
     <div class="big-linha"><div class="big">${fmt.format(S.saldoAtual)}</div>${dias === null || mostraSaldo ? '' : bancoAuto
-      ? `<button class="btn mini" data-buscar-bancos title="Busca o saldo e as faturas no banco (o Meu Pluggy atualiza uma vez por dia)">${ico('repete')} Buscar no banco</button><button class="olho" data-editar-saldo title="Informar o saldo à mão" aria-label="Informar o saldo à mão">${ico('lapis')}</button>`
+      ? `<span class="saldo-acoes"><button class="btn mini" data-buscar-bancos title="Busca o saldo e as faturas no banco (o Meu Pluggy atualiza uma vez por dia)">${ico('repete')} Buscar<span class="so-largo"> no banco</span></button><button class="olho" data-editar-saldo title="Informar o saldo à mão" aria-label="Informar o saldo à mão">${ico('lapis')}</button></span>`
       : `<button class="btn mini" data-editar-saldo title="Informar o saldo de hoje: o app compara com o esperado">${ico('lapis')} Atualizar</button>`}</div>` : `<div class="lbl">${futuro ? 'Previsto para' : 'Resultado de'} ${nomeMes(mesSel)}${futuro ? ' · só o que já existe' : ''}${olhoBtn}</div>
     <div class="big-linha"><div class="big">${fmt.format(t.saldo)}</div></div>`}
     <div class="stats">
