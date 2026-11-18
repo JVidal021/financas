@@ -875,7 +875,8 @@ td .sim-dif { display: block; font-size: 12px; font-weight: 600; }
   #fundo-vidro { transform: translateZ(0); contain: strict; }
   .topo::before { backdrop-filter: none; -webkit-backdrop-filter: none; background: hsl(var(--th) var(--tinta) 9% / .94); }
   :root:not([data-theme="dark"]) .topo::before { background: hsl(var(--th) var(--tinta) 99% / .94); }
-  nav { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transform: translateZ(0); }
+  nav { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transform: translateZ(0);
+    bottom: max(10px, calc(env(safe-area-inset-bottom) - 12px)); }
   main { padding-bottom: calc(116px + env(safe-area-inset-bottom)); }
   .tiles > .tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .pend-resumo .sub { display: none; }
